@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -46,8 +48,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SearchFilterBar, EmptyState } from '@/components/common/PageComponents';
+import { termoEncerramentoSchema, type TermoEncerramentoFormData } from '@/lib/validations';
 import type { TermoEncerramento, TermoEncerramentoCusto } from '@/types';
 
 // Mock data
@@ -90,13 +101,16 @@ export default function TermoEncerramentoPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<typeof mockTermos[0] | null>(null);
-
-  // Form state
-  const [formData, setFormData] = useState({
-    demandaTecnicaId: '',
-    resultadoEntregue: '',
-  });
   const [custos, setCustos] = useState<CustoForm[]>([]);
+  const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
+
+  const form = useForm<TermoEncerramentoFormData>({
+    resolver: zodResolver(termoEncerramentoSchema),
+    defaultValues: {
+      demandaTecnicaId: '',
+      resultadoEntregue: '',
+    },
+  });
 
   const filteredTermos = termos.filter((termo) => {
     const demanda = mockDemandas.find(d => d.id === termo.demandaTecnicaId);
@@ -126,14 +140,15 @@ export default function TermoEncerramentoPage() {
 
   const handleAdd = () => {
     setSelectedTermo(null);
-    setFormData({ demandaTecnicaId: '', resultadoEntregue: '' });
+    form.reset({ demandaTecnicaId: '', resultadoEntregue: '' });
     setCustos([]);
+    setCustoErrors({});
     setIsFormOpen(true);
   };
 
   const handleEdit = (termo: typeof mockTermos[0]) => {
     setSelectedTermo(termo);
-    setFormData({
+    form.reset({
       demandaTecnicaId: String(termo.demandaTecnicaId),
       resultadoEntregue: termo.resultadoEntregue,
     });
@@ -142,6 +157,7 @@ export default function TermoEncerramentoPage() {
       qtdeHora: String(c.qtdeHora),
       valorHora: String(c.valorHora),
     })));
+    setCustoErrors({});
     setIsFormOpen(true);
   };
 
@@ -164,15 +180,38 @@ export default function TermoEncerramentoPage() {
 
   const handleRemoveCusto = (index: number) => {
     setCustos(custos.filter((_, i) => i !== index));
+    const newErrors = { ...custoErrors };
+    delete newErrors[index];
+    setCustoErrors(newErrors);
   };
 
   const handleCustoChange = (index: number, field: keyof CustoForm, value: string) => {
     setCustos(custos.map((c, i) => 
       i === index ? { ...c, [field]: value } : c
     ));
+    if (custoErrors[index]) {
+      const newErrors = { ...custoErrors };
+      delete newErrors[index];
+      setCustoErrors(newErrors);
+    }
   };
 
-  const handleSave = () => {
+  const validateCustos = (): boolean => {
+    const errors: Record<number, string> = {};
+    custos.forEach((custo, index) => {
+      if (!custo.perfilId || !custo.qtdeHora || !custo.valorHora) {
+        errors[index] = 'Preencha todos os campos do custo';
+      } else if (Number(custo.qtdeHora) <= 0 || Number(custo.valorHora) <= 0) {
+        errors[index] = 'Valores devem ser maiores que zero';
+      }
+    });
+    setCustoErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const onSubmit = (data: TermoEncerramentoFormData) => {
+    if (!validateCustos()) return;
+
     const custosFormatted = custos
       .filter(c => c.perfilId && c.qtdeHora && c.valorHora)
       .map((c, index) => ({
@@ -188,8 +227,8 @@ export default function TermoEncerramentoPage() {
         t.id === selectedTermo.id 
           ? { 
               ...t, 
-              demandaTecnicaId: Number(formData.demandaTecnicaId),
-              resultadoEntregue: formData.resultadoEntregue,
+              demandaTecnicaId: Number(data.demandaTecnicaId),
+              resultadoEntregue: data.resultadoEntregue,
               custos: custosFormatted,
             }
           : t
@@ -197,8 +236,8 @@ export default function TermoEncerramentoPage() {
     } else {
       const newTermo = {
         id: Math.max(...termos.map(t => t.id), 0) + 1,
-        demandaTecnicaId: Number(formData.demandaTecnicaId),
-        resultadoEntregue: formData.resultadoEntregue,
+        demandaTecnicaId: Number(data.demandaTecnicaId),
+        resultadoEntregue: data.resultadoEntregue,
         dataTermo: new Date().toISOString(),
         usuarioId: 1,
         dataAssinatura: null,
@@ -207,6 +246,7 @@ export default function TermoEncerramentoPage() {
       setTermos([...termos, newTermo]);
     }
     setIsFormOpen(false);
+    form.reset();
   };
 
   const handleConfirmDelete = () => {
@@ -215,8 +255,6 @@ export default function TermoEncerramentoPage() {
     }
     setIsDeleteOpen(false);
   };
-
-  const isFormValid = formData.demandaTecnicaId && formData.resultadoEntregue;
 
   return (
     <div className="space-y-6">
@@ -326,118 +364,143 @@ export default function TermoEncerramentoPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>{t('closingTerm.demand')} *</Label>
-              <Select 
-                value={formData.demandaTecnicaId} 
-                onValueChange={(value) => setFormData({ ...formData, demandaTecnicaId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma demanda" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockDemandas.map((demanda) => (
-                    <SelectItem key={demanda.id} value={String(demanda.id)}>
-                      {demanda.codigo} - {demanda.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label>{t('closingTerm.deliveredResult')} *</Label>
-              <Textarea
-                value={formData.resultadoEntregue}
-                onChange={(e) => setFormData({ ...formData, resultadoEntregue: e.target.value })}
-                placeholder="Descreva os resultados entregues..."
-                rows={6}
-              />
-            </div>
-
-            {/* Custos Realizados */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{t('closingTerm.costs')}</CardTitle>
-                  <Button variant="outline" size="sm" onClick={handleAddCusto}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    {t('closingTerm.addCost')}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {custos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Nenhum custo adicionado
-                  </p>
-                ) : (
-                  custos.map((custo, index) => (
-                    <div key={index} className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
-                      <div className="flex-1 grid grid-cols-3 gap-2">
-                        <div>
-                          <Label className="text-xs">{t('closingTerm.profile')}</Label>
-                          <Select 
-                            value={custo.perfilId} 
-                            onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
-                          >
-                            <SelectTrigger className="h-8">
-                              <SelectValue placeholder="Perfil" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {mockPerfis.map((perfil) => (
-                                <SelectItem key={perfil.id} value={String(perfil.id)}>
-                                  {perfil.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">{t('closingTerm.hours')}</Label>
-                          <Input
-                            type="number"
-                            className="h-8"
-                            value={custo.qtdeHora}
-                            onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
-                            placeholder="Horas"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs">{t('closingTerm.hourlyRate')}</Label>
-                          <Input
-                            type="number"
-                            className="h-8"
-                            value={custo.valorHora}
-                            onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
-                            placeholder="R$ 0,00"
-                          />
-                        </div>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => handleRemoveCusto(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="demandaTecnicaId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('closingTerm.demand')} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma demanda" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {mockDemandas.map((demanda) => (
+                          <SelectItem key={demanda.id} value={String(demanda.id)}>
+                            {demanda.codigo} - {demanda.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFormOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSave} disabled={!isFormValid}>
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
+              />
+              
+              <FormField
+                control={form.control}
+                name="resultadoEntregue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('closingTerm.deliveredResult')} *</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Descreva os resultados entregues..."
+                        rows={6}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Custos Realizados */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{t('closingTerm.costs')}</CardTitle>
+                    <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      {t('closingTerm.addCost')}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {custos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nenhum custo adicionado
+                    </p>
+                  ) : (
+                    custos.map((custo, index) => (
+                      <div key={index} className="space-y-2">
+                        <div className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
+                          <div className="flex-1 grid grid-cols-3 gap-2">
+                            <div>
+                              <Label className="text-xs">{t('closingTerm.profile')}</Label>
+                              <Select 
+                                value={custo.perfilId} 
+                                onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue placeholder="Perfil" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {mockPerfis.map((perfil) => (
+                                    <SelectItem key={perfil.id} value={String(perfil.id)}>
+                                      {perfil.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">{t('closingTerm.hours')}</Label>
+                              <Input
+                                type="number"
+                                className="h-8"
+                                value={custo.qtdeHora}
+                                onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
+                                placeholder="Horas"
+                                min="1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">{t('closingTerm.hourlyRate')}</Label>
+                              <Input
+                                type="number"
+                                className="h-8"
+                                value={custo.valorHora}
+                                onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
+                                placeholder="R$ 0,00"
+                                min="0.01"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleRemoveCusto(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {custoErrors[index] && (
+                          <p className="text-sm text-destructive px-3">{custoErrors[index]}</p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit">
+                  {t('common.save')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
