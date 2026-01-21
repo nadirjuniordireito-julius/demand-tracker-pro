@@ -16,6 +16,7 @@ import DemandasPage from "./pages/demandas/DemandasPage";
 import TermoAberturaPage from "./pages/demandas/TermoAberturaPage";
 import TermoPlanejamentoPage from "./pages/demandas/TermoPlanejamentoPage";
 import TermoEncerramentoPage from "./pages/demandas/TermoEncerramentoPage";
+import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
               <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
               <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
+              <Route path="/perfil" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

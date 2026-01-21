@@ -275,5 +275,28 @@
     "delete": "Excluir mensagem",
     "unread": "Não lidas",
     "all": "Todas"
+  },
+  "profile": {
+    "title": "Meu Perfil",
+    "description": "Gerencie suas informações pessoais e configurações de segurança",
+    "personalData": "Dados Pessoais",
+    "changePassword": "Alterar Senha",
+    "userProfile": "Perfil de Acesso",
+    "namePlaceholder": "Digite seu nome completo",
+    "emailPlaceholder": "Digite seu e-mail",
+    "currentPassword": "Senha Atual",
+    "currentPasswordPlaceholder": "Digite sua senha atual",
+    "newPassword": "Nova Senha",
+    "newPasswordPlaceholder": "Digite a nova senha",
+    "confirmPassword": "Confirmar Nova Senha",
+    "confirmPasswordPlaceholder": "Confirme a nova senha",
+    "updatePassword": "Alterar Senha",
+    "updateSuccess": "Sucesso",
+    "profileUpdated": "Dados pessoais atualizados com sucesso",
+    "updateError": "Erro ao atualizar dados pessoais",
+    "passwordSuccess": "Sucesso",
+    "passwordUpdated": "Senha alterada com sucesso",
+    "passwordError": "Erro ao alterar senha",
+    "passwordMismatch": "As senhas não coincidem"
   }
 }

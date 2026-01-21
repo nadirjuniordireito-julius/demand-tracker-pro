@@ -208,7 +208,7 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
               <p className="text-sm font-medium">{user?.nome}</p>
               <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/perfil')}>
               <User className="h-4 w-4 mr-2" />
               {t('header.profile')}
             </DropdownMenuItem>
