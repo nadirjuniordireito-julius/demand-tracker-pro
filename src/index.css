@@ -2,95 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* 
+ * Design System Corporativo - Cinza/Grafite
+ * Sistema de Demandas Técnicas
+ * All colors MUST be HSL.
+ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Cores principais - Tema Cinza/Grafite Corporativo */
+    --background: 0 0% 98%;
+    --foreground: 220 13% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 13% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 13% 18%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Grafite escuro */
+    --primary: 220 13% 26%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Cinza médio */
+    --secondary: 220 9% 94%;
+    --secondary-foreground: 220 13% 26%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Cinza suave para backgrounds */
+    --muted: 220 9% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Azul corporativo sutil */
+    --accent: 214 32% 91%;
+    --accent-foreground: 220 13% 26%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive - Vermelho para erros */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Success - Verde para sucesso */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
 
-    --radius: 0.5rem;
+    /* Warning - Amarelo para alertas */
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 13% 18%;
 
-    --sidebar-background: 0 0% 98%;
+    /* Info - Azul para informação */
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 98%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Borders e inputs */
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 220 13% 26%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --radius: 0.375rem;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Sidebar */
+    --sidebar-background: 220 13% 18%;
+    --sidebar-foreground: 220 9% 85%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 220 13% 18%;
+    --sidebar-accent: 220 13% 24%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 13% 26%;
+    --sidebar-ring: 214 32% 60%;
+    --sidebar-muted: 220 9% 46%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    /* Header */
+    --header-background: 0 0% 100%;
+    --header-foreground: 220 13% 18%;
+    --header-border: 220 13% 90%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    /* Footer */
+    --footer-background: 220 13% 96%;
+    --footer-foreground: 220 9% 46%;
+    --footer-border: 220 13% 90%;
 
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Table */
+    --table-header: 220 9% 96%;
+    --table-row-hover: 220 9% 98%;
+    --table-border: 220 13% 91%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 220 13% 10%;
+    --foreground: 220 9% 94%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 13% 13%;
+    --card-foreground: 220 9% 94%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 13% 13%;
+    --popover-foreground: 220 9% 94%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 220 9% 85%;
+    --primary-foreground: 220 13% 13%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 13% 20%;
+    --secondary-foreground: 220 9% 94%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 13% 18%;
+    --muted-foreground: 220 9% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 220 13% 22%;
+    --accent-foreground: 220 9% 94%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --success: 142 71% 40%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 92% 45%;
+    --warning-foreground: 220 13% 10%;
+
+    --info: 199 89% 42%;
+    --info-foreground: 0 0% 98%;
+
+    --border: 220 13% 24%;
+    --input: 220 13% 24%;
+    --ring: 220 9% 60%;
+
+    --sidebar-background: 220 13% 8%;
+    --sidebar-foreground: 220 9% 85%;
+    --sidebar-primary: 220 9% 94%;
+    --sidebar-primary-foreground: 220 13% 10%;
+    --sidebar-accent: 220 13% 16%;
+    --sidebar-accent-foreground: 220 9% 94%;
+    --sidebar-border: 220 13% 18%;
+    --sidebar-ring: 214 32% 50%;
+    --sidebar-muted: 220 9% 50%;
+
+    --header-background: 220 13% 10%;
+    --header-foreground: 220 9% 94%;
+    --header-border: 220 13% 20%;
+
+    --footer-background: 220 13% 8%;
+    --footer-foreground: 220 9% 60%;
+    --footer-border: 220 13% 18%;
+
+    --table-header: 220 13% 16%;
+    --table-row-hover: 220 13% 14%;
+    --table-border: 220 13% 22%;
   }
 }
 
@@ -100,6 +154,126 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Form elements */
+  input, textarea, select {
+    @apply transition-colors duration-200;
+  }
+
+  /* Focus states */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+  }
+}
+
+@layer components {
+  /* Card corporativo */
+  .card-corporate {
+    @apply bg-card border border-border rounded-md shadow-sm;
+  }
+
+  /* Botão corporativo */
+  .btn-corporate {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 
+           bg-primary text-primary-foreground rounded-md
+           font-medium text-sm
+           transition-all duration-200
+           hover:bg-primary/90
+           focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* Input corporativo */
+  .input-corporate {
+    @apply flex h-10 w-full rounded-md border border-input 
+           bg-background px-3 py-2 text-sm
+           placeholder:text-muted-foreground
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+           disabled:cursor-not-allowed disabled:opacity-50
+           transition-colors duration-200;
+  }
+
+  /* Table corporativo */
+  .table-corporate {
+    @apply w-full text-sm;
+  }
+
+  .table-corporate th {
+    @apply bg-table-header px-4 py-3 text-left font-medium text-foreground border-b border-table-border;
+  }
+
+  .table-corporate td {
+    @apply px-4 py-3 border-b border-table-border;
+  }
+
+  .table-corporate tr:hover {
+    @apply bg-table-row-hover;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 }
