@@ -298,5 +298,17 @@
     "passwordUpdated": "Password changed successfully",
     "passwordError": "Error changing password",
     "passwordMismatch": "Passwords do not match"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage system settings",
+    "appearance": "Appearance",
+    "appearanceDescription": "Customize the system interface appearance",
+    "lightMode": "Light Mode",
+    "lightModeDescription": "Ideal for well-lit environments",
+    "darkMode": "Dark Mode",
+    "darkModeDescription": "Reduces eye strain in dark environments",
+    "systemMode": "Automatic",
+    "systemModeDescription": "Follows your operating system preferences"
   }
 }

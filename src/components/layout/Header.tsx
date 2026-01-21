@@ -212,7 +212,7 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
               <User className="h-4 w-4 mr-2" />
               {t('header.profile')}
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
               <Settings className="h-4 w-4 mr-2" />
               {t('header.settings')}
             </DropdownMenuItem>

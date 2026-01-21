@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout";
@@ -17,17 +18,19 @@ import TermoAberturaPage from "./pages/demandas/TermoAberturaPage";
 import TermoPlanejamentoPage from "./pages/demandas/TermoPlanejamentoPage";
 import TermoEncerramentoPage from "./pages/demandas/TermoEncerramentoPage";
 import ProfilePage from "./pages/ProfilePage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
@@ -47,12 +50,14 @@ const App = () => (
               <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
               <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
+              <Route path="/configuracoes" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
