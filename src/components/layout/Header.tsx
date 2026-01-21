@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { 
   Menu, 
   Bell, 
@@ -19,7 +20,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LANGUAGES, changeLanguage, type LanguageCode } from '@/i18n';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -28,6 +31,8 @@ interface HeaderProps {
 
 export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [notificationCount] = useState(3);
   const [messageCount] = useState(5);
 
@@ -35,6 +40,31 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
 
   const handleLanguageChange = (code: LanguageCode) => {
     changeLanguage(code);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const getUserInitials = () => {
+    if (!user?.nome) return 'U';
+    const names = user.nome.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    return names[0][0].toUpperCase();
+  };
+
+  const getProfileLabel = () => {
+    if (!user?.perfil) return '';
+    const profiles: Record<string, string> = {
+      ADMIN: t('users.profileAdmin'),
+      MANAGER: t('users.profileManager'),
+      ANALYST: t('users.profileAnalyst'),
+      USER: t('users.profileUser'),
+    };
+    return profiles[user.perfil] || user.perfil;
   };
 
   return (
@@ -155,16 +185,29 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
             <Button 
               variant="ghost" 
               size="sm"
-              className="text-header-foreground hover:bg-muted gap-2"
+              className="text-header-foreground hover:bg-muted gap-2 pl-1"
             >
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                <User className="h-4 w-4 text-primary-foreground" />
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+                  {getUserInitials()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden md:flex flex-col items-start text-left">
+                <span className="text-sm font-medium leading-tight">
+                  {user?.nome || 'Usuário'}
+                </span>
+                <span className="text-xs text-muted-foreground leading-tight">
+                  {getProfileLabel()}
+                </span>
               </div>
-              <span className="hidden md:inline">Admin</span>
-              <ChevronDown className="h-3 w-3" />
+              <ChevronDown className="h-3 w-3 hidden md:block" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-56">
+            <div className="px-2 py-1.5 border-b mb-1">
+              <p className="text-sm font-medium">{user?.nome}</p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            </div>
             <DropdownMenuItem>
               <User className="h-4 w-4 mr-2" />
               {t('header.profile')}
@@ -174,7 +217,10 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
               {t('header.settings')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem 
+              className="text-destructive focus:text-destructive"
+              onClick={handleLogout}
+            >
               <LogOut className="h-4 w-4 mr-2" />
               {t('header.logout')}
             </DropdownMenuItem>

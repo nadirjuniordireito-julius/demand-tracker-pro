@@ -18,6 +18,7 @@ export type DemandStatus = 'opened' | 'inPlanning' | 'inExecution' | 'closed';
 export interface Usuario {
   id: number;
   nome: string;
+  email?: string;
   password?: string; // Opcional no retorno da API
   perfil: UserProfile;
   status: UserStatus;
