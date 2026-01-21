@@ -43,6 +43,15 @@
     "createdAt": "Criado em",
     "updatedAt": "Atualizado em"
   },
+  "pagination": {
+    "showing": "Exibindo",
+    "of": "de",
+    "perPage": "Por página",
+    "first": "Primeira",
+    "last": "Última",
+    "next": "Próxima",
+    "previous": "Anterior"
+  },
   "nav": {
     "home": "Início",
     "dashboard": "Dashboard",
