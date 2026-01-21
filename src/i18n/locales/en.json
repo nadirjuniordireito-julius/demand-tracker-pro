@@ -275,5 +275,28 @@
     "delete": "Delete message",
     "unread": "Unread",
     "all": "All"
+  },
+  "profile": {
+    "title": "My Profile",
+    "description": "Manage your personal information and security settings",
+    "personalData": "Personal Data",
+    "changePassword": "Change Password",
+    "userProfile": "Access Profile",
+    "namePlaceholder": "Enter your full name",
+    "emailPlaceholder": "Enter your email",
+    "currentPassword": "Current Password",
+    "currentPasswordPlaceholder": "Enter your current password",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Enter your new password",
+    "confirmPassword": "Confirm New Password",
+    "confirmPasswordPlaceholder": "Confirm your new password",
+    "updatePassword": "Change Password",
+    "updateSuccess": "Success",
+    "profileUpdated": "Personal data updated successfully",
+    "updateError": "Error updating personal data",
+    "passwordSuccess": "Success",
+    "passwordUpdated": "Password changed successfully",
+    "passwordError": "Error changing password",
+    "passwordMismatch": "Passwords do not match"
   }
 }

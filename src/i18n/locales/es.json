@@ -275,5 +275,28 @@
     "delete": "Eliminar mensaje",
     "unread": "No leídos",
     "all": "Todos"
+  },
+  "profile": {
+    "title": "Mi Perfil",
+    "description": "Gestiona tu información personal y configuraciones de seguridad",
+    "personalData": "Datos Personales",
+    "changePassword": "Cambiar Contraseña",
+    "userProfile": "Perfil de Acceso",
+    "namePlaceholder": "Ingresa tu nombre completo",
+    "emailPlaceholder": "Ingresa tu correo electrónico",
+    "currentPassword": "Contraseña Actual",
+    "currentPasswordPlaceholder": "Ingresa tu contraseña actual",
+    "newPassword": "Nueva Contraseña",
+    "newPasswordPlaceholder": "Ingresa tu nueva contraseña",
+    "confirmPassword": "Confirmar Nueva Contraseña",
+    "confirmPasswordPlaceholder": "Confirma tu nueva contraseña",
+    "updatePassword": "Cambiar Contraseña",
+    "updateSuccess": "Éxito",
+    "profileUpdated": "Datos personales actualizados con éxito",
+    "updateError": "Error al actualizar datos personales",
+    "passwordSuccess": "Éxito",
+    "passwordUpdated": "Contraseña cambiada con éxito",
+    "passwordError": "Error al cambiar contraseña",
+    "passwordMismatch": "Las contraseñas no coinciden"
   }
 }
