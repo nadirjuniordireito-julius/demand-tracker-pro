@@ -298,5 +298,17 @@
     "passwordUpdated": "Contraseña cambiada con éxito",
     "passwordError": "Error al cambiar contraseña",
     "passwordMismatch": "Las contraseñas no coinciden"
+  },
+  "settings": {
+    "title": "Configuración",
+    "description": "Gestiona la configuración del sistema",
+    "appearance": "Apariencia",
+    "appearanceDescription": "Personaliza la apariencia de la interfaz del sistema",
+    "lightMode": "Modo Claro",
+    "lightModeDescription": "Ideal para ambientes bien iluminados",
+    "darkMode": "Modo Oscuro",
+    "darkModeDescription": "Reduce la fatiga visual en ambientes oscuros",
+    "systemMode": "Automático",
+    "systemModeDescription": "Sigue las preferencias de tu sistema operativo"
   }
 }
