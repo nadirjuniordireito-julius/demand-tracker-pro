@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -35,7 +37,6 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -43,7 +44,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState } from '@/components/common/PageComponents';
+import { termoAberturaSchema, type TermoAberturaFormData } from '@/lib/validations';
 import type { TermoAbertura } from '@/types';
 
 // Mock data
@@ -81,10 +91,12 @@ export default function TermoAberturaPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoAbertura | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    demandaTecnicaId: '',
-    descricao: '',
+  const form = useForm<TermoAberturaFormData>({
+    resolver: zodResolver(termoAberturaSchema),
+    defaultValues: {
+      demandaTecnicaId: '',
+      descricao: '',
+    },
   });
 
   const filteredTermos = termos.filter((termo) => {
@@ -104,13 +116,13 @@ export default function TermoAberturaPage() {
 
   const handleAdd = () => {
     setSelectedTermo(null);
-    setFormData({ demandaTecnicaId: '', descricao: '' });
+    form.reset({ demandaTecnicaId: '', descricao: '' });
     setIsFormOpen(true);
   };
 
   const handleEdit = (termo: TermoAbertura) => {
     setSelectedTermo(termo);
-    setFormData({
+    form.reset({
       demandaTecnicaId: String(termo.demandaTecnicaId),
       descricao: termo.descricao,
     });
@@ -130,22 +142,22 @@ export default function TermoAberturaPage() {
     ));
   };
 
-  const handleSave = () => {
+  const onSubmit = (data: TermoAberturaFormData) => {
     if (selectedTermo) {
       setTermos(termos.map(t => 
         t.id === selectedTermo.id 
           ? { 
               ...t, 
-              demandaTecnicaId: Number(formData.demandaTecnicaId),
-              descricao: formData.descricao,
+              demandaTecnicaId: Number(data.demandaTecnicaId),
+              descricao: data.descricao,
             }
           : t
       ));
     } else {
       const newTermo: TermoAbertura = {
         id: Math.max(...termos.map(t => t.id), 0) + 1,
-        demandaTecnicaId: Number(formData.demandaTecnicaId),
-        descricao: formData.descricao,
+        demandaTecnicaId: Number(data.demandaTecnicaId),
+        descricao: data.descricao,
         dataAbertura: new Date().toISOString(),
         usuarioId: 1,
         dataAssinatura: null,
@@ -153,6 +165,7 @@ export default function TermoAberturaPage() {
       setTermos([...termos, newTermo]);
     }
     setIsFormOpen(false);
+    form.reset();
   };
 
   const handleConfirmDelete = () => {
@@ -161,8 +174,6 @@ export default function TermoAberturaPage() {
     }
     setIsDeleteOpen(false);
   };
-
-  const isFormValid = formData.demandaTecnicaId && formData.descricao;
 
   return (
     <div className="space-y-6">
@@ -274,46 +285,61 @@ export default function TermoAberturaPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="demanda">{t('openingTerm.demand')} *</Label>
-              <Select 
-                value={formData.demandaTecnicaId} 
-                onValueChange={(value) => setFormData({ ...formData, demandaTecnicaId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma demanda" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockDemandas.map((demanda) => (
-                    <SelectItem key={demanda.id} value={String(demanda.id)}>
-                      {demanda.codigo} - {demanda.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="descricao">{t('openingTerm.description')} *</Label>
-              <Textarea
-                id="descricao"
-                value={formData.descricao}
-                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                placeholder="Descreva o objetivo e escopo desta demanda..."
-                rows={6}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="demandaTecnicaId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('openingTerm.demand')} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma demanda" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {mockDemandas.map((demanda) => (
+                          <SelectItem key={demanda.id} value={String(demanda.id)}>
+                            {demanda.codigo} - {demanda.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFormOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSave} disabled={!isFormValid}>
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
+              
+              <FormField
+                control={form.control}
+                name="descricao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('openingTerm.description')} *</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Descreva o objetivo e escopo desta demanda..."
+                        rows={6}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit">
+                  {t('common.save')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

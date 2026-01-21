@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -34,15 +36,23 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState } from '@/components/common/PageComponents';
 import { cn } from '@/lib/utils';
+import { perfilSchema, type PerfilFormData } from '@/lib/validations';
 import type { Perfil } from '@/types';
 
 // Mock data
@@ -93,12 +103,14 @@ export default function PerfisPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedPerfil, setSelectedPerfil] = useState<Perfil | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    nome: '',
-    codTed: '',
-    termoInicial: undefined as Date | undefined,
-    termoFinal: undefined as Date | undefined,
+  const form = useForm<PerfilFormData>({
+    resolver: zodResolver(perfilSchema),
+    defaultValues: {
+      nome: '',
+      codTed: '',
+      termoInicial: undefined,
+      termoFinal: undefined,
+    },
   });
 
   const filteredPerfis = perfis.filter(
@@ -113,7 +125,7 @@ export default function PerfisPage() {
 
   const handleAdd = () => {
     setSelectedPerfil(null);
-    setFormData({
+    form.reset({
       nome: '',
       codTed: '',
       termoInicial: undefined,
@@ -124,7 +136,7 @@ export default function PerfisPage() {
 
   const handleEdit = (perfil: Perfil) => {
     setSelectedPerfil(perfil);
-    setFormData({
+    form.reset({
       nome: perfil.nome,
       codTed: perfil.codTed,
       termoInicial: new Date(perfil.termoInicial),
@@ -138,18 +150,16 @@ export default function PerfisPage() {
     setIsDeleteOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.termoInicial || !formData.termoFinal) return;
-    
+  const onSubmit = (data: PerfilFormData) => {
     if (selectedPerfil) {
       setPerfis(perfis.map(p => 
         p.id === selectedPerfil.id 
           ? { 
               ...p, 
-              nome: formData.nome,
-              codTed: formData.codTed,
-              termoInicial: formData.termoInicial!.toISOString().split('T')[0],
-              termoFinal: formData.termoFinal!.toISOString().split('T')[0],
+              nome: data.nome,
+              codTed: data.codTed,
+              termoInicial: data.termoInicial.toISOString().split('T')[0],
+              termoFinal: data.termoFinal.toISOString().split('T')[0],
               dataUpdate: new Date().toISOString(),
             }
           : p
@@ -157,16 +167,17 @@ export default function PerfisPage() {
     } else {
       const newPerfil: Perfil = {
         id: Math.max(...perfis.map(p => p.id)) + 1,
-        nome: formData.nome,
-        codTed: formData.codTed,
-        termoInicial: formData.termoInicial!.toISOString().split('T')[0],
-        termoFinal: formData.termoFinal!.toISOString().split('T')[0],
+        nome: data.nome,
+        codTed: data.codTed,
+        termoInicial: data.termoInicial.toISOString().split('T')[0],
+        termoFinal: data.termoFinal.toISOString().split('T')[0],
         dataUpdate: new Date().toISOString(),
         usuarioId: 1,
       };
       setPerfis([...perfis, newPerfil]);
     }
     setIsFormOpen(false);
+    form.reset();
   };
 
   const handleConfirmDelete = () => {
@@ -175,8 +186,6 @@ export default function PerfisPage() {
     }
     setIsDeleteOpen(false);
   };
-
-  const isFormValid = formData.nome && formData.codTed && formData.termoInicial && formData.termoFinal;
 
   return (
     <div className="space-y-6">
@@ -268,96 +277,124 @@ export default function PerfisPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="nome">{t('profiles.name')} *</Label>
-              <Input
-                id="nome"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                placeholder="Nome do perfil"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="nome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('profiles.name')} *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do perfil" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="codTed">{t('profiles.codeTed')} *</Label>
-              <Input
-                id="codTed"
-                value={formData.codTed}
-                onChange={(e) => setFormData({ ...formData, codTed: e.target.value })}
-                placeholder="PERF-XXX"
+              
+              <FormField
+                control={form.control}
+                name="codTed"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('profiles.codeTed')} *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="PERF-XXX" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>{t('profiles.startDate')} *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !formData.termoInicial && "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {formData.termoInicial 
-                        ? format(formData.termoInicial, "dd/MM/yyyy")
-                        : "Selecionar"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={formData.termoInicial}
-                      onSelect={(date) => setFormData({ ...formData, termoInicial: date })}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="termoInicial"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('profiles.startDate')} *</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value 
+                                ? format(field.value, "dd/MM/yyyy")
+                                : "Selecionar"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="termoFinal"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('profiles.endDate')} *</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value 
+                                ? format(field.value, "dd/MM/yyyy")
+                                : "Selecionar"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
               
-              <div className="grid gap-2">
-                <Label>{t('profiles.endDate')} *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !formData.termoFinal && "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {formData.termoFinal 
-                        ? format(formData.termoFinal, "dd/MM/yyyy")
-                        : "Selecionar"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={formData.termoFinal}
-                      onSelect={(date) => setFormData({ ...formData, termoFinal: date })}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFormOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSave} disabled={!isFormValid}>
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit">
+                  {t('common.save')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

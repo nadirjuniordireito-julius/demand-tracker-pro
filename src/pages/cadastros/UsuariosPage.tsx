@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { 
   Edit, 
   Trash2, 
   MoreHorizontal, 
-  Eye,
   ChevronUp,
   ChevronDown,
   Users
@@ -43,7 +44,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState } from '@/components/common/PageComponents';
+import { usuarioSchema, usuarioCreateSchema, type UsuarioFormData } from '@/lib/validations';
 import type { Usuario, UserProfile, UserStatus } from '@/types';
 
 // Mock data
@@ -81,12 +91,14 @@ export default function UsuariosPage() {
   const [sortField, setSortField] = useState<'nome' | 'perfil'>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Form state
-  const [formData, setFormData] = useState({
-    nome: '',
-    password: '',
-    perfil: 'O' as UserProfile,
-    status: 'A' as UserStatus,
+  const form = useForm<UsuarioFormData>({
+    resolver: zodResolver(selectedUsuario ? usuarioSchema : usuarioCreateSchema),
+    defaultValues: {
+      nome: '',
+      password: '',
+      perfil: 'O',
+      status: 'A',
+    },
   });
 
   const filteredUsuarios = usuarios
@@ -109,13 +121,13 @@ export default function UsuariosPage() {
 
   const handleAdd = () => {
     setSelectedUsuario(null);
-    setFormData({ nome: '', password: '', perfil: 'O', status: 'A' });
+    form.reset({ nome: '', password: '', perfil: 'O', status: 'A' });
     setIsFormOpen(true);
   };
 
   const handleEdit = (usuario: Usuario) => {
     setSelectedUsuario(usuario);
-    setFormData({
+    form.reset({
       nome: usuario.nome,
       password: '',
       perfil: usuario.perfil,
@@ -129,21 +141,24 @@ export default function UsuariosPage() {
     setIsDeleteOpen(true);
   };
 
-  const handleSave = () => {
+  const onSubmit = (data: UsuarioFormData) => {
     if (selectedUsuario) {
       setUsuarios(usuarios.map(u => 
         u.id === selectedUsuario.id 
-          ? { ...u, ...formData }
+          ? { ...u, nome: data.nome, perfil: data.perfil, status: data.status }
           : u
       ));
     } else {
       const newUsuario: Usuario = {
         id: Math.max(...usuarios.map(u => u.id)) + 1,
-        ...formData,
+        nome: data.nome,
+        perfil: data.perfil,
+        status: data.status,
       };
       setUsuarios([...usuarios, newUsuario]);
     }
     setIsFormOpen(false);
+    form.reset();
   };
 
   const handleConfirmDelete = () => {
@@ -266,70 +281,95 @@ export default function UsuariosPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="nome">{t('users.name')} *</Label>
-              <Input
-                id="nome"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                placeholder="Nome completo"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="nome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('users.name')} *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome completo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="password">{t('users.password')} {!selectedUsuario && '*'}</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder={selectedUsuario ? 'Deixe em branco para manter' : 'Senha'}
+              
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('users.password')} {!selectedUsuario && '*'}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder={selectedUsuario ? 'Deixe em branco para manter' : 'Senha'}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="perfil">{t('users.profile')} *</Label>
-              <Select 
-                value={formData.perfil} 
-                onValueChange={(value: UserProfile) => setFormData({ ...formData, perfil: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">{t('users.administrator')}</SelectItem>
-                  <SelectItem value="O">{t('users.operator')}</SelectItem>
-                  <SelectItem value="V">{t('users.viewer')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="status">{t('users.status')} *</Label>
-              <Select 
-                value={formData.status} 
-                onValueChange={(value: UserStatus) => setFormData({ ...formData, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">{t('users.active')}</SelectItem>
-                  <SelectItem value="I">{t('users.inactive')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFormOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSave} disabled={!formData.nome}>
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
+              
+              <FormField
+                control={form.control}
+                name="perfil"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('users.profile')} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="A">{t('users.administrator')}</SelectItem>
+                        <SelectItem value="O">{t('users.operator')}</SelectItem>
+                        <SelectItem value="V">{t('users.viewer')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('users.status')} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="A">{t('users.active')}</SelectItem>
+                        <SelectItem value="I">{t('users.inactive')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit">
+                  {t('common.save')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
@@ -39,7 +41,6 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -47,7 +48,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, FilterSelect } from '@/components/common/PageComponents';
+import { demandaSchema, type DemandaFormData } from '@/lib/validations';
 import type { DemandaTecnica, DemandStatus } from '@/types';
 
 // Mock data
@@ -126,11 +136,13 @@ export default function DemandasPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaTecnica | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    codigo: '',
-    nome: '',
-    projetoId: '',
+  const form = useForm<DemandaFormData>({
+    resolver: zodResolver(demandaSchema),
+    defaultValues: {
+      codigo: '',
+      nome: '',
+      projetoId: '',
+    },
   });
 
   const filteredDemandas = demandas.filter((d) => {
@@ -151,13 +163,13 @@ export default function DemandasPage() {
 
   const handleAdd = () => {
     setSelectedDemanda(null);
-    setFormData({ codigo: '', nome: '', projetoId: '' });
+    form.reset({ codigo: '', nome: '', projetoId: '' });
     setIsFormOpen(true);
   };
 
   const handleEdit = (demanda: DemandaTecnica) => {
     setSelectedDemanda(demanda);
-    setFormData({
+    form.reset({
       codigo: demanda.codigo,
       nome: demanda.nome,
       projetoId: String(demanda.projetoId),
@@ -170,24 +182,24 @@ export default function DemandasPage() {
     setIsDeleteOpen(true);
   };
 
-  const handleSave = () => {
+  const onSubmit = (data: DemandaFormData) => {
     if (selectedDemanda) {
       setDemandas(demandas.map(d => 
         d.id === selectedDemanda.id 
           ? { 
               ...d, 
-              codigo: formData.codigo,
-              nome: formData.nome,
-              projetoId: Number(formData.projetoId),
+              codigo: data.codigo,
+              nome: data.nome,
+              projetoId: Number(data.projetoId),
             }
           : d
       ));
     } else {
       const newDemanda: DemandaTecnica = {
         id: Math.max(...demandas.map(d => d.id)) + 1,
-        codigo: formData.codigo,
-        nome: formData.nome,
-        projetoId: Number(formData.projetoId),
+        codigo: data.codigo,
+        nome: data.nome,
+        projetoId: Number(data.projetoId),
         dataAbertura: new Date().toISOString(),
         usuarioId: 1,
         status: 'opened',
@@ -195,6 +207,7 @@ export default function DemandasPage() {
       setDemandas([...demandas, newDemanda]);
     }
     setIsFormOpen(false);
+    form.reset();
   };
 
   const handleConfirmDelete = () => {
@@ -203,8 +216,6 @@ export default function DemandasPage() {
     }
     setIsDeleteOpen(false);
   };
-
-  const isFormValid = formData.codigo && formData.nome && formData.projetoId;
 
   const statusOptions = [
     { value: 'all', label: t('common.all') },
@@ -338,55 +349,71 @@ export default function DemandasPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="codigo">{t('demands.code')} *</Label>
-              <Input
-                id="codigo"
-                value={formData.codigo}
-                onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                placeholder="DEM-2024-XXX"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="codigo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('demands.code')} *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="DEM-2024-XXX" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="nome">{t('demands.name')} *</Label>
-              <Input
-                id="nome"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                placeholder="Nome da demanda"
+              
+              <FormField
+                control={form.control}
+                name="nome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('demands.name')} *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome da demanda" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="projeto">{t('demands.project')} *</Label>
-              <Select 
-                value={formData.projetoId} 
-                onValueChange={(value) => setFormData({ ...formData, projetoId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um projeto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockProjetos.map((projeto) => (
-                    <SelectItem key={projeto.id} value={String(projeto.id)}>
-                      {projeto.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFormOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSave} disabled={!isFormValid}>
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
+              
+              <FormField
+                control={form.control}
+                name="projetoId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('demands.project')} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um projeto" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {mockProjetos.map((projeto) => (
+                          <SelectItem key={projeto.id} value={String(projeto.id)}>
+                            {projeto.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit">
+                  {t('common.save')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
