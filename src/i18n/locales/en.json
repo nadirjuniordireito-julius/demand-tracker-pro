@@ -83,11 +83,18 @@
   "auth": {
     "login": "Login",
     "logout": "Logout",
-    "email": "Email",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
     "password": "Password",
+    "passwordPlaceholder": "Enter your password",
     "forgotPassword": "Forgot password?",
     "rememberMe": "Remember me",
-    "loginError": "Invalid email or password",
+    "loginError": "Login failed",
+    "invalidCredentials": "Invalid username or password",
+    "loginSuccess": "Login successful",
+    "welcomeBack": "Welcome back!",
+    "loggingIn": "Logging in...",
+    "loginDescription": "Enter your credentials to access the system",
     "sessionExpired": "Your session has expired. Please login again."
   },
   "dashboard": {

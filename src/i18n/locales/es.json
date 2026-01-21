@@ -83,11 +83,18 @@
   "auth": {
     "login": "Iniciar sesión",
     "logout": "Cerrar sesión",
-    "email": "Correo electrónico",
+    "username": "Usuario",
+    "usernamePlaceholder": "Ingrese su usuario",
     "password": "Contraseña",
+    "passwordPlaceholder": "Ingrese su contraseña",
     "forgotPassword": "¿Olvidó su contraseña?",
     "rememberMe": "Recordarme",
-    "loginError": "Correo electrónico o contraseña inválidos",
+    "loginError": "Error al iniciar sesión",
+    "invalidCredentials": "Usuario o contraseña inválidos",
+    "loginSuccess": "Inicio de sesión exitoso",
+    "welcomeBack": "¡Bienvenido de nuevo!",
+    "loggingIn": "Iniciando sesión...",
+    "loginDescription": "Ingrese sus credenciales para acceder al sistema",
     "sessionExpired": "Su sesión ha expirado. Inicie sesión nuevamente."
   },
   "dashboard": {

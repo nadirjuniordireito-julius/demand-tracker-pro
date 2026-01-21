@@ -3,7 +3,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout";
+import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
 import UsuariosPage from "./pages/cadastros/UsuariosPage";
@@ -23,20 +26,29 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
-            <Route path="/cadastros/projetos" element={<ProjetosPage />} />
-            <Route path="/cadastros/perfis" element={<PerfisPage />} />
-            <Route path="/demandas" element={<DemandasPage />} />
-            <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
-            <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
-            <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/" element={<HomePage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
+              <Route path="/cadastros/projetos" element={<ProjetosPage />} />
+              <Route path="/cadastros/perfis" element={<PerfisPage />} />
+              <Route path="/demandas" element={<DemandasPage />} />
+              <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
+              <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
+              <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
