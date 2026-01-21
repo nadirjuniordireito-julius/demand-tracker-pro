@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -57,7 +57,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHeader, SearchFilterBar, EmptyState } from '@/components/common/PageComponents';
+import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { termoEncerramentoSchema, type TermoEncerramentoFormData } from '@/lib/validations';
 import type { TermoEncerramento, TermoEncerramentoCusto } from '@/types';
 
@@ -103,6 +103,8 @@ export default function TermoEncerramentoPage() {
   const [selectedTermo, setSelectedTermo] = useState<typeof mockTermos[0] | null>(null);
   const [custos, setCustos] = useState<CustoForm[]>([]);
   const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const form = useForm<TermoEncerramentoFormData>({
     resolver: zodResolver(termoEncerramentoSchema),
@@ -112,11 +114,29 @@ export default function TermoEncerramentoPage() {
     },
   });
 
-  const filteredTermos = termos.filter((termo) => {
-    const demanda = mockDemandas.find(d => d.id === termo.demandaTecnicaId);
-    return demanda?.nome.toLowerCase().includes(search.toLowerCase()) ||
-           demanda?.codigo.toLowerCase().includes(search.toLowerCase());
-  });
+  const filteredTermos = useMemo(() => {
+    return termos.filter((termo) => {
+      const demanda = mockDemandas.find(d => d.id === termo.demandaTecnicaId);
+      return demanda?.nome.toLowerCase().includes(search.toLowerCase()) ||
+             demanda?.codigo.toLowerCase().includes(search.toLowerCase());
+    });
+  }, [termos, search]);
+
+  const totalPages = Math.ceil(filteredTermos.length / pageSize);
+  
+  const paginatedTermos = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTermos.slice(start, start + pageSize);
+  }, [filteredTermos, currentPage, pageSize]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const formatDateTime = (dateStr: string) => {
     return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
@@ -284,70 +304,80 @@ export default function TermoEncerramentoPage() {
           }
         />
       ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('closingTerm.demand')}</TableHead>
-                <TableHead>{t('closingTerm.termDate')}</TableHead>
-                <TableHead>{t('closingTerm.totalCost')}</TableHead>
-                <TableHead>{t('common.status')}</TableHead>
-                <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTermos.map((termo) => (
-                <TableRow key={termo.id}>
-                  <TableCell className="font-medium max-w-[250px] truncate">
-                    {getDemandaNome(termo.demandaTecnicaId)}
-                  </TableCell>
-                  <TableCell>{formatDateTime(termo.dataTermo)}</TableCell>
-                  <TableCell>{formatCurrency(calcularCustoTotal(termo.custos))}</TableCell>
-                  <TableCell>
-                    {termo.dataAssinatura ? (
-                      <Badge className="bg-success text-success-foreground">
-                        {t('closingTerm.signed')}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        {t('closingTerm.notSigned')}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(termo)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          {t('common.edit')}
-                        </DropdownMenuItem>
-                        {!termo.dataAssinatura && (
-                          <DropdownMenuItem onClick={() => handleSign(termo)}>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            {t('closingTerm.sign')}
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(termo)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t('common.delete')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        <>
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('closingTerm.demand')}</TableHead>
+                  <TableHead>{t('closingTerm.termDate')}</TableHead>
+                  <TableHead>{t('closingTerm.totalCost')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {paginatedTermos.map((termo) => (
+                  <TableRow key={termo.id}>
+                    <TableCell className="font-medium max-w-[250px] truncate">
+                      {getDemandaNome(termo.demandaTecnicaId)}
+                    </TableCell>
+                    <TableCell>{formatDateTime(termo.dataTermo)}</TableCell>
+                    <TableCell>{formatCurrency(calcularCustoTotal(termo.custos))}</TableCell>
+                    <TableCell>
+                      {termo.dataAssinatura ? (
+                        <Badge className="bg-success text-success-foreground">
+                          {t('closingTerm.signed')}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          {t('closingTerm.notSigned')}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(termo)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            {t('common.edit')}
+                          </DropdownMenuItem>
+                          {!termo.dataAssinatura && (
+                            <DropdownMenuItem onClick={() => handleSign(termo)}>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              {t('closingTerm.sign')}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(termo)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {t('common.delete')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredTermos.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </>
       )}
 
       {/* Form Dialog */}
