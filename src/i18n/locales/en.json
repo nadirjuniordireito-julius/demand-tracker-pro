@@ -43,6 +43,15 @@
     "createdAt": "Created at",
     "updatedAt": "Updated at"
   },
+  "pagination": {
+    "showing": "Showing",
+    "of": "of",
+    "perPage": "Per page",
+    "first": "First",
+    "last": "Last",
+    "next": "Next",
+    "previous": "Previous"
+  },
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",

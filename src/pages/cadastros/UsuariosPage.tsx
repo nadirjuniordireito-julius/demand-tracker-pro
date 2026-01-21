@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,7 +36,6 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -52,7 +51,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { PageHeader, SearchFilterBar, EmptyState } from '@/components/common/PageComponents';
+import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { usuarioSchema, usuarioCreateSchema, type UsuarioFormData } from '@/lib/validations';
 import type { Usuario, UserProfile, UserStatus } from '@/types';
 
@@ -63,6 +62,13 @@ const mockUsuarios: Usuario[] = [
   { id: 3, nome: 'Pedro Oliveira', perfil: 'V', status: 'A' },
   { id: 4, nome: 'Ana Costa', perfil: 'O', status: 'I' },
   { id: 5, nome: 'Carlos Souza', perfil: 'V', status: 'A' },
+  { id: 6, nome: 'Fernanda Lima', perfil: 'O', status: 'A' },
+  { id: 7, nome: 'Ricardo Mendes', perfil: 'V', status: 'A' },
+  { id: 8, nome: 'Paula Ferreira', perfil: 'A', status: 'I' },
+  { id: 9, nome: 'Bruno Alves', perfil: 'O', status: 'A' },
+  { id: 10, nome: 'Camila Rodrigues', perfil: 'V', status: 'A' },
+  { id: 11, nome: 'Diego Nascimento', perfil: 'O', status: 'A' },
+  { id: 12, nome: 'Elena Martins', perfil: 'V', status: 'I' },
 ];
 
 const getProfileLabel = (perfil: UserProfile, t: (key: string) => string) => {
@@ -90,6 +96,8 @@ export default function UsuariosPage() {
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
   const [sortField, setSortField] = useState<'nome' | 'perfil'>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const form = useForm<UsuarioFormData>({
     resolver: zodResolver(selectedUsuario ? usuarioSchema : usuarioCreateSchema),
@@ -101,14 +109,30 @@ export default function UsuariosPage() {
     },
   });
 
-  const filteredUsuarios = usuarios
-    .filter((u) => u.nome.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      const direction = sortDirection === 'asc' ? 1 : -1;
-      return aValue.localeCompare(bValue) * direction;
-    });
+  const filteredUsuarios = useMemo(() => {
+    return usuarios
+      .filter((u) => u.nome.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        const direction = sortDirection === 'asc' ? 1 : -1;
+        return aValue.localeCompare(bValue) * direction;
+      });
+  }, [usuarios, search, sortField, sortDirection]);
+
+  const totalPages = Math.ceil(filteredUsuarios.length / pageSize);
+  
+  const paginatedUsuarios = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredUsuarios.slice(start, start + pageSize);
+  }, [filteredUsuarios, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredUsuarios.length]);
 
   const handleSort = (field: 'nome' | 'perfil') => {
     if (sortField === field) {
@@ -168,6 +192,15 @@ export default function UsuariosPage() {
     setIsDeleteOpen(false);
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
   const SortIcon = ({ field }: { field: 'nome' | 'perfil' }) => {
     if (sortField !== field) return null;
     return sortDirection === 'asc' ? (
@@ -188,7 +221,7 @@ export default function UsuariosPage() {
 
       <SearchFilterBar
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => { setSearch(value); setCurrentPage(1); }}
         searchPlaceholder="Buscar por nome..."
         onRefresh={() => {}}
       />
@@ -205,66 +238,77 @@ export default function UsuariosPage() {
           }
         />
       ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead 
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('nome')}
-                >
-                  <div className="flex items-center gap-2">
-                    {t('users.name')}
-                    <SortIcon field="nome" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('perfil')}
-                >
-                  <div className="flex items-center gap-2">
-                    {t('users.profile')}
-                    <SortIcon field="perfil" />
-                  </div>
-                </TableHead>
-                <TableHead>{t('users.status')}</TableHead>
-                <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsuarios.map((usuario) => (
-                <TableRow key={usuario.id}>
-                  <TableCell className="font-medium">{usuario.nome}</TableCell>
-                  <TableCell>{getProfileLabel(usuario.perfil, t)}</TableCell>
-                  <TableCell>{getStatusBadge(usuario.status, t)}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(usuario)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          {t('common.edit')}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(usuario)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t('common.delete')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        <>
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('nome')}
+                  >
+                    <div className="flex items-center gap-2">
+                      {t('users.name')}
+                      <SortIcon field="nome" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('perfil')}
+                  >
+                    <div className="flex items-center gap-2">
+                      {t('users.profile')}
+                      <SortIcon field="perfil" />
+                    </div>
+                  </TableHead>
+                  <TableHead>{t('users.status')}</TableHead>
+                  <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {paginatedUsuarios.map((usuario) => (
+                  <TableRow key={usuario.id}>
+                    <TableCell className="font-medium">{usuario.nome}</TableCell>
+                    <TableCell>{getProfileLabel(usuario.perfil, t)}</TableCell>
+                    <TableCell>{getStatusBadge(usuario.status, t)}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(usuario)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            {t('common.edit')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(usuario)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {t('common.delete')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredUsuarios.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </>
       )}
 
       {/* Form Dialog */}
