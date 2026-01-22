@@ -18,73 +18,68 @@ import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/Lo
 import { cn } from '@/lib/utils';
 import { perfilSchema, type PerfilFormData } from '@/lib/validations';
 import { useApi } from '@/hooks/useApi';
-import type { Perfil } from '@/types';
-
-// Mock data - será substituído pela API real
-const mockPerfis: Perfil[] = [
-  { id: 1, nome: 'Analista Sênior', codTed: 'PERF-001', termoInicial: '2024-01-01', termoFinal: '2024-12-31', dataUpdate: '2024-01-01T10:00:00', usuarioId: 1 },
-  { id: 2, nome: 'Desenvolvedor Pleno', codTed: 'PERF-002', termoInicial: '2024-01-01', termoFinal: '2024-12-31', dataUpdate: '2024-01-01T10:00:00', usuarioId: 1 },
-  { id: 3, nome: 'Gerente de Projetos', codTed: 'PERF-003', termoInicial: '2024-01-01', termoFinal: '2024-12-31', dataUpdate: '2024-01-01T10:00:00', usuarioId: 1 },
-  { id: 4, nome: 'Consultor Técnico', codTed: 'PERF-004', termoInicial: '2024-02-01', termoFinal: '2024-11-30', dataUpdate: '2024-02-01T14:00:00', usuarioId: 2 },
-  { id: 5, nome: 'Arquiteto de Soluções', codTed: 'PERF-005', termoInicial: '2024-03-01', termoFinal: '2025-02-28', dataUpdate: '2024-03-01T09:00:00', usuarioId: 1 },
-  { id: 6, nome: 'DevOps Engineer', codTed: 'PERF-006', termoInicial: '2024-04-01', termoFinal: '2024-12-31', dataUpdate: '2024-04-01T11:00:00', usuarioId: 2 },
-];
-
-// Simula delay de API
-const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
-  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+import { perfilService } from '@/services/perfilService';
+import { useAuth } from '@/contexts/AuthContext';
+import { useProject } from '@/contexts/ProjectContext';
+import type { Perfil, PaginatedResponse } from '@/types';
 
 export default function PerfisPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { selectedProject } = useProject();
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedPerfil, setSelectedPerfil] = useState<Perfil | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   // API states
-  const { isLoading, error, execute } = useApi<Perfil[]>(null);
+  const { isLoading, error, execute } = useApi<PaginatedResponse<Perfil>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const form = useForm<PerfilFormData>({
     resolver: zodResolver(perfilSchema),
-    defaultValues: { nome: '', codTed: '', termoInicial: undefined, termoFinal: undefined }
+    defaultValues: { nome: '', termoInicial: undefined, termoFinal: undefined }
   });
 
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
     await execute(
-      () => simulateApiCall(mockPerfis),
+      () => perfilService.findAll({ 
+        nome: search || undefined,
+        page: currentPage, 
+        size: pageSize 
+      }),
       {
-        onSuccess: (data) => setPerfis(data),
+        onSuccess: (data) => {
+          setPerfis(data.content);
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+        },
       }
     );
-  }, [execute]);
+  }, [execute, search, currentPage, pageSize]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filteredPerfis = useMemo(() => 
-    perfis.filter(p => 
-      p.nome.toLowerCase().includes(search.toLowerCase()) || 
-      p.codTed.toLowerCase().includes(search.toLowerCase())
-    ), [perfis, search]);
-
-  const totalPages = Math.ceil(filteredPerfis.length / pageSize);
-  const paginatedPerfis = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredPerfis.slice(start, start + pageSize);
-  }, [filteredPerfis, currentPage, pageSize]);
+  const paginatedPerfis = perfis;
 
   const formatDate = (dateStr: string) => format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
 
   const handleAdd = () => {
+    if (!selectedProject) {
+      // TODO: Mostrar mensagem de erro ou redirecionar para seleção de projeto
+      return;
+    }
     setSelectedPerfil(null);
-    form.reset({ nome: '', codTed: '', termoInicial: undefined, termoFinal: undefined });
+    form.reset({ nome: '', termoInicial: undefined, termoFinal: undefined });
     setIsFormOpen(true);
   };
 
@@ -92,7 +87,6 @@ export default function PerfisPage() {
     setSelectedPerfil(perfil);
     form.reset({
       nome: perfil.nome,
-      codTed: perfil.codTed,
       termoInicial: new Date(perfil.termoInicial),
       termoFinal: new Date(perfil.termoFinal)
     });
@@ -105,33 +99,31 @@ export default function PerfisPage() {
   };
 
   const onSubmit = async (data: PerfilFormData) => {
+    if (!user || !selectedProject) return;
+    
     setIsSaving(true);
     try {
-      // Simula chamada API
-      await simulateApiCall(null, 1000);
-      
       if (selectedPerfil) {
-        setPerfis(perfis.map(p => p.id === selectedPerfil.id ? {
-          ...p,
+        await perfilService.update(selectedPerfil.id, {
           nome: data.nome,
-          codTed: data.codTed,
           termoInicial: data.termoInicial.toISOString().split('T')[0],
           termoFinal: data.termoFinal.toISOString().split('T')[0],
-          dataUpdate: new Date().toISOString()
-        } : p));
+          projetoId: selectedProject.id,
+          projeto: selectedProject,
+        });
       } else {
-        setPerfis([...perfis, {
-          id: Math.max(...perfis.map(p => p.id)) + 1,
+        await perfilService.create({
           nome: data.nome,
-          codTed: data.codTed,
           termoInicial: data.termoInicial.toISOString().split('T')[0],
           termoFinal: data.termoFinal.toISOString().split('T')[0],
-          dataUpdate: new Date().toISOString(),
-          usuarioId: 1
-        }]);
+          usuarioId: user.id,
+          projetoId: selectedProject.id,
+          projeto: selectedProject,
+        });
       }
       setIsFormOpen(false);
       form.reset();
+      loadData();
     } finally {
       setIsSaving(false);
     }
@@ -142,10 +134,9 @@ export default function PerfisPage() {
     
     setIsDeleting(true);
     try {
-      // Simula chamada API
-      await simulateApiCall(null, 800);
-      setPerfis(perfis.filter(p => p.id !== selectedPerfil.id));
+      await perfilService.delete(selectedPerfil.id);
       setIsDeleteOpen(false);
+      loadData();
     } finally {
       setIsDeleting(false);
     }
@@ -177,14 +168,14 @@ export default function PerfisPage() {
       
       <SearchFilterBar 
         searchValue={search} 
-        onSearchChange={(v) => { setSearch(v); setCurrentPage(1); }} 
-        searchPlaceholder="Buscar por nome ou código..." 
+        onSearchChange={(v) => { setSearch(v); setCurrentPage(0); }} 
+        searchPlaceholder="Buscar por nome..." 
         onRefresh={loadData} 
       />
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={5} />
-      ) : filteredPerfis.length === 0 ? (
+      ) : paginatedPerfis.length === 0 ? (
         <EmptyState 
           title={t('common.noResults')} 
           description="Nenhum perfil encontrado" 
@@ -198,7 +189,7 @@ export default function PerfisPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('profiles.name')}</TableHead>
-                  <TableHead>{t('profiles.codeTed')}</TableHead>
+                  <TableHead>Projeto</TableHead>
                   <TableHead>{t('profiles.startDate')}</TableHead>
                   <TableHead>{t('profiles.endDate')}</TableHead>
                   <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
@@ -208,7 +199,7 @@ export default function PerfisPage() {
                 {paginatedPerfis.map((perfil) => (
                   <TableRow key={perfil.id}>
                     <TableCell className="font-medium">{perfil.nome}</TableCell>
-                    <TableCell>{perfil.codTed}</TableCell>
+                    <TableCell>{perfil.projeto?.nome || '-'}</TableCell>
                     <TableCell>{formatDate(perfil.termoInicial)}</TableCell>
                     <TableCell>{formatDate(perfil.termoFinal)}</TableCell>
                     <TableCell>
@@ -235,12 +226,12 @@ export default function PerfisPage() {
             </Table>
           </div>
           <TablePagination 
-            currentPage={currentPage} 
+            currentPage={currentPage + 1} 
             totalPages={totalPages} 
             pageSize={pageSize} 
-            totalItems={filteredPerfis.length} 
-            onPageChange={setCurrentPage} 
-            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} 
+            totalItems={totalElements} 
+            onPageChange={(p) => setCurrentPage(p - 1)} 
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }} 
           />
         </>
       )}
@@ -267,17 +258,12 @@ export default function PerfisPage() {
                   </FormItem>
                 )} 
               />
-              <FormField 
-                control={form.control} 
-                name="codTed" 
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('profiles.codeTed')} *</FormLabel>
-                    <FormControl><Input placeholder="PERF-XXX" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} 
-              />
+              {selectedProject && (
+                <div className="p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium">Projeto selecionado:</p>
+                  <p className="text-sm text-muted-foreground">{selectedProject.nome}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <FormField 
                   control={form.control} 

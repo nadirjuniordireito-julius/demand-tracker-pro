@@ -9,7 +9,8 @@ import {
   User, 
   LogOut,
   Settings,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LANGUAGES, changeLanguage, type LanguageCode } from '@/i18n';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProject } from '@/contexts/ProjectContext';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -33,6 +35,7 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { selectedProject, openProjectSelection } = useProject();
   const [notificationCount] = useState(3);
   const [messageCount] = useState(5);
 
@@ -43,8 +46,14 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
   };
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+    } catch (error) {
+      // Ignora erros do backend - o importante é limpar o token localmente
+      console.warn('Erro ao fazer logout no backend, mas continuando com logout local:', error);
+    }
+    // Força um refresh completo da página para garantir que o estado seja limpo
+    window.location.href = '/login';
   };
 
   const getUserInitials = () => {
@@ -85,10 +94,30 @@ export function Header({ onToggleSidebar, isSidebarCollapsed }: HeaderProps) {
           />
         </Button>
         
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-4">
           <h1 className="text-lg font-semibold text-header-foreground">
             {t('common.appName')}
           </h1>
+          {selectedProject && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border group">
+              <span className="text-sm font-medium text-header-foreground">
+                {selectedProject.codTed}
+              </span>
+              <span className="text-xs text-muted-foreground">•</span>
+              <span className="text-sm text-muted-foreground">
+                {selectedProject.nome}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-header-foreground"
+                onClick={openProjectSelection}
+                title={t('project.change', 'Trocar projeto')}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

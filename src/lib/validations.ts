@@ -65,11 +65,6 @@ export const perfilSchema = z.object({
     .trim()
     .min(1, { message: 'Nome é obrigatório' })
     .max(150, { message: 'Nome deve ter no máximo 150 caracteres' }),
-  codTed: z
-    .string()
-    .trim()
-    .min(1, { message: 'Código TED é obrigatório' })
-    .max(50, { message: 'Código TED deve ter no máximo 50 caracteres' }),
   termoInicial: z.date({ 
     required_error: 'Data inicial é obrigatória',
     invalid_type_error: 'Data inicial inválida',

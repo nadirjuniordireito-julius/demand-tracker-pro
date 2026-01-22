@@ -55,55 +55,32 @@ import {
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { useApi } from '@/hooks/useApi';
+import { termoAberturaService } from '@/services/termoService';
+import { demandaService } from '@/services/demandaService';
+import { useAuth } from '@/contexts/AuthContext';
 import { termoAberturaSchema, type TermoAberturaFormData } from '@/lib/validations';
-import type { TermoAbertura } from '@/types';
-
-// Mock data
-const mockTermos: TermoAbertura[] = [
-  { 
-    id: 1, 
-    demandaTecnicaId: 1,
-    descricao: 'Este termo formaliza a abertura da demanda para desenvolvimento do módulo de relatórios gerenciais.',
-    dataAbertura: '2024-01-20T10:30:00',
-    usuarioId: 1,
-    dataAssinatura: '2024-01-21T14:00:00',
-  },
-  { 
-    id: 2, 
-    demandaTecnicaId: 2,
-    descricao: 'Termo de abertura para integração com sistema externo de gestão financeira.',
-    dataAbertura: '2024-02-15T14:00:00',
-    usuarioId: 2,
-    dataAssinatura: null,
-  },
-];
-
-const mockDemandas = [
-  { id: 1, codigo: 'DEM-2024-001', nome: 'Desenvolvimento do Módulo de Relatórios' },
-  { id: 2, codigo: 'DEM-2024-002', nome: 'Integração com Sistema Externo' },
-  { id: 3, codigo: 'DEM-2024-003', nome: 'Implementação de Dashboard' },
-  { id: 4, codigo: 'DEM-2024-004', nome: 'Migração de Dados' },
-];
-
-// Simula delay de API
-const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
-  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+import type { TermoAbertura, DemandaTecnica, PaginatedResponse } from '@/types';
 
 export default function TermoAberturaPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [termos, setTermos] = useState<TermoAbertura[]>([]);
+  const [demandas, setDemandas] = useState<DemandaTecnica[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoAbertura | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   // API states
-  const { isLoading, error, execute } = useApi<TermoAbertura[]>(null);
+  const { isLoading, error, execute } = useApi<PaginatedResponse<TermoAbertura>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
+  const [isLoadingDemandas, setIsLoadingDemandas] = useState(false);
 
   const form = useForm<TermoAberturaFormData>({
     resolver: zodResolver(termoAberturaSchema),
@@ -113,50 +90,59 @@ export default function TermoAberturaPage() {
     },
   });
 
+  // Carrega demandas para o select
+  const loadDemandas = useCallback(async () => {
+    setIsLoadingDemandas(true);
+    try {
+      const response = await demandaService.findAll({ size: 1000 });
+      setDemandas(response.content);
+    } catch (err) {
+      console.error('Erro ao carregar demandas:', err);
+    } finally {
+      setIsLoadingDemandas(false);
+    }
+  }, []);
+
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
     await execute(
-      () => simulateApiCall(mockTermos),
+      () => termoAberturaService.findAll(currentPage, pageSize),
       {
-        onSuccess: (data) => setTermos(data),
+        onSuccess: (data) => {
+          setTermos(data.content);
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+        },
       }
     );
-  }, [execute]);
+  }, [execute, currentPage, pageSize]);
+
+  useEffect(() => {
+    loadDemandas();
+  }, [loadDemandas]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const filteredTermos = useMemo(() => {
+    if (!search) return termos;
     return termos.filter((termo) => {
-      const demanda = mockDemandas.find(d => d.id === termo.demandaTecnicaId);
+      const demanda = demandas.find(d => d.id === termo.demandaTecnicaId);
       return demanda?.nome.toLowerCase().includes(search.toLowerCase()) ||
              demanda?.codigo.toLowerCase().includes(search.toLowerCase());
     });
-  }, [termos, search]);
-
-  const totalPages = Math.ceil(filteredTermos.length / pageSize);
+  }, [termos, search, demandas]);
   
-  const paginatedTermos = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredTermos.slice(start, start + pageSize);
-  }, [filteredTermos, currentPage, pageSize]);
+  const paginatedTermos = filteredTermos;
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  };
 
   const formatDateTime = (dateStr: string) => {
     return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
   };
 
   const getDemandaNome = (demandaId: number) => {
-    const demanda = mockDemandas.find(d => d.id === demandaId);
+    const demanda = demandas.find(d => d.id === demandaId);
     return demanda ? `${demanda.codigo} - ${demanda.nome}` : '-';
   };
 
@@ -183,45 +169,32 @@ export default function TermoAberturaPage() {
   const handleSign = async (termo: TermoAbertura) => {
     setIsSigning(true);
     try {
-      await simulateApiCall(null, 800);
-      setTermos(termos.map(t => 
-        t.id === termo.id 
-          ? { ...t, dataAssinatura: new Date().toISOString() }
-          : t
-      ));
+      await termoAberturaService.sign(termo.id);
+      loadData();
     } finally {
       setIsSigning(false);
     }
   };
 
   const onSubmit = async (data: TermoAberturaFormData) => {
+    if (!user) return;
+    
     setIsSaving(true);
     try {
-      await simulateApiCall(null, 1000);
-      
       if (selectedTermo) {
-        setTermos(termos.map(t => 
-          t.id === selectedTermo.id 
-            ? { 
-                ...t, 
-                demandaTecnicaId: Number(data.demandaTecnicaId),
-                descricao: data.descricao,
-              }
-            : t
-        ));
+        await termoAberturaService.update(selectedTermo.id, {
+          descricao: data.descricao,
+        });
       } else {
-        const newTermo: TermoAbertura = {
-          id: Math.max(...termos.map(t => t.id), 0) + 1,
+        await termoAberturaService.create({
           demandaTecnicaId: Number(data.demandaTecnicaId),
           descricao: data.descricao,
-          dataAbertura: new Date().toISOString(),
-          usuarioId: 1,
-          dataAssinatura: null,
-        };
-        setTermos([...termos, newTermo]);
+          usuarioId: user.id,
+        });
       }
       setIsFormOpen(false);
       form.reset();
+      loadData();
     } finally {
       setIsSaving(false);
     }
@@ -232,9 +205,9 @@ export default function TermoAberturaPage() {
     
     setIsDeleting(true);
     try {
-      await simulateApiCall(null, 800);
-      setTermos(termos.filter(t => t.id !== selectedTermo.id));
+      await termoAberturaService.delete(selectedTermo.id);
       setIsDeleteOpen(false);
+      loadData();
     } finally {
       setIsDeleting(false);
     }
@@ -353,12 +326,12 @@ export default function TermoAberturaPage() {
             </Table>
           </div>
           <TablePagination
-            currentPage={currentPage}
+            currentPage={currentPage + 1}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalItems={filteredTermos.length}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
+            totalItems={totalElements}
+            onPageChange={(p) => setCurrentPage(p - 1)}
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }}
           />
         </>
       )}
@@ -392,11 +365,15 @@ export default function TermoAberturaPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockDemandas.map((demanda) => (
-                          <SelectItem key={demanda.id} value={String(demanda.id)}>
-                            {demanda.codigo} - {demanda.nome}
-                          </SelectItem>
-                        ))}
+                        {isLoadingDemandas ? (
+                          <SelectItem value="" disabled>Carregando...</SelectItem>
+                        ) : (
+                          demandas.map((demanda) => (
+                            <SelectItem key={demanda.id} value={String(demanda.id)}>
+                              {demanda.codigo} - {demanda.nome}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

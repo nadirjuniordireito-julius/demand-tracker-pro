@@ -74,28 +74,31 @@ export interface ProjetoUpdateDTO {
 export interface Perfil {
   id: number;
   nome: string;
-  codTed: string;
   termoInicial: string;
   termoFinal: string;
   dataUpdate: string;
   usuarioId: number;
+  projetoId: number;
   usuario?: Usuario;
+  projeto?: Projeto;
 }
 
 export interface PerfilCreateDTO {
   nome: string;
-  codTed: string;
   termoInicial: string;
   termoFinal: string;
   usuarioId: number;
+  projetoId: number;
+  projeto?: Projeto;
 }
 
 export interface PerfilUpdateDTO {
   nome?: string;
-  codTed?: string;
   termoInicial?: string;
   termoFinal?: string;
   usuarioId?: number;
+  projetoId?: number;
+  projeto?: Projeto;
 }
 
 // =====================================================

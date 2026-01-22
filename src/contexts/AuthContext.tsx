@@ -41,8 +41,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
+    try {
+      await authService.logout();
+    } catch (error) {
+      // Garante que o estado seja limpo mesmo se houver erro
+      console.warn('Erro durante logout:', error);
+    } finally {
+      // Sempre limpa o estado do usuário
+      setUser(null);
+    }
   };
 
   return (

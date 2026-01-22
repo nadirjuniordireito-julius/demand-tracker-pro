@@ -17,24 +17,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { PageHeader, SearchFilterBar, EmptyState, FilterSelect, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { useApi } from '@/hooks/useApi';
+import { demandaService } from '@/services/demandaService';
+import { projetoService } from '@/services/projetoService';
+import { useAuth } from '@/contexts/AuthContext';
 import { demandaSchema, type DemandaFormData } from '@/lib/validations';
-import type { DemandaTecnica, DemandStatus } from '@/types';
-
-const mockDemandas: DemandaTecnica[] = [
-  { id: 1, projetoId: 1, codigo: 'DEM-2024-001', nome: 'Desenvolvimento do Módulo de Relatórios', dataAbertura: '2024-01-20T10:30:00', usuarioId: 1, status: 'closed' },
-  { id: 2, projetoId: 1, codigo: 'DEM-2024-002', nome: 'Integração com Sistema Externo', dataAbertura: '2024-02-15T14:00:00', usuarioId: 2, status: 'inExecution' },
-  { id: 3, projetoId: 2, codigo: 'DEM-2024-003', nome: 'Implementação de Dashboard', dataAbertura: '2024-03-01T09:00:00', usuarioId: 1, status: 'inPlanning' },
-  { id: 4, projetoId: 2, codigo: 'DEM-2024-004', nome: 'Migração de Dados', dataAbertura: '2024-03-10T11:30:00', usuarioId: 3, status: 'opened' },
-  { id: 5, projetoId: 1, codigo: 'DEM-2024-005', nome: 'API Gateway Implementation', dataAbertura: '2024-04-01T08:00:00', usuarioId: 1, status: 'inExecution' },
-  { id: 6, projetoId: 3, codigo: 'DEM-2024-006', nome: 'Autenticação OAuth 2.0', dataAbertura: '2024-04-15T10:00:00', usuarioId: 2, status: 'opened' },
-  { id: 7, projetoId: 2, codigo: 'DEM-2024-007', nome: 'Performance Optimization', dataAbertura: '2024-05-01T14:00:00', usuarioId: 1, status: 'closed' },
-];
-
-const mockProjetos = [{ id: 1, nome: 'Projeto Alpha' }, { id: 2, nome: 'Projeto Beta' }, { id: 3, nome: 'Projeto Gamma' }];
-
-// Simula delay de API
-const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
-  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+import type { DemandaTecnica, DemandStatus, Projeto, PaginatedResponse } from '@/types';
 
 const getStatusBadge = (status: DemandStatus, t: (key: string) => string) => {
   const config: Record<DemandStatus, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
@@ -55,56 +42,75 @@ const getStatusBadge = (status: DemandStatus, t: (key: string) => string) => {
 
 export default function DemandasPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [demandas, setDemandas] = useState<DemandaTecnica[]>([]);
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaTecnica | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   // API states
-  const { isLoading, error, execute } = useApi<DemandaTecnica[]>(null);
+  const { isLoading, error, execute } = useApi<PaginatedResponse<DemandaTecnica>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingProjetos, setIsLoadingProjetos] = useState(false);
 
   const form = useForm<DemandaFormData>({
     resolver: zodResolver(demandaSchema),
     defaultValues: { codigo: '', nome: '', projetoId: '' }
   });
 
+  // Carrega projetos para o select
+  const loadProjetos = useCallback(async () => {
+    setIsLoadingProjetos(true);
+    try {
+      const response = await projetoService.findAll({ size: 1000 });
+      setProjetos(response.content);
+    } catch (err) {
+      console.error('Erro ao carregar projetos:', err);
+    } finally {
+      setIsLoadingProjetos(false);
+    }
+  }, []);
+
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
     await execute(
-      () => simulateApiCall(mockDemandas),
+      () => demandaService.findAll({ 
+        nome: search || undefined,
+        codigo: search || undefined,
+        status: statusFilter !== 'all' ? statusFilter as DemandStatus : undefined,
+        page: currentPage, 
+        size: pageSize 
+      }),
       {
-        onSuccess: (data) => setDemandas(data),
+        onSuccess: (data) => {
+          setDemandas(data.content);
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+        },
       }
     );
-  }, [execute]);
+  }, [execute, search, statusFilter, currentPage, pageSize]);
+
+  useEffect(() => {
+    loadProjetos();
+  }, [loadProjetos]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filteredDemandas = useMemo(() => {
-    return demandas.filter(d => {
-      const matchesSearch = d.codigo.toLowerCase().includes(search.toLowerCase()) || 
-                           d.nome.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [demandas, search, statusFilter]);
-
-  const totalPages = Math.ceil(filteredDemandas.length / pageSize);
-  const paginatedDemandas = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredDemandas.slice(start, start + pageSize);
-  }, [filteredDemandas, currentPage, pageSize]);
+  const paginatedDemandas = demandas;
 
   const formatDateTime = (dateStr: string) => format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  const getProjetoNome = (projetoId: number) => mockProjetos.find(p => p.id === projetoId)?.nome || '-';
+  const getProjetoNome = (projetoId: number) => projetos.find(p => p.id === projetoId)?.nome || '-';
 
   const handleAdd = () => {
     setSelectedDemanda(null);
@@ -128,30 +134,27 @@ export default function DemandasPage() {
   };
 
   const onSubmit = async (data: DemandaFormData) => {
+    if (!user) return;
+    
     setIsSaving(true);
     try {
-      await simulateApiCall(null, 1000);
-      
       if (selectedDemanda) {
-        setDemandas(demandas.map(d => d.id === selectedDemanda.id ? {
-          ...d,
-          codigo: data.codigo,
-          nome: data.nome,
-          projetoId: Number(data.projetoId)
-        } : d));
-      } else {
-        setDemandas([...demandas, {
-          id: Math.max(...demandas.map(d => d.id)) + 1,
+        await demandaService.update(selectedDemanda.id, {
           codigo: data.codigo,
           nome: data.nome,
           projetoId: Number(data.projetoId),
-          dataAbertura: new Date().toISOString(),
-          usuarioId: 1,
-          status: 'opened'
-        }]);
+        });
+      } else {
+        await demandaService.create({
+          codigo: data.codigo,
+          nome: data.nome,
+          projetoId: Number(data.projetoId),
+          usuarioId: user.id,
+        });
       }
       setIsFormOpen(false);
       form.reset();
+      loadData();
     } finally {
       setIsSaving(false);
     }
@@ -162,9 +165,9 @@ export default function DemandasPage() {
     
     setIsDeleting(true);
     try {
-      await simulateApiCall(null, 800);
-      setDemandas(demandas.filter(d => d.id !== selectedDemanda.id));
+      await demandaService.delete(selectedDemanda.id);
       setIsDeleteOpen(false);
+      loadData();
     } finally {
       setIsDeleting(false);
     }
@@ -204,13 +207,13 @@ export default function DemandasPage() {
       
       <SearchFilterBar 
         searchValue={search} 
-        onSearchChange={(v) => { setSearch(v); setCurrentPage(1); }} 
+        onSearchChange={(v) => { setSearch(v); setCurrentPage(0); }} 
         searchPlaceholder="Buscar por código ou nome..." 
         onRefresh={loadData}
       >
         <FilterSelect 
           value={statusFilter} 
-          onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }} 
+          onValueChange={(v) => { setStatusFilter(v); setCurrentPage(0); }} 
           placeholder={t('common.status')} 
           options={statusOptions} 
         />
@@ -218,7 +221,7 @@ export default function DemandasPage() {
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={6} />
-      ) : filteredDemandas.length === 0 ? (
+      ) : paginatedDemandas.length === 0 ? (
         <EmptyState 
           title={t('common.noResults')} 
           description="Nenhuma demanda encontrada" 
@@ -292,12 +295,12 @@ export default function DemandasPage() {
             </Table>
           </div>
           <TablePagination 
-            currentPage={currentPage} 
+            currentPage={currentPage + 1} 
             totalPages={totalPages} 
             pageSize={pageSize} 
-            totalItems={filteredDemandas.length} 
-            onPageChange={setCurrentPage} 
-            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} 
+            totalItems={totalElements} 
+            onPageChange={(p) => setCurrentPage(p - 1)} 
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }} 
           />
         </>
       )}
@@ -348,9 +351,13 @@ export default function DemandasPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockProjetos.map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
-                        ))}
+                        {isLoadingProjetos ? (
+                          <SelectItem value="" disabled>Carregando...</SelectItem>
+                        ) : (
+                          projetos.map((p) => (
+                            <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

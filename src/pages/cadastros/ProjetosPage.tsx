@@ -55,34 +55,25 @@ import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/Lo
 import { useApi } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { projetoSchema, type ProjetoFormData } from '@/lib/validations';
-import type { Projeto } from '@/types';
-
-// Mock data
-const mockProjetos: Projeto[] = [
-  { id: 1, nome: 'Projeto Alpha', codTed: 'TED-2024-001', termoInicial: '2024-01-15', termoFinal: '2024-12-31', dataUpdate: '2024-01-15T10:30:00', usuarioId: 1 },
-  { id: 2, nome: 'Projeto Beta', codTed: 'TED-2024-002', termoInicial: '2024-02-01', termoFinal: '2024-11-30', dataUpdate: '2024-02-01T14:20:00', usuarioId: 2 },
-  { id: 3, nome: 'Projeto Gamma', codTed: 'TED-2024-003', termoInicial: '2024-03-10', termoFinal: '2025-03-10', dataUpdate: '2024-03-10T09:15:00', usuarioId: 1 },
-  { id: 4, nome: 'Projeto Delta', codTed: 'TED-2024-004', termoInicial: '2024-04-01', termoFinal: '2024-09-30', dataUpdate: '2024-04-01T11:00:00', usuarioId: 2 },
-  { id: 5, nome: 'Projeto Epsilon', codTed: 'TED-2024-005', termoInicial: '2024-05-15', termoFinal: '2025-05-15', dataUpdate: '2024-05-15T08:30:00', usuarioId: 1 },
-  { id: 6, nome: 'Projeto Zeta', codTed: 'TED-2024-006', termoInicial: '2024-06-01', termoFinal: '2024-12-31', dataUpdate: '2024-06-01T14:00:00', usuarioId: 3 },
-];
-
-// Simula delay de API
-const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
-  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+import { projetoService } from '@/services/projetoService';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Projeto, PaginatedResponse } from '@/types';
 
 export default function ProjetosPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedProjeto, setSelectedProjeto] = useState<Projeto | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   // API states
-  const { isLoading, error, execute } = useApi<Projeto[]>(null);
+  const { isLoading, error, execute } = useApi<PaginatedResponse<Projeto>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -94,29 +85,26 @@ export default function ProjetosPage() {
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
     await execute(
-      () => simulateApiCall(mockProjetos),
+      () => projetoService.findAll({ 
+        nome: search || undefined,
+        page: currentPage, 
+        size: pageSize 
+      }),
       {
-        onSuccess: (data) => setProjetos(data),
+        onSuccess: (data) => {
+          setProjetos(data.content);
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+        },
       }
     );
-  }, [execute]);
+  }, [execute, search, currentPage, pageSize]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filteredProjetos = useMemo(() => {
-    return projetos.filter(p => 
-      p.nome.toLowerCase().includes(search.toLowerCase()) || 
-      p.codTed.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [projetos, search]);
-
-  const totalPages = Math.ceil(filteredProjetos.length / pageSize);
-  const paginatedProjetos = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredProjetos.slice(start, start + pageSize);
-  }, [filteredProjetos, currentPage, pageSize]);
+  const paginatedProjetos = projetos;
 
   const formatDate = (dateStr: string) => format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
 
@@ -143,32 +131,29 @@ export default function ProjetosPage() {
   };
 
   const onSubmit = async (data: ProjetoFormData) => {
+    if (!user) return;
+    
     setIsSaving(true);
     try {
-      await simulateApiCall(null, 1000);
-      
       if (selectedProjeto) {
-        setProjetos(projetos.map(p => p.id === selectedProjeto.id ? {
-          ...p,
+        await projetoService.update(selectedProjeto.id, {
           nome: data.nome,
           codTed: data.codTed,
           termoInicial: data.termoInicial.toISOString().split('T')[0],
           termoFinal: data.termoFinal.toISOString().split('T')[0],
-          dataUpdate: new Date().toISOString()
-        } : p));
+        });
       } else {
-        setProjetos([...projetos, {
-          id: Math.max(...projetos.map(p => p.id)) + 1,
+        await projetoService.create({
           nome: data.nome,
           codTed: data.codTed,
           termoInicial: data.termoInicial.toISOString().split('T')[0],
           termoFinal: data.termoFinal.toISOString().split('T')[0],
-          dataUpdate: new Date().toISOString(),
-          usuarioId: 1
-        }]);
+          usuarioId: user.id,
+        });
       }
       setIsFormOpen(false);
       form.reset();
+      loadData();
     } finally {
       setIsSaving(false);
     }
@@ -179,9 +164,9 @@ export default function ProjetosPage() {
     
     setIsDeleting(true);
     try {
-      await simulateApiCall(null, 800);
-      setProjetos(projetos.filter(p => p.id !== selectedProjeto.id));
+      await projetoService.delete(selectedProjeto.id);
       setIsDeleteOpen(false);
+      loadData();
     } finally {
       setIsDeleting(false);
     }
@@ -213,14 +198,14 @@ export default function ProjetosPage() {
       
       <SearchFilterBar 
         searchValue={search} 
-        onSearchChange={(v) => { setSearch(v); setCurrentPage(1); }} 
+        onSearchChange={(v) => { setSearch(v); setCurrentPage(0); }} 
         searchPlaceholder="Buscar por nome ou código..." 
         onRefresh={loadData} 
       />
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={5} />
-      ) : filteredProjetos.length === 0 ? (
+      ) : paginatedProjetos.length === 0 ? (
         <EmptyState 
           title={t('common.noResults')} 
           description="Nenhum projeto encontrado" 
@@ -271,12 +256,12 @@ export default function ProjetosPage() {
             </Table>
           </div>
           <TablePagination 
-            currentPage={currentPage} 
+            currentPage={currentPage + 1} 
             totalPages={totalPages} 
             pageSize={pageSize} 
-            totalItems={filteredProjetos.length} 
-            onPageChange={setCurrentPage} 
-            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} 
+            totalItems={totalElements} 
+            onPageChange={(p) => setCurrentPage(p - 1)} 
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }} 
           />
         </>
       )}

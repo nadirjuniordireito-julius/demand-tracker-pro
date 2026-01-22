@@ -18,7 +18,6 @@ const ENDPOINTS = {
 
 export interface PerfilFilters {
   nome?: string;
-  codTed?: string;
   page?: number;
   size?: number;
   sort?: string;
@@ -32,7 +31,6 @@ export const perfilService = {
     const params = new URLSearchParams();
     
     if (filters.nome) params.append('nome', filters.nome);
-    if (filters.codTed) params.append('codTed', filters.codTed);
     if (filters.page !== undefined) params.append('page', String(filters.page));
     if (filters.size !== undefined) params.append('size', String(filters.size));
     if (filters.sort) params.append('sort', filters.sort);

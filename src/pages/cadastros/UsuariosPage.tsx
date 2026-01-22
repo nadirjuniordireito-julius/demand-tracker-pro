@@ -55,27 +55,8 @@ import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/comp
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { useApi } from '@/hooks/useApi';
 import { usuarioSchema, usuarioCreateSchema, type UsuarioFormData } from '@/lib/validations';
-import type { Usuario, UserProfile, UserStatus } from '@/types';
-
-// Mock data
-const mockUsuarios: Usuario[] = [
-  { id: 1, nome: 'João Silva', perfil: 'A', status: 'A' },
-  { id: 2, nome: 'Maria Santos', perfil: 'O', status: 'A' },
-  { id: 3, nome: 'Pedro Oliveira', perfil: 'V', status: 'A' },
-  { id: 4, nome: 'Ana Costa', perfil: 'O', status: 'I' },
-  { id: 5, nome: 'Carlos Souza', perfil: 'V', status: 'A' },
-  { id: 6, nome: 'Fernanda Lima', perfil: 'O', status: 'A' },
-  { id: 7, nome: 'Ricardo Mendes', perfil: 'V', status: 'A' },
-  { id: 8, nome: 'Paula Ferreira', perfil: 'A', status: 'I' },
-  { id: 9, nome: 'Bruno Alves', perfil: 'O', status: 'A' },
-  { id: 10, nome: 'Camila Rodrigues', perfil: 'V', status: 'A' },
-  { id: 11, nome: 'Diego Nascimento', perfil: 'O', status: 'A' },
-  { id: 12, nome: 'Elena Martins', perfil: 'V', status: 'I' },
-];
-
-// Simula delay de API
-const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
-  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+import { usuarioService } from '@/services/usuarioService';
+import type { Usuario, UserProfile, UserStatus, PaginatedResponse } from '@/types';
 
 const getProfileLabel = (perfil: UserProfile, t: (key: string) => string) => {
   const labels: Record<UserProfile, string> = {
@@ -102,11 +83,13 @@ export default function UsuariosPage() {
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
   const [sortField, setSortField] = useState<'nome' | 'perfil'>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   // API states
-  const { isLoading, error, execute } = useApi<Usuario[]>(null);
+  const { isLoading, error, execute } = useApi<PaginatedResponse<Usuario>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -123,41 +106,27 @@ export default function UsuariosPage() {
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
     await execute(
-      () => simulateApiCall(mockUsuarios),
+      () => usuarioService.findAll({ 
+        nome: search || undefined,
+        page: currentPage, 
+        size: pageSize,
+        sort: `${sortField},${sortDirection}`
+      }),
       {
-        onSuccess: (data) => setUsuarios(data),
+        onSuccess: (data) => {
+          setUsuarios(data.content);
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+        },
       }
     );
-  }, [execute]);
+  }, [execute, search, currentPage, pageSize, sortField, sortDirection]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filteredUsuarios = useMemo(() => {
-    return usuarios
-      .filter((u) => u.nome.toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        const direction = sortDirection === 'asc' ? 1 : -1;
-        return aValue.localeCompare(bValue) * direction;
-      });
-  }, [usuarios, search, sortField, sortDirection]);
-
-  const totalPages = Math.ceil(filteredUsuarios.length / pageSize);
-  
-  const paginatedUsuarios = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredUsuarios.slice(start, start + pageSize);
-  }, [filteredUsuarios, currentPage, pageSize]);
-
-  // Reset to page 1 when filters change
-  useMemo(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [filteredUsuarios.length, currentPage, totalPages]);
+  const paginatedUsuarios = usuarios;
 
   const handleSort = (field: 'nome' | 'perfil') => {
     if (sortField === field) {
@@ -166,6 +135,7 @@ export default function UsuariosPage() {
       setSortField(field);
       setSortDirection('asc');
     }
+    setCurrentPage(0);
   };
 
   const handleAdd = () => {
@@ -193,25 +163,24 @@ export default function UsuariosPage() {
   const onSubmit = async (data: UsuarioFormData) => {
     setIsSaving(true);
     try {
-      await simulateApiCall(null, 1000);
-      
       if (selectedUsuario) {
-        setUsuarios(usuarios.map(u => 
-          u.id === selectedUsuario.id 
-            ? { ...u, nome: data.nome, perfil: data.perfil, status: data.status }
-            : u
-        ));
-      } else {
-        const newUsuario: Usuario = {
-          id: Math.max(...usuarios.map(u => u.id)) + 1,
+        await usuarioService.update(selectedUsuario.id, {
           nome: data.nome,
           perfil: data.perfil,
           status: data.status,
-        };
-        setUsuarios([...usuarios, newUsuario]);
+          ...(data.password && { password: data.password }),
+        });
+      } else {
+        await usuarioService.create({
+          nome: data.nome,
+          password: data.password,
+          perfil: data.perfil,
+          status: data.status,
+        });
       }
       setIsFormOpen(false);
       form.reset();
+      loadData();
     } finally {
       setIsSaving(false);
     }
@@ -222,22 +191,14 @@ export default function UsuariosPage() {
     
     setIsDeleting(true);
     try {
-      await simulateApiCall(null, 800);
-      setUsuarios(usuarios.filter(u => u.id !== selectedUsuario.id));
+      await usuarioService.delete(selectedUsuario.id);
       setIsDeleteOpen(false);
+      loadData();
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  };
 
   const SortIcon = ({ field }: { field: 'nome' | 'perfil' }) => {
     if (sortField !== field) return null;
@@ -274,14 +235,14 @@ export default function UsuariosPage() {
 
       <SearchFilterBar
         searchValue={search}
-        onSearchChange={(value) => { setSearch(value); setCurrentPage(1); }}
+        onSearchChange={(value) => { setSearch(value); setCurrentPage(0); }}
         searchPlaceholder="Buscar por nome..."
         onRefresh={loadData}
       />
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={4} />
-      ) : filteredUsuarios.length === 0 ? (
+      ) : usuarios.length === 0 ? (
         <EmptyState
           title={t('common.noResults')}
           description="Nenhum usuário encontrado com os filtros aplicados"
@@ -356,12 +317,12 @@ export default function UsuariosPage() {
           </div>
 
           <TablePagination
-            currentPage={currentPage}
+            currentPage={currentPage + 1}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalItems={filteredUsuarios.length}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
+            totalItems={totalElements}
+            onPageChange={(p) => setCurrentPage(p - 1)}
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }}
           />
         </>
       )}

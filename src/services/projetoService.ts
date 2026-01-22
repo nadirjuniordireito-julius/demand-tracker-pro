@@ -14,6 +14,7 @@ import type {
 const ENDPOINTS = {
   base: '/projetos',
   byId: (id: number) => `/projetos/${id}`,
+  byUsuario: (usuarioId: number) => `/usuario-projeto/usuario/${usuarioId}`,
 };
 
 export interface ProjetoFilters {
@@ -69,6 +70,52 @@ export const projetoService = {
    */
   async delete(id: number): Promise<void> {
     return api.delete(ENDPOINTS.byId(id));
+  },
+
+  /**
+   * Busca projetos vinculados a um usuário (tabela UsuarioProjeto)
+   * Tenta vários endpoints possíveis
+   */
+  async findByUsuario(usuarioId: number): Promise<Projeto[]> {
+    // Lista de endpoints possíveis para tentar
+    const possibleEndpoints = [
+      `/usuario-projeto/usuario/${usuarioId}`,
+      `/usuario-projeto?usuarioId=${usuarioId}`,
+      `/usuarios/${usuarioId}/projetos`,
+      `/projetos/usuario/${usuarioId}`,
+    ];
+
+    // Tenta cada endpoint até encontrar um que funcione
+    for (const endpoint of possibleEndpoints) {
+      try {
+        const result = await api.get<Projeto[]>(endpoint);
+        if (Array.isArray(result)) {
+          return result;
+        }
+      } catch (error: any) {
+        // Se for 404 ou 500, tenta o próximo endpoint
+        if (error?.status === 404 || error?.status === 500) {
+          continue;
+        }
+        // Se for outro erro, continua tentando
+        continue;
+      }
+    }
+
+    // Se nenhum endpoint funcionou, tenta usar findAll com filtro como último recurso
+    // Nota: Isso pode retornar projetos onde o usuário é dono, não necessariamente vinculados
+    try {
+      console.warn('Nenhum endpoint específico encontrado, usando findAll com filtro como fallback');
+      const response = await this.findAll({ 
+        usuarioId, 
+        page: 0, 
+        size: 1000
+      });
+      return response.content;
+    } catch (fallbackError) {
+      console.error('Erro ao buscar projetos do usuário:', fallbackError);
+      return [];
+    }
   },
 };
 

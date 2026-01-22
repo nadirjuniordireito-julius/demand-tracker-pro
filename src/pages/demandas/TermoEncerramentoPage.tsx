@@ -60,39 +60,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { useApi } from '@/hooks/useApi';
+import { termoEncerramentoService } from '@/services/termoService';
+import { demandaService } from '@/services/demandaService';
+import { perfilService } from '@/services/perfilService';
+import { useAuth } from '@/contexts/AuthContext';
 import { termoEncerramentoSchema, type TermoEncerramentoFormData } from '@/lib/validations';
-import type { TermoEncerramento, TermoEncerramentoCusto } from '@/types';
-
-// Mock data
-const mockTermos: (TermoEncerramento & { custos: TermoEncerramentoCusto[] })[] = [
-  { 
-    id: 1, 
-    demandaTecnicaId: 1,
-    resultadoEntregue: 'Módulo de relatórios desenvolvido e implantado com sucesso. Todas as funcionalidades especificadas foram entregues.',
-    dataTermo: '2024-03-15T16:00:00',
-    usuarioId: 1,
-    dataAssinatura: '2024-03-16T10:00:00',
-    custos: [
-      { id: 1, termoEncerramentoId: 1, perfilId: 1, qtdeHora: 150, valorHora: 150 },
-      { id: 2, termoEncerramentoId: 1, perfilId: 2, qtdeHora: 300, valorHora: 100 },
-    ],
-  },
-];
-
-const mockDemandas = [
-  { id: 1, codigo: 'DEM-2024-001', nome: 'Desenvolvimento do Módulo de Relatórios' },
-  { id: 2, codigo: 'DEM-2024-002', nome: 'Integração com Sistema Externo' },
-];
-
-const mockPerfis = [
-  { id: 1, nome: 'Analista Sênior' },
-  { id: 2, nome: 'Desenvolvedor Pleno' },
-  { id: 3, nome: 'Gerente de Projetos' },
-];
-
-// Simula delay de API
-const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
-  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+import type { TermoEncerramento, TermoEncerramentoCusto, DemandaTecnica, Perfil, PaginatedResponse } from '@/types';
 
 interface CustoForm {
   perfilId: string;
@@ -102,21 +75,28 @@ interface CustoForm {
 
 export default function TermoEncerramentoPage() {
   const { t } = useTranslation();
-  const [termos, setTermos] = useState<typeof mockTermos>([]);
+  const { user } = useAuth();
+  const [termos, setTermos] = useState<TermoEncerramento[]>([]);
+  const [demandas, setDemandas] = useState<DemandaTecnica[]>([]);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedTermo, setSelectedTermo] = useState<typeof mockTermos[0] | null>(null);
+  const [selectedTermo, setSelectedTermo] = useState<TermoEncerramento | null>(null);
   const [custos, setCustos] = useState<CustoForm[]>([]);
   const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   // API states
-  const { isLoading, error, execute } = useApi<typeof mockTermos>(null);
+  const { isLoading, error, execute } = useApi<PaginatedResponse<TermoEncerramento>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
+  const [isLoadingDemandas, setIsLoadingDemandas] = useState(false);
+  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false);
 
   const form = useForm<TermoEncerramentoFormData>({
     resolver: zodResolver(termoEncerramentoSchema),
@@ -126,43 +106,65 @@ export default function TermoEncerramentoPage() {
     },
   });
 
+  // Carrega demandas e perfis para os selects
+  const loadDemandas = useCallback(async () => {
+    setIsLoadingDemandas(true);
+    try {
+      const response = await demandaService.findAll({ size: 1000 });
+      setDemandas(response.content);
+    } catch (err) {
+      console.error('Erro ao carregar demandas:', err);
+    } finally {
+      setIsLoadingDemandas(false);
+    }
+  }, []);
+
+  const loadPerfis = useCallback(async () => {
+    setIsLoadingPerfis(true);
+    try {
+      const response = await perfilService.findAll({ size: 1000 });
+      setPerfis(response.content);
+    } catch (err) {
+      console.error('Erro ao carregar perfis:', err);
+    } finally {
+      setIsLoadingPerfis(false);
+    }
+  }, []);
+
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
     await execute(
-      () => simulateApiCall(mockTermos),
+      () => termoEncerramentoService.findAll(currentPage, pageSize),
       {
-        onSuccess: (data) => setTermos(data),
+        onSuccess: (data) => {
+          setTermos(data.content);
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+        },
       }
     );
-  }, [execute]);
+  }, [execute, currentPage, pageSize]);
+
+  useEffect(() => {
+    loadDemandas();
+    loadPerfis();
+  }, [loadDemandas, loadPerfis]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const filteredTermos = useMemo(() => {
+    if (!search) return termos;
     return termos.filter((termo) => {
-      const demanda = mockDemandas.find(d => d.id === termo.demandaTecnicaId);
+      const demanda = demandas.find(d => d.id === termo.demandaTecnicaId);
       return demanda?.nome.toLowerCase().includes(search.toLowerCase()) ||
              demanda?.codigo.toLowerCase().includes(search.toLowerCase());
     });
-  }, [termos, search]);
-
-  const totalPages = Math.ceil(filteredTermos.length / pageSize);
+  }, [termos, search, demandas]);
   
-  const paginatedTermos = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredTermos.slice(start, start + pageSize);
-  }, [filteredTermos, currentPage, pageSize]);
+  const paginatedTermos = filteredTermos;
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  };
 
   const formatDateTime = (dateStr: string) => {
     return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
@@ -176,11 +178,11 @@ export default function TermoEncerramentoPage() {
   };
 
   const getDemandaNome = (demandaId: number) => {
-    const demanda = mockDemandas.find(d => d.id === demandaId);
+    const demanda = demandas.find(d => d.id === demandaId);
     return demanda ? `${demanda.codigo} - ${demanda.nome}` : '-';
   };
 
-  const calcularCustoTotal = (custosList: TermoEncerramentoCusto[]) => {
+  const calcularCustoTotal = (custosList: TermoEncerramentoCusto[] = []) => {
     return custosList.reduce((total, c) => total + (c.qtdeHora * c.valorHora), 0);
   };
 
@@ -192,13 +194,13 @@ export default function TermoEncerramentoPage() {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (termo: typeof mockTermos[0]) => {
+  const handleEdit = (termo: TermoEncerramento) => {
     setSelectedTermo(termo);
     form.reset({
       demandaTecnicaId: String(termo.demandaTecnicaId),
       resultadoEntregue: termo.resultadoEntregue,
     });
-    setCustos(termo.custos.map(c => ({
+    setCustos((termo.custos || []).map(c => ({
       perfilId: String(c.perfilId),
       qtdeHora: String(c.qtdeHora),
       valorHora: String(c.valorHora),
@@ -207,20 +209,16 @@ export default function TermoEncerramentoPage() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (termo: typeof mockTermos[0]) => {
+  const handleDelete = (termo: TermoEncerramento) => {
     setSelectedTermo(termo);
     setIsDeleteOpen(true);
   };
 
-  const handleSign = async (termo: typeof mockTermos[0]) => {
+  const handleSign = async (termo: TermoEncerramento) => {
     setIsSigning(true);
     try {
-      await simulateApiCall(null, 800);
-      setTermos(termos.map(t => 
-        t.id === termo.id 
-          ? { ...t, dataAssinatura: new Date().toISOString() }
-          : t
-      ));
+      await termoEncerramentoService.sign(termo.id);
+      loadData();
     } finally {
       setIsSigning(false);
     }
@@ -262,47 +260,35 @@ export default function TermoEncerramentoPage() {
   };
 
   const onSubmit = async (data: TermoEncerramentoFormData) => {
-    if (!validateCustos()) return;
+    if (!validateCustos() || !user) return;
 
     setIsSaving(true);
     try {
-      await simulateApiCall(null, 1000);
-      
       const custosFormatted = custos
         .filter(c => c.perfilId && c.qtdeHora && c.valorHora)
-        .map((c, index) => ({
-          id: index + 1,
-          termoEncerramentoId: selectedTermo?.id || termos.length + 1,
+        .map(c => ({
           perfilId: Number(c.perfilId),
           qtdeHora: Number(c.qtdeHora),
           valorHora: Number(c.valorHora),
         }));
 
       if (selectedTermo) {
-        setTermos(termos.map(t => 
-          t.id === selectedTermo.id 
-            ? { 
-                ...t, 
-                demandaTecnicaId: Number(data.demandaTecnicaId),
-                resultadoEntregue: data.resultadoEntregue,
-                custos: custosFormatted,
-              }
-            : t
-        ));
+        await termoEncerramentoService.update(selectedTermo.id, {
+          resultadoEntregue: data.resultadoEntregue,
+          custos: custosFormatted,
+        });
       } else {
-        const newTermo = {
-          id: Math.max(...termos.map(t => t.id), 0) + 1,
+        await termoEncerramentoService.create({
           demandaTecnicaId: Number(data.demandaTecnicaId),
           resultadoEntregue: data.resultadoEntregue,
-          dataTermo: new Date().toISOString(),
-          usuarioId: 1,
-          dataAssinatura: null,
+          usuarioId: user.id,
           custos: custosFormatted,
-        };
-        setTermos([...termos, newTermo]);
+        });
       }
       setIsFormOpen(false);
       form.reset();
+      setCustos([]);
+      loadData();
     } finally {
       setIsSaving(false);
     }
@@ -313,9 +299,9 @@ export default function TermoEncerramentoPage() {
     
     setIsDeleting(true);
     try {
-      await simulateApiCall(null, 800);
-      setTermos(termos.filter(t => t.id !== selectedTermo.id));
+      await termoEncerramentoService.delete(selectedTermo.id);
       setIsDeleteOpen(false);
+      loadData();
     } finally {
       setIsDeleting(false);
     }
@@ -432,12 +418,12 @@ export default function TermoEncerramentoPage() {
             </Table>
           </div>
           <TablePagination
-            currentPage={currentPage}
+            currentPage={currentPage + 1}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalItems={filteredTermos.length}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
+            totalItems={totalElements}
+            onPageChange={(p) => setCurrentPage(p - 1)}
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }}
           />
         </>
       )}
@@ -471,11 +457,15 @@ export default function TermoEncerramentoPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockDemandas.map((demanda) => (
-                          <SelectItem key={demanda.id} value={String(demanda.id)}>
-                            {demanda.codigo} - {demanda.nome}
-                          </SelectItem>
-                        ))}
+                        {isLoadingDemandas ? (
+                          <SelectItem value="" disabled>Carregando...</SelectItem>
+                        ) : (
+                          demandas.map((demanda) => (
+                            <SelectItem key={demanda.id} value={String(demanda.id)}>
+                              {demanda.codigo} - {demanda.nome}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -532,11 +522,15 @@ export default function TermoEncerramentoPage() {
                                   <SelectValue placeholder="Perfil" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {mockPerfis.map((perfil) => (
-                                    <SelectItem key={perfil.id} value={String(perfil.id)}>
-                                      {perfil.nome}
-                                    </SelectItem>
-                                  ))}
+                                  {isLoadingPerfis ? (
+                                    <SelectItem value="" disabled>Carregando...</SelectItem>
+                                  ) : (
+                                    perfis.map((perfil) => (
+                                      <SelectItem key={perfil.id} value={String(perfil.id)}>
+                                        {perfil.nome}
+                                      </SelectItem>
+                                    ))
+                                  )}
                                 </SelectContent>
                               </Select>
                             </div>
