@@ -41,7 +41,16 @@
     "inactive": "Inactive",
     "date": "Date",
     "createdAt": "Created at",
-    "updatedAt": "Updated at"
+    "updatedAt": "Updated at",
+    "loadingData": "Loading data...",
+    "errorTitle": "An error occurred",
+    "errorMessage": "Unable to load data. Please try again.",
+    "connectionError": "Connection Error",
+    "connectionErrorMessage": "Unable to connect to the server. Check your connection and try again.",
+    "retry": "Try again",
+    "saving": "Saving...",
+    "deleting": "Deleting...",
+    "processing": "Processing..."
   },
   "pagination": {
     "showing": "Showing",

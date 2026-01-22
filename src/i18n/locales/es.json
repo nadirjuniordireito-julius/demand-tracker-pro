@@ -41,7 +41,16 @@
     "inactive": "Inactivo",
     "date": "Fecha",
     "createdAt": "Creado en",
-    "updatedAt": "Actualizado en"
+    "updatedAt": "Actualizado en",
+    "loadingData": "Cargando datos...",
+    "errorTitle": "Se produjo un error",
+    "errorMessage": "No se pudieron cargar los datos. Por favor, inténtelo de nuevo.",
+    "connectionError": "Error de Conexión",
+    "connectionErrorMessage": "No se pudo conectar al servidor. Verifique su conexión e inténtelo de nuevo.",
+    "retry": "Intentar de nuevo",
+    "saving": "Guardando...",
+    "deleting": "Eliminando...",
+    "processing": "Procesando..."
   },
   "pagination": {
     "showing": "Mostrando",
