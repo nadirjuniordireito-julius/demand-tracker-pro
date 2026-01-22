@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -53,6 +53,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
+import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { useApi } from '@/hooks/useApi';
 import { termoAberturaSchema, type TermoAberturaFormData } from '@/lib/validations';
 import type { TermoAbertura } from '@/types';
 
@@ -83,15 +85,25 @@ const mockDemandas = [
   { id: 4, codigo: 'DEM-2024-004', nome: 'Migração de Dados' },
 ];
 
+// Simula delay de API
+const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
+  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+
 export default function TermoAberturaPage() {
   const { t } = useTranslation();
-  const [termos, setTermos] = useState<TermoAbertura[]>(mockTermos);
+  const [termos, setTermos] = useState<TermoAbertura[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoAbertura | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // API states
+  const { isLoading, error, execute } = useApi<TermoAbertura[]>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
 
   const form = useForm<TermoAberturaFormData>({
     resolver: zodResolver(termoAberturaSchema),
@@ -100,6 +112,20 @@ export default function TermoAberturaPage() {
       descricao: '',
     },
   });
+
+  // Carrega dados iniciais
+  const loadData = useCallback(async () => {
+    await execute(
+      () => simulateApiCall(mockTermos),
+      {
+        onSuccess: (data) => setTermos(data),
+      }
+    );
+  }, [execute]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredTermos = useMemo(() => {
     return termos.filter((termo) => {
@@ -154,46 +180,80 @@ export default function TermoAberturaPage() {
     setIsDeleteOpen(true);
   };
 
-  const handleSign = (termo: TermoAbertura) => {
-    setTermos(termos.map(t => 
-      t.id === termo.id 
-        ? { ...t, dataAssinatura: new Date().toISOString() }
-        : t
-    ));
-  };
-
-  const onSubmit = (data: TermoAberturaFormData) => {
-    if (selectedTermo) {
+  const handleSign = async (termo: TermoAbertura) => {
+    setIsSigning(true);
+    try {
+      await simulateApiCall(null, 800);
       setTermos(termos.map(t => 
-        t.id === selectedTermo.id 
-          ? { 
-              ...t, 
-              demandaTecnicaId: Number(data.demandaTecnicaId),
-              descricao: data.descricao,
-            }
+        t.id === termo.id 
+          ? { ...t, dataAssinatura: new Date().toISOString() }
           : t
       ));
-    } else {
-      const newTermo: TermoAbertura = {
-        id: Math.max(...termos.map(t => t.id), 0) + 1,
-        demandaTecnicaId: Number(data.demandaTecnicaId),
-        descricao: data.descricao,
-        dataAbertura: new Date().toISOString(),
-        usuarioId: 1,
-        dataAssinatura: null,
-      };
-      setTermos([...termos, newTermo]);
+    } finally {
+      setIsSigning(false);
     }
-    setIsFormOpen(false);
-    form.reset();
   };
 
-  const handleConfirmDelete = () => {
-    if (selectedTermo) {
-      setTermos(termos.filter(t => t.id !== selectedTermo.id));
+  const onSubmit = async (data: TermoAberturaFormData) => {
+    setIsSaving(true);
+    try {
+      await simulateApiCall(null, 1000);
+      
+      if (selectedTermo) {
+        setTermos(termos.map(t => 
+          t.id === selectedTermo.id 
+            ? { 
+                ...t, 
+                demandaTecnicaId: Number(data.demandaTecnicaId),
+                descricao: data.descricao,
+              }
+            : t
+        ));
+      } else {
+        const newTermo: TermoAbertura = {
+          id: Math.max(...termos.map(t => t.id), 0) + 1,
+          demandaTecnicaId: Number(data.demandaTecnicaId),
+          descricao: data.descricao,
+          dataAbertura: new Date().toISOString(),
+          usuarioId: 1,
+          dataAssinatura: null,
+        };
+        setTermos([...termos, newTermo]);
+      }
+      setIsFormOpen(false);
+      form.reset();
+    } finally {
+      setIsSaving(false);
     }
-    setIsDeleteOpen(false);
   };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedTermo) return;
+    
+    setIsDeleting(true);
+    try {
+      await simulateApiCall(null, 800);
+      setTermos(termos.filter(t => t.id !== selectedTermo.id));
+      setIsDeleteOpen(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Estado de erro
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('openingTerm.title')} description="Gerencie os termos de abertura das demandas" />
+        <ErrorState
+          title={t('common.errorTitle')}
+          message={error}
+          onRetry={loadData}
+          retryText={t('common.retry')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -208,10 +268,12 @@ export default function TermoAberturaPage() {
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por demanda..."
-        onRefresh={() => {}}
+        onRefresh={loadData}
       />
 
-      {filteredTermos.length === 0 ? (
+      {isLoading ? (
+        <TableSkeleton rows={5} columns={5} />
+      ) : filteredTermos.length === 0 ? (
         <EmptyState
           title={t('common.noResults')}
           description="Nenhum termo de abertura encontrado"
@@ -259,7 +321,7 @@ export default function TermoAberturaPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" disabled={isSigning}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -361,12 +423,12 @@ export default function TermoAberturaPage() {
               />
               
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
                   {t('common.cancel')}
                 </Button>
-                <Button type="submit">
+                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
                   {t('common.save')}
-                </Button>
+                </LoadingButton>
               </DialogFooter>
             </form>
           </Form>
@@ -383,12 +445,17 @@ export default function TermoAberturaPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
               {t('common.cancel')}
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete}>
+            <LoadingButton 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              isLoading={isDeleting}
+              loadingText={t('common.deleting')}
+            >
               {t('common.delete')}
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
