@@ -6,7 +6,7 @@ import { Loader2, AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 // =====================================================
@@ -247,29 +247,52 @@ export function StatsCardSkeleton() {
 }
 
 // =====================================================
+// Chart Skeleton
+// =====================================================
+export function ChartSkeleton({ height = 300 }: { height?: number }) {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-4 w-56 mt-1" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="w-full" style={{ height }} />
+      </CardContent>
+    </Card>
+  );
+}
+
+// =====================================================
 // Dashboard Skeleton
 // =====================================================
 export function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <StatsCardSkeleton key={i} />
-        ))}
+      {/* Header skeleton */}
+      <div className="space-y-2">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-5 w-72" />
       </div>
+
+      {/* Stats cards skeleton */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatsCardSkeleton />
+        <StatsCardSkeleton />
+        <StatsCardSkeleton />
+        <StatsCardSkeleton />
+      </div>
+
+      {/* Cost cards skeleton */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-6 w-32 mb-4" />
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-6 w-32 mb-4" />
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
+        <StatsCardSkeleton />
+        <StatsCardSkeleton />
+      </div>
+
+      {/* Charts skeleton */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartSkeleton height={300} />
+        <ChartSkeleton height={300} />
       </div>
     </div>
   );

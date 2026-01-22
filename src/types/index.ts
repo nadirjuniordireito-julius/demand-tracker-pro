@@ -297,8 +297,9 @@ export interface DemandaPorProjeto {
 }
 
 export interface DemandaPorStatus {
-  status: DemandStatus;
-  quantidade: number;
+  name: string;
+  value: number;
+  color: string;
 }
 
 // =====================================================

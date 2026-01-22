@@ -1,9 +1,9 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   FileText, 
   FolderKanban, 
   CheckCircle, 
-  XCircle,
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -23,9 +23,12 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { useApi } from '@/hooks/useApi';
+import { DashboardSkeleton, ErrorState } from '@/components/common/LoadingStates';
+import type { DashboardStats, DemandaPorProjeto, DemandaPorStatus } from '@/types';
 
 // Mock data para demonstração
-const mockStats = {
+const mockStats: DashboardStats = {
   totalDemandas: 45,
   demandasAbertas: 12,
   demandasEncerradas: 28,
@@ -33,20 +36,24 @@ const mockStats = {
   custosRealizados: 425000,
 };
 
-const mockDemandsByProject = [
-  { name: 'Projeto Alpha', quantidade: 15 },
-  { name: 'Projeto Beta', quantidade: 12 },
-  { name: 'Projeto Gamma', quantidade: 8 },
-  { name: 'Projeto Delta', quantidade: 6 },
-  { name: 'Projeto Epsilon', quantidade: 4 },
+const mockDemandsByProject: DemandaPorProjeto[] = [
+  { projetoNome: 'Projeto Alpha', quantidade: 15 },
+  { projetoNome: 'Projeto Beta', quantidade: 12 },
+  { projetoNome: 'Projeto Gamma', quantidade: 8 },
+  { projetoNome: 'Projeto Delta', quantidade: 6 },
+  { projetoNome: 'Projeto Epsilon', quantidade: 4 },
 ];
 
-const mockDemandsByStatus = [
+const mockDemandsByStatus: DemandaPorStatus[] = [
   { name: 'Abertas', value: 12, color: '#3b82f6' },
   { name: 'Em Planejamento', value: 5, color: '#f59e0b' },
   { name: 'Em Execução', value: 8, color: '#8b5cf6' },
   { name: 'Encerradas', value: 28, color: '#22c55e' },
 ];
+
+const simulateApiCall = <T,>(data: T, delay = 1200): Promise<T> => {
+  return new Promise((resolve) => setTimeout(() => resolve(data), delay));
+};
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -57,14 +64,40 @@ const formatCurrency = (value: number) => {
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+  
+  const { data: stats, isLoading: isLoadingStats, error: errorStats, execute: executeStats } = useApi<DashboardStats>(null);
+  const { data: demandsByProject, isLoading: isLoadingProjects, execute: executeProjects } = useApi<DemandaPorProjeto[]>(null);
+  const { data: demandsByStatus, isLoading: isLoadingStatus, execute: executeStatus } = useApi<DemandaPorStatus[]>(null);
 
-  const costVariance = mockStats.custosPlanejados - mockStats.custosRealizados;
-  const costVariancePercent = ((costVariance / mockStats.custosPlanejados) * 100).toFixed(1);
+  const loadData = async () => {
+    await Promise.all([
+      executeStats(() => simulateApiCall(mockStats)),
+      executeProjects(() => simulateApiCall(mockDemandsByProject)),
+      executeStatus(() => simulateApiCall(mockDemandsByStatus)),
+    ]);
+  };
 
-  const stats = [
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const isLoading = isLoadingStats || isLoadingProjects || isLoadingStatus;
+
+  if (errorStats) {
+    return <ErrorState onRetry={loadData} />;
+  }
+
+  if (isLoading || !stats) {
+    return <DashboardSkeleton />;
+  }
+
+  const costVariance = stats.custosPlanejados - stats.custosRealizados;
+  const costVariancePercent = ((costVariance / stats.custosPlanejados) * 100).toFixed(1);
+
+  const statsCards = [
     {
       title: t('dashboard.totalDemands'),
-      value: mockStats.totalDemandas,
+      value: stats.totalDemandas,
       icon: FileText,
       color: 'bg-info/10 text-info',
       trend: '+5 este mês',
@@ -72,7 +105,7 @@ export default function DashboardPage() {
     },
     {
       title: t('dashboard.openDemands'),
-      value: mockStats.demandasAbertas,
+      value: stats.demandasAbertas,
       icon: FolderKanban,
       color: 'bg-warning/10 text-warning',
       trend: '3 novas',
@@ -80,7 +113,7 @@ export default function DashboardPage() {
     },
     {
       title: t('dashboard.closedDemands'),
-      value: mockStats.demandasEncerradas,
+      value: stats.demandasEncerradas,
       icon: CheckCircle,
       color: 'bg-success/10 text-success',
       trend: '+8 este mês',
@@ -108,7 +141,7 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {statsCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -139,7 +172,7 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(mockStats.custosPlanejados)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.custosPlanejados)}</div>
           </CardContent>
         </Card>
         
@@ -151,7 +184,7 @@ export default function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(mockStats.custosRealizados)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.custosRealizados)}</div>
           </CardContent>
         </Card>
       </div>
@@ -169,10 +202,10 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockDemandsByProject} layout="vertical">
+                <BarChart data={demandsByProject || []} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                  <YAxis dataKey="projetoNome" type="category" width={100} tick={{ fontSize: 12 }} />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))', 
@@ -199,7 +232,7 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={mockDemandsByStatus}
+                    data={demandsByStatus || []}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -209,11 +242,11 @@ export default function DashboardPage() {
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {mockDemandsByStatus.map((entry, index) => (
+                    {(demandsByStatus || []).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))', 
                       border: '1px solid hsl(var(--border))' 
