@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,6 +52,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
+import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { useApi } from '@/hooks/useApi';
 import { usuarioSchema, usuarioCreateSchema, type UsuarioFormData } from '@/lib/validations';
 import type { Usuario, UserProfile, UserStatus } from '@/types';
 
@@ -71,6 +73,10 @@ const mockUsuarios: Usuario[] = [
   { id: 12, nome: 'Elena Martins', perfil: 'V', status: 'I' },
 ];
 
+// Simula delay de API
+const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
+  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+
 const getProfileLabel = (perfil: UserProfile, t: (key: string) => string) => {
   const labels: Record<UserProfile, string> = {
     A: t('users.administrator'),
@@ -89,7 +95,7 @@ const getStatusBadge = (status: UserStatus, t: (key: string) => string) => {
 
 export default function UsuariosPage() {
   const { t } = useTranslation();
-  const [usuarios, setUsuarios] = useState<Usuario[]>(mockUsuarios);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -98,6 +104,11 @@ export default function UsuariosPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  // API states
+  const { isLoading, error, execute } = useApi<Usuario[]>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const form = useForm<UsuarioFormData>({
     resolver: zodResolver(selectedUsuario ? usuarioSchema : usuarioCreateSchema),
@@ -108,6 +119,20 @@ export default function UsuariosPage() {
       status: 'A',
     },
   });
+
+  // Carrega dados iniciais
+  const loadData = useCallback(async () => {
+    await execute(
+      () => simulateApiCall(mockUsuarios),
+      {
+        onSuccess: (data) => setUsuarios(data),
+      }
+    );
+  }, [execute]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredUsuarios = useMemo(() => {
     return usuarios
@@ -132,7 +157,7 @@ export default function UsuariosPage() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [filteredUsuarios.length]);
+  }, [filteredUsuarios.length, currentPage, totalPages]);
 
   const handleSort = (field: 'nome' | 'perfil') => {
     if (sortField === field) {
@@ -165,31 +190,44 @@ export default function UsuariosPage() {
     setIsDeleteOpen(true);
   };
 
-  const onSubmit = (data: UsuarioFormData) => {
-    if (selectedUsuario) {
-      setUsuarios(usuarios.map(u => 
-        u.id === selectedUsuario.id 
-          ? { ...u, nome: data.nome, perfil: data.perfil, status: data.status }
-          : u
-      ));
-    } else {
-      const newUsuario: Usuario = {
-        id: Math.max(...usuarios.map(u => u.id)) + 1,
-        nome: data.nome,
-        perfil: data.perfil,
-        status: data.status,
-      };
-      setUsuarios([...usuarios, newUsuario]);
+  const onSubmit = async (data: UsuarioFormData) => {
+    setIsSaving(true);
+    try {
+      await simulateApiCall(null, 1000);
+      
+      if (selectedUsuario) {
+        setUsuarios(usuarios.map(u => 
+          u.id === selectedUsuario.id 
+            ? { ...u, nome: data.nome, perfil: data.perfil, status: data.status }
+            : u
+        ));
+      } else {
+        const newUsuario: Usuario = {
+          id: Math.max(...usuarios.map(u => u.id)) + 1,
+          nome: data.nome,
+          perfil: data.perfil,
+          status: data.status,
+        };
+        setUsuarios([...usuarios, newUsuario]);
+      }
+      setIsFormOpen(false);
+      form.reset();
+    } finally {
+      setIsSaving(false);
     }
-    setIsFormOpen(false);
-    form.reset();
   };
 
-  const handleConfirmDelete = () => {
-    if (selectedUsuario) {
+  const handleConfirmDelete = async () => {
+    if (!selectedUsuario) return;
+    
+    setIsDeleting(true);
+    try {
+      await simulateApiCall(null, 800);
       setUsuarios(usuarios.filter(u => u.id !== selectedUsuario.id));
+      setIsDeleteOpen(false);
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleteOpen(false);
   };
 
   const handlePageChange = (page: number) => {
@@ -210,6 +248,21 @@ export default function UsuariosPage() {
     );
   };
 
+  // Estado de erro
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('users.title')} description="Gerencie os usuários do sistema" />
+        <ErrorState
+          title={t('common.errorTitle')}
+          message={error}
+          onRetry={loadData}
+          retryText={t('common.retry')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -223,10 +276,12 @@ export default function UsuariosPage() {
         searchValue={search}
         onSearchChange={(value) => { setSearch(value); setCurrentPage(1); }}
         searchPlaceholder="Buscar por nome..."
-        onRefresh={() => {}}
+        onRefresh={loadData}
       />
 
-      {filteredUsuarios.length === 0 ? (
+      {isLoading ? (
+        <TableSkeleton rows={5} columns={4} />
+      ) : filteredUsuarios.length === 0 ? (
         <EmptyState
           title={t('common.noResults')}
           description="Nenhum usuário encontrado com os filtros aplicados"
@@ -405,12 +460,12 @@ export default function UsuariosPage() {
               />
               
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
                   {t('common.cancel')}
                 </Button>
-                <Button type="submit">
+                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
                   {t('common.save')}
-                </Button>
+                </LoadingButton>
               </DialogFooter>
             </form>
           </Form>
@@ -427,12 +482,17 @@ export default function UsuariosPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
               {t('common.cancel')}
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete}>
+            <LoadingButton 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              isLoading={isDeleting}
+              loadingText={t('common.deleting')}
+            >
               {t('common.delete')}
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

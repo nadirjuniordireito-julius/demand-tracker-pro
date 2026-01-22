@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -51,6 +51,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
+import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { useApi } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { projetoSchema, type ProjetoFormData } from '@/lib/validations';
 import type { Projeto } from '@/types';
@@ -65,9 +67,13 @@ const mockProjetos: Projeto[] = [
   { id: 6, nome: 'Projeto Zeta', codTed: 'TED-2024-006', termoInicial: '2024-06-01', termoFinal: '2024-12-31', dataUpdate: '2024-06-01T14:00:00', usuarioId: 3 },
 ];
 
+// Simula delay de API
+const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
+  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+
 export default function ProjetosPage() {
   const { t } = useTranslation();
-  const [projetos, setProjetos] = useState<Projeto[]>(mockProjetos);
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -75,13 +81,35 @@ export default function ProjetosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
+  // API states
+  const { isLoading, error, execute } = useApi<Projeto[]>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const form = useForm<ProjetoFormData>({
     resolver: zodResolver(projetoSchema),
     defaultValues: { nome: '', codTed: '', termoInicial: undefined, termoFinal: undefined },
   });
 
+  // Carrega dados iniciais
+  const loadData = useCallback(async () => {
+    await execute(
+      () => simulateApiCall(mockProjetos),
+      {
+        onSuccess: (data) => setProjetos(data),
+      }
+    );
+  }, [execute]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const filteredProjetos = useMemo(() => {
-    return projetos.filter(p => p.nome.toLowerCase().includes(search.toLowerCase()) || p.codTed.toLowerCase().includes(search.toLowerCase()));
+    return projetos.filter(p => 
+      p.nome.toLowerCase().includes(search.toLowerCase()) || 
+      p.codTed.toLowerCase().includes(search.toLowerCase())
+    );
   }, [projetos, search]);
 
   const totalPages = Math.ceil(filteredProjetos.length / pageSize);
@@ -92,28 +120,113 @@ export default function ProjetosPage() {
 
   const formatDate = (dateStr: string) => format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
 
-  const handleAdd = () => { setSelectedProjeto(null); form.reset({ nome: '', codTed: '', termoInicial: undefined, termoFinal: undefined }); setIsFormOpen(true); };
-  const handleEdit = (projeto: Projeto) => { setSelectedProjeto(projeto); form.reset({ nome: projeto.nome, codTed: projeto.codTed, termoInicial: new Date(projeto.termoInicial), termoFinal: new Date(projeto.termoFinal) }); setIsFormOpen(true); };
-  const handleDelete = (projeto: Projeto) => { setSelectedProjeto(projeto); setIsDeleteOpen(true); };
-
-  const onSubmit = (data: ProjetoFormData) => {
-    if (selectedProjeto) {
-      setProjetos(projetos.map(p => p.id === selectedProjeto.id ? { ...p, nome: data.nome, codTed: data.codTed, termoInicial: data.termoInicial.toISOString().split('T')[0], termoFinal: data.termoFinal.toISOString().split('T')[0], dataUpdate: new Date().toISOString() } : p));
-    } else {
-      setProjetos([...projetos, { id: Math.max(...projetos.map(p => p.id)) + 1, nome: data.nome, codTed: data.codTed, termoInicial: data.termoInicial.toISOString().split('T')[0], termoFinal: data.termoFinal.toISOString().split('T')[0], dataUpdate: new Date().toISOString(), usuarioId: 1 }]);
-    }
-    setIsFormOpen(false); form.reset();
+  const handleAdd = () => {
+    setSelectedProjeto(null);
+    form.reset({ nome: '', codTed: '', termoInicial: undefined, termoFinal: undefined });
+    setIsFormOpen(true);
   };
 
-  const handleConfirmDelete = () => { if (selectedProjeto) setProjetos(projetos.filter(p => p.id !== selectedProjeto.id)); setIsDeleteOpen(false); };
+  const handleEdit = (projeto: Projeto) => {
+    setSelectedProjeto(projeto);
+    form.reset({
+      nome: projeto.nome,
+      codTed: projeto.codTed,
+      termoInicial: new Date(projeto.termoInicial),
+      termoFinal: new Date(projeto.termoFinal)
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = (projeto: Projeto) => {
+    setSelectedProjeto(projeto);
+    setIsDeleteOpen(true);
+  };
+
+  const onSubmit = async (data: ProjetoFormData) => {
+    setIsSaving(true);
+    try {
+      await simulateApiCall(null, 1000);
+      
+      if (selectedProjeto) {
+        setProjetos(projetos.map(p => p.id === selectedProjeto.id ? {
+          ...p,
+          nome: data.nome,
+          codTed: data.codTed,
+          termoInicial: data.termoInicial.toISOString().split('T')[0],
+          termoFinal: data.termoFinal.toISOString().split('T')[0],
+          dataUpdate: new Date().toISOString()
+        } : p));
+      } else {
+        setProjetos([...projetos, {
+          id: Math.max(...projetos.map(p => p.id)) + 1,
+          nome: data.nome,
+          codTed: data.codTed,
+          termoInicial: data.termoInicial.toISOString().split('T')[0],
+          termoFinal: data.termoFinal.toISOString().split('T')[0],
+          dataUpdate: new Date().toISOString(),
+          usuarioId: 1
+        }]);
+      }
+      setIsFormOpen(false);
+      form.reset();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedProjeto) return;
+    
+    setIsDeleting(true);
+    try {
+      await simulateApiCall(null, 800);
+      setProjetos(projetos.filter(p => p.id !== selectedProjeto.id));
+      setIsDeleteOpen(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Estado de erro
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('projects.title')} description="Gerencie os projetos do sistema" />
+        <ErrorState
+          title={t('common.errorTitle')}
+          message={error}
+          onRetry={loadData}
+          retryText={t('common.retry')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t('projects.title')} description="Gerencie os projetos do sistema" onAdd={handleAdd} addLabel={t('projects.newProject')} />
-      <SearchFilterBar searchValue={search} onSearchChange={(v) => { setSearch(v); setCurrentPage(1); }} searchPlaceholder="Buscar por nome ou código..." onRefresh={() => {}} />
+      <PageHeader 
+        title={t('projects.title')} 
+        description="Gerencie os projetos do sistema" 
+        onAdd={handleAdd} 
+        addLabel={t('projects.newProject')} 
+      />
+      
+      <SearchFilterBar 
+        searchValue={search} 
+        onSearchChange={(v) => { setSearch(v); setCurrentPage(1); }} 
+        searchPlaceholder="Buscar por nome ou código..." 
+        onRefresh={loadData} 
+      />
 
-      {filteredProjetos.length === 0 ? (
-        <EmptyState title={t('common.noResults')} description="Nenhum projeto encontrado" icon={<FolderKanban className="h-6 w-6 text-muted-foreground" />} action={<Button onClick={handleAdd}>{t('projects.newProject')}</Button>} />
+      {isLoading ? (
+        <TableSkeleton rows={5} columns={5} />
+      ) : filteredProjetos.length === 0 ? (
+        <EmptyState 
+          title={t('common.noResults')} 
+          description="Nenhum projeto encontrado" 
+          icon={<FolderKanban className="h-6 w-6 text-muted-foreground" />} 
+          action={<Button onClick={handleAdd}>{t('projects.newProject')}</Button>} 
+        />
       ) : (
         <>
           <div className="border rounded-lg">
@@ -136,11 +249,19 @@ export default function ProjetosPage() {
                     <TableCell>{formatDate(projeto.termoFinal)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(projeto)}><Edit className="h-4 w-4 mr-2" />{t('common.edit')}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(projeto)}>
+                            <Edit className="h-4 w-4 mr-2" />{t('common.edit')}
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDelete(projeto)} className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />{t('common.delete')}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(projeto)} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />{t('common.delete')}
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -149,39 +270,149 @@ export default function ProjetosPage() {
               </TableBody>
             </Table>
           </div>
-          <TablePagination currentPage={currentPage} totalPages={totalPages} pageSize={pageSize} totalItems={filteredProjetos.length} onPageChange={setCurrentPage} onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
+          <TablePagination 
+            currentPage={currentPage} 
+            totalPages={totalPages} 
+            pageSize={pageSize} 
+            totalItems={filteredProjetos.length} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} 
+          />
         </>
       )}
 
+      {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>{selectedProjeto ? t('projects.editProject') : t('projects.newProject')}</DialogTitle>
-            <DialogDescription>{selectedProjeto ? 'Edite as informações do projeto.' : 'Preencha as informações para criar um novo projeto.'}</DialogDescription>
+            <DialogDescription>
+              {selectedProjeto ? 'Edite as informações do projeto.' : 'Preencha as informações para criar um novo projeto.'}
+            </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="nome" render={({ field }) => (<FormItem><FormLabel>{t('projects.name')} *</FormLabel><FormControl><Input placeholder="Nome do projeto" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="codTed" render={({ field }) => (<FormItem><FormLabel>{t('projects.codeTed')} *</FormLabel><FormControl><Input placeholder="TED-2024-XXX" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField 
+                control={form.control} 
+                name="nome" 
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('projects.name')} *</FormLabel>
+                    <FormControl><Input placeholder="Nome do projeto" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} 
+              />
+              <FormField 
+                control={form.control} 
+                name="codTed" 
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('projects.codeTed')} *</FormLabel>
+                    <FormControl><Input placeholder="TED-2024-XXX" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} 
+              />
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="termoInicial" render={({ field }) => (
-                  <FormItem><FormLabel>{t('projects.startDate')} *</FormLabel>
-                    <Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}><Calendar className="mr-2 h-4 w-4" />{field.value ? format(field.value, "dd/MM/yyyy") : "Selecionar"}</Button></FormControl></PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start"><CalendarComponent mode="single" selected={field.value} onSelect={field.onChange} initialFocus className="pointer-events-auto" /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="termoFinal" render={({ field }) => (
-                  <FormItem><FormLabel>{t('projects.endDate')} *</FormLabel>
-                    <Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}><Calendar className="mr-2 h-4 w-4" />{field.value ? format(field.value, "dd/MM/yyyy") : "Selecionar"}</Button></FormControl></PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start"><CalendarComponent mode="single" selected={field.value} onSelect={field.onChange} initialFocus className="pointer-events-auto" /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                <FormField 
+                  control={form.control} 
+                  name="termoInicial" 
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('projects.startDate')} *</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button 
+                              variant="outline" 
+                              className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "dd/MM/yyyy") : "Selecionar"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent 
+                            mode="single" 
+                            selected={field.value} 
+                            onSelect={field.onChange} 
+                            initialFocus 
+                            className="pointer-events-auto" 
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
+                <FormField 
+                  control={form.control} 
+                  name="termoFinal" 
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('projects.endDate')} *</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button 
+                              variant="outline" 
+                              className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "dd/MM/yyyy") : "Selecionar"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent 
+                            mode="single" 
+                            selected={field.value} 
+                            onSelect={field.onChange} 
+                            initialFocus 
+                            className="pointer-events-auto" 
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
               </div>
-              <DialogFooter><Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t('common.cancel')}</Button><Button type="submit">{t('common.save')}</Button></DialogFooter>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
+                  {t('common.cancel')}
+                </Button>
+                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
+                  {t('common.save')}
+                </LoadingButton>
+              </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent><DialogHeader><DialogTitle>{t('common.confirmDelete')}</DialogTitle><DialogDescription>{t('projects.deleteConfirm')}</DialogDescription></DialogHeader>
-          <DialogFooter><Button variant="outline" onClick={() => setIsDeleteOpen(false)}>{t('common.cancel')}</Button><Button variant="destructive" onClick={handleConfirmDelete}>{t('common.delete')}</Button></DialogFooter>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('common.confirmDelete')}</DialogTitle>
+            <DialogDescription>{t('projects.deleteConfirm')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              isLoading={isDeleting}
+              loadingText={t('common.deleting')}
+            >
+              {t('common.delete')}
+            </LoadingButton>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
