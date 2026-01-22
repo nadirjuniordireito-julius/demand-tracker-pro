@@ -25,35 +25,8 @@ import {
 } from 'recharts';
 import { useApi } from '@/hooks/useApi';
 import { DashboardSkeleton, ErrorState } from '@/components/common/LoadingStates';
+import { dashboardService } from '@/services/dashboardService';
 import type { DashboardStats, DemandaPorProjeto, DemandaPorStatus } from '@/types';
-
-// Mock data para demonstração
-const mockStats: DashboardStats = {
-  totalDemandas: 45,
-  demandasAbertas: 12,
-  demandasEncerradas: 28,
-  custosPlanejados: 450000,
-  custosRealizados: 425000,
-};
-
-const mockDemandsByProject: DemandaPorProjeto[] = [
-  { projetoNome: 'Projeto Alpha', quantidade: 15 },
-  { projetoNome: 'Projeto Beta', quantidade: 12 },
-  { projetoNome: 'Projeto Gamma', quantidade: 8 },
-  { projetoNome: 'Projeto Delta', quantidade: 6 },
-  { projetoNome: 'Projeto Epsilon', quantidade: 4 },
-];
-
-const mockDemandsByStatus: DemandaPorStatus[] = [
-  { name: 'Abertas', value: 12, color: '#3b82f6' },
-  { name: 'Em Planejamento', value: 5, color: '#f59e0b' },
-  { name: 'Em Execução', value: 8, color: '#8b5cf6' },
-  { name: 'Encerradas', value: 28, color: '#22c55e' },
-];
-
-const simulateApiCall = <T,>(data: T, delay = 1200): Promise<T> => {
-  return new Promise((resolve) => setTimeout(() => resolve(data), delay));
-};
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -71,9 +44,9 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     await Promise.all([
-      executeStats(() => simulateApiCall(mockStats)),
-      executeProjects(() => simulateApiCall(mockDemandsByProject)),
-      executeStatus(() => simulateApiCall(mockDemandsByStatus)),
+      executeStats(() => dashboardService.getStats()),
+      executeProjects(() => dashboardService.getDemandsByProject()),
+      executeStatus(() => dashboardService.getDemandsByStatus()),
     ]);
   };
 
