@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,6 +58,8 @@ import {
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
+import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { useApi } from '@/hooks/useApi';
 import { termoPlanejamentoSchema, type TermoPlanejamentoFormData } from '@/lib/validations';
 import type { TermoPlanejamento, TermoPlanejamentoCusto } from '@/types';
 
@@ -104,6 +106,10 @@ const mockPerfis = [
   { id: 3, nome: 'Gerente de Projetos' },
 ];
 
+// Simula delay de API
+const simulateApiCall = <T,>(data: T, delay = 800): Promise<T> => 
+  new Promise((resolve) => setTimeout(() => resolve(data), delay));
+
 interface CustoForm {
   perfilId: string;
   qtdeHora: string;
@@ -112,7 +118,7 @@ interface CustoForm {
 
 export default function TermoPlanejamentoPage() {
   const { t } = useTranslation();
-  const [termos, setTermos] = useState(mockTermos);
+  const [termos, setTermos] = useState<typeof mockTermos>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -121,6 +127,12 @@ export default function TermoPlanejamentoPage() {
   const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // API states
+  const { isLoading, error, execute } = useApi<typeof mockTermos>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
 
   const form = useForm<TermoPlanejamentoFormData>({
     resolver: zodResolver(termoPlanejamentoSchema),
@@ -131,6 +143,20 @@ export default function TermoPlanejamentoPage() {
       resultadoEsperado: '',
     },
   });
+
+  // Carrega dados iniciais
+  const loadData = useCallback(async () => {
+    await execute(
+      () => simulateApiCall(mockTermos),
+      {
+        onSuccess: (data) => setTermos(data),
+      }
+    );
+  }, [execute]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredTermos = useMemo(() => {
     return termos.filter((termo) => {
@@ -206,12 +232,18 @@ export default function TermoPlanejamentoPage() {
     setIsDeleteOpen(true);
   };
 
-  const handleSign = (termo: typeof mockTermos[0]) => {
-    setTermos(termos.map(t => 
-      t.id === termo.id 
-        ? { ...t, dataAssinatura: new Date().toISOString() }
-        : t
-    ));
+  const handleSign = async (termo: typeof mockTermos[0]) => {
+    setIsSigning(true);
+    try {
+      await simulateApiCall(null, 800);
+      setTermos(termos.map(t => 
+        t.id === termo.id 
+          ? { ...t, dataAssinatura: new Date().toISOString() }
+          : t
+      ));
+    } finally {
+      setIsSigning(false);
+    }
   };
 
   const handleAddCusto = () => {
@@ -229,7 +261,6 @@ export default function TermoPlanejamentoPage() {
     setCustos(custos.map((c, i) => 
       i === index ? { ...c, [field]: value } : c
     ));
-    // Clear error when user starts typing
     if (custoErrors[index]) {
       const newErrors = { ...custoErrors };
       delete newErrors[index];
@@ -250,56 +281,84 @@ export default function TermoPlanejamentoPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const onSubmit = (data: TermoPlanejamentoFormData) => {
+  const onSubmit = async (data: TermoPlanejamentoFormData) => {
     if (!validateCustos()) return;
 
-    const custosFormatted = custos
-      .filter(c => c.perfilId && c.qtdeHora && c.valorHora)
-      .map((c, index) => ({
-        id: index + 1,
-        termoPlanejamentoId: selectedTermo?.id || termos.length + 1,
-        perfilId: Number(c.perfilId),
-        qtdeHora: Number(c.qtdeHora),
-        valorHora: Number(c.valorHora),
-      }));
+    setIsSaving(true);
+    try {
+      await simulateApiCall(null, 1000);
+      
+      const custosFormatted = custos
+        .filter(c => c.perfilId && c.qtdeHora && c.valorHora)
+        .map((c, index) => ({
+          id: index + 1,
+          termoPlanejamentoId: selectedTermo?.id || termos.length + 1,
+          perfilId: Number(c.perfilId),
+          qtdeHora: Number(c.qtdeHora),
+          valorHora: Number(c.valorHora),
+        }));
 
-    if (selectedTermo) {
-      setTermos(termos.map(t => 
-        t.id === selectedTermo.id 
-          ? { 
-              ...t, 
-              demandaTecnicaId: Number(data.demandaTecnicaId),
-              especificacao: data.especificacao,
-              cronograma: data.cronograma,
-              resultadoEsperado: data.resultadoEsperado,
-              custos: custosFormatted,
-            }
-          : t
-      ));
-    } else {
-      const newTermo = {
-        id: Math.max(...termos.map(t => t.id), 0) + 1,
-        demandaTecnicaId: Number(data.demandaTecnicaId),
-        especificacao: data.especificacao,
-        cronograma: data.cronograma,
-        resultadoEsperado: data.resultadoEsperado,
-        dataAbertura: new Date().toISOString(),
-        usuarioId: 1,
-        dataAssinatura: null,
-        custos: custosFormatted,
-      };
-      setTermos([...termos, newTermo]);
+      if (selectedTermo) {
+        setTermos(termos.map(t => 
+          t.id === selectedTermo.id 
+            ? { 
+                ...t, 
+                demandaTecnicaId: Number(data.demandaTecnicaId),
+                especificacao: data.especificacao,
+                cronograma: data.cronograma,
+                resultadoEsperado: data.resultadoEsperado,
+                custos: custosFormatted,
+              }
+            : t
+        ));
+      } else {
+        const newTermo = {
+          id: Math.max(...termos.map(t => t.id), 0) + 1,
+          demandaTecnicaId: Number(data.demandaTecnicaId),
+          especificacao: data.especificacao,
+          cronograma: data.cronograma,
+          resultadoEsperado: data.resultadoEsperado,
+          dataAbertura: new Date().toISOString(),
+          usuarioId: 1,
+          dataAssinatura: null,
+          custos: custosFormatted,
+        };
+        setTermos([...termos, newTermo]);
+      }
+      setIsFormOpen(false);
+      form.reset();
+    } finally {
+      setIsSaving(false);
     }
-    setIsFormOpen(false);
-    form.reset();
   };
 
-  const handleConfirmDelete = () => {
-    if (selectedTermo) {
+  const handleConfirmDelete = async () => {
+    if (!selectedTermo) return;
+    
+    setIsDeleting(true);
+    try {
+      await simulateApiCall(null, 800);
       setTermos(termos.filter(t => t.id !== selectedTermo.id));
+      setIsDeleteOpen(false);
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleteOpen(false);
   };
+
+  // Estado de erro
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('planningTerm.title')} description="Gerencie os termos de planejamento das demandas" />
+        <ErrorState
+          title={t('common.errorTitle')}
+          message={error}
+          onRetry={loadData}
+          retryText={t('common.retry')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -314,10 +373,12 @@ export default function TermoPlanejamentoPage() {
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por demanda..."
-        onRefresh={() => {}}
+        onRefresh={loadData}
       />
 
-      {filteredTermos.length === 0 ? (
+      {isLoading ? (
+        <TableSkeleton rows={5} columns={5} />
+      ) : filteredTermos.length === 0 ? (
         <EmptyState
           title={t('common.noResults')}
           description="Nenhum termo de planejamento encontrado"
@@ -363,7 +424,7 @@ export default function TermoPlanejamentoPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" disabled={isSigning}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -500,7 +561,7 @@ export default function TermoPlanejamentoPage() {
                 )}
               />
 
-              {/* Custos */}
+              {/* Custos Planejados */}
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -547,7 +608,6 @@ export default function TermoPlanejamentoPage() {
                                 value={custo.qtdeHora}
                                 onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
                                 placeholder="Horas"
-                                min="1"
                               />
                             </div>
                             <div>
@@ -557,24 +617,22 @@ export default function TermoPlanejamentoPage() {
                                 className="h-8"
                                 value={custo.valorHora}
                                 onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
-                                placeholder="R$ 0,00"
-                                min="0.01"
-                                step="0.01"
+                                placeholder="R$"
                               />
                             </div>
                           </div>
-                          <Button 
+                          <Button
                             type="button"
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
                             onClick={() => handleRemoveCusto(index)}
                           >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
                         {custoErrors[index] && (
-                          <p className="text-sm text-destructive px-3">{custoErrors[index]}</p>
+                          <p className="text-xs text-destructive">{custoErrors[index]}</p>
                         )}
                       </div>
                     ))
@@ -583,12 +641,12 @@ export default function TermoPlanejamentoPage() {
               </Card>
               
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
                   {t('common.cancel')}
                 </Button>
-                <Button type="submit">
+                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
                   {t('common.save')}
-                </Button>
+                </LoadingButton>
               </DialogFooter>
             </form>
           </Form>
@@ -605,12 +663,17 @@ export default function TermoPlanejamentoPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
               {t('common.cancel')}
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete}>
+            <LoadingButton 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              isLoading={isDeleting}
+              loadingText={t('common.deleting')}
+            >
               {t('common.delete')}
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
