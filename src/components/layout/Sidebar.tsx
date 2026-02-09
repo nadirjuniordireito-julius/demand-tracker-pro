@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -8,16 +8,19 @@ import {
   FolderKanban,
   UserCircle,
   FileText,
-  FilePlus,
-  FileCheck,
-  FileX,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  Target,
+  HeartPulse,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SidebarProps {
   isCollapsed: boolean;
+  onToggleSidebar: () => void;
 }
 
 interface NavItemProps {
@@ -34,6 +37,10 @@ interface NavGroupProps {
   isCollapsed: boolean;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  /** Prefixo da rota (ex: /cadastros, /demandas) para destacar só quando a rota atual pertence a este grupo */
+  pathPrefix: string;
+  /** Chamado ao clicar no grupo com menu recolhido, para expandir o sidebar */
+  onExpandSidebar?: () => void;
 }
 
 function NavItem({ to, icon, label, isCollapsed, end = false }: NavItemProps) {
@@ -43,48 +50,55 @@ function NavItem({ to, icon, label, isCollapsed, end = false }: NavItemProps) {
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200',
+          'flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 text-sm font-light',
           'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          isActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-medium',
+          isActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-normal',
           isCollapsed && 'justify-center px-2'
         )
       }
       title={isCollapsed ? label : undefined}
     >
-      <span className="flex-shrink-0">{icon}</span>
+      <span className="flex-shrink-0 [&_svg]:stroke-[1]">{icon}</span>
       {!isCollapsed && <span className="truncate">{label}</span>}
     </NavLink>
   );
 }
 
-function NavGroup({ icon, label, isCollapsed, children, defaultOpen = false }: NavGroupProps) {
+function NavGroup({ icon, label, isCollapsed, children, defaultOpen = false, pathPrefix, onExpandSidebar }: NavGroupProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const location = useLocation();
 
-  // Check if any child route is active
-  const isChildActive = location.pathname.includes('/cadastros') || 
-                        location.pathname.includes('/demandas');
+  const isChildActive = location.pathname === pathPrefix || location.pathname.startsWith(pathPrefix + '/');
+
+  const handleClick = () => {
+    if (isCollapsed) {
+      onExpandSidebar?.();
+      setIsOpen(true);
+    } else {
+      setIsOpen(!isOpen);
+    }
+  };
 
   return (
     <div className="space-y-1">
       <button
-        onClick={() => !isCollapsed && setIsOpen(!isOpen)}
+        onClick={handleClick}
         className={cn(
-          'w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200',
+          'w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 text-sm font-light',
           'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
           isChildActive && 'text-sidebar-accent-foreground',
           isCollapsed && 'justify-center px-2'
         )}
         title={isCollapsed ? label : undefined}
       >
-        <span className="flex-shrink-0">{icon}</span>
+        <span className="flex-shrink-0 [&_svg]:stroke-[1]">{icon}</span>
         {!isCollapsed && (
           <>
             <span className="flex-1 text-left truncate">{label}</span>
             {isOpen ? (
-              <ChevronDown className="h-4 w-4 flex-shrink-0" />
+              <ChevronDown className="h-4 w-4 flex-shrink-0 stroke-[1]" />
             ) : (
-              <ChevronRight className="h-4 w-4 flex-shrink-0" />
+              <ChevronRight className="h-4 w-4 flex-shrink-0 stroke-[1]" />
             )}
           </>
         )}
@@ -99,44 +113,87 @@ function NavGroup({ icon, label, isCollapsed, children, defaultOpen = false }: N
   );
 }
 
-export function Sidebar({ isCollapsed }: SidebarProps) {
+interface NavSubGroupProps {
+  icon: React.ReactNode;
+  label: string;
+  isCollapsed: boolean;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}
+
+function NavSubGroup({ icon, label, isCollapsed, children, defaultOpen = false }: NavSubGroupProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const location = useLocation();
+
+  // Check if any child route is active
+  const isChildActive = location.pathname.startsWith('/cadastros/projeto-meta') || 
+                        location.pathname.startsWith('/cadastros/meta-produto');
+  
+  // Auto-open if child is active
+  useEffect(() => {
+    if (isChildActive && !isCollapsed) {
+      setIsOpen(true);
+    }
+  }, [isChildActive, isCollapsed]);
+
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={() => !isCollapsed && setIsOpen(!isOpen)}
+        className={cn(
+          'w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-200 text-xs font-light',
+          'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+          isChildActive && 'text-sidebar-accent-foreground',
+          isCollapsed && 'justify-center px-1'
+        )}
+        title={isCollapsed ? label : undefined}
+      >
+        <span className="flex-shrink-0 [&_svg]:stroke-[1]">{icon}</span>
+        {!isCollapsed && (
+          <>
+            <span className="flex-1 text-left truncate">{label}</span>
+            {isOpen ? (
+              <ChevronDown className="h-3 w-3 flex-shrink-0 stroke-[1]" />
+            ) : (
+              <ChevronRight className="h-3 w-3 flex-shrink-0 stroke-[1]" />
+            )}
+          </>
+        )}
+      </button>
+      
+      {!isCollapsed && isOpen && (
+        <div className="ml-3 pl-2 border-l border-sidebar-border/50 space-y-1 animate-fade-in">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   return (
     <aside
       className={cn(
-        'bg-sidebar border-r border-sidebar-border flex flex-col',
+        'relative bg-sidebar border-r border-sidebar-border flex flex-col',
         'transition-all duration-300 ease-in-out',
         isCollapsed ? 'w-16' : 'w-64'
       )}
     >
-      {/* Logo Area */}
-      <div className={cn(
-        'h-14 flex items-center border-b border-sidebar-border px-4',
-        isCollapsed && 'justify-center px-2'
-      )}>
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-            <FileText className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>
-          {!isCollapsed && (
-            <span className="font-semibold text-sidebar-foreground truncate">
-              SDT
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-2">
-        <NavItem 
-          to="/" 
-          icon={<Home className="h-5 w-5" />} 
-          label={t('nav.home')} 
-          isCollapsed={isCollapsed}
-          end
-        />
-        
+      <nav className="flex-1 overflow-y-auto p-3 space-y-2 pt-4">
+        {/* Início - oculto para perfil Visualizador (V) */}
+        {user?.perfil !== 'V' && (
+          <NavItem 
+            to="/"
+            icon={<Home className="h-5 w-5" />} 
+            label={t('nav.home')} 
+            isCollapsed={isCollapsed}
+            end
+          />
+        )}
         <NavItem 
           to="/dashboard" 
           icon={<LayoutDashboard className="h-5 w-5" />} 
@@ -144,67 +201,98 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
           isCollapsed={isCollapsed}
         />
 
-        {/* Cadastros Group */}
-        <NavGroup
-          icon={<FolderKanban className="h-5 w-5" />}
-          label={t('nav.registrations')}
-          isCollapsed={isCollapsed}
-          defaultOpen
-        >
-          <NavItem 
-            to="/cadastros/usuarios" 
-            icon={<Users className="h-4 w-4" />} 
-            label={t('nav.users')} 
+        {/* Cadastros Group - apenas perfil Admin (A) */}
+        {user?.perfil === 'A' && (
+          <NavGroup
+            icon={<FolderKanban className="h-5 w-5" />}
+            label={t('nav.registrations')}
             isCollapsed={isCollapsed}
-          />
-          <NavItem 
-            to="/cadastros/projetos" 
-            icon={<FolderKanban className="h-4 w-4" />} 
-            label={t('nav.projects')} 
-            isCollapsed={isCollapsed}
-          />
-          <NavItem 
-            to="/cadastros/perfis" 
-            icon={<UserCircle className="h-4 w-4" />} 
-            label={t('nav.profiles')} 
-            isCollapsed={isCollapsed}
-          />
-        </NavGroup>
+            defaultOpen
+            pathPrefix="/cadastros"
+            onExpandSidebar={() => isCollapsed && onToggleSidebar()}
+          >
+            <NavItem 
+              to="/cadastros/usuarios" 
+              icon={<Users className="h-4 w-4" />} 
+              label={t('nav.users')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem 
+              to="/cadastros/projetos" 
+              icon={<FolderKanban className="h-4 w-4" />} 
+              label={t('nav.projects')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem 
+              to="/cadastros/projeto-meta" 
+              icon={<Target className="h-4 w-4" />} 
+              label={t('nav.goals')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem 
+              to="/cadastros/perfis" 
+              icon={<UserCircle className="h-4 w-4" />} 
+              label={t('nav.profiles')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem 
+              to="/cadastros/templates" 
+              icon={<FileText className="h-4 w-4" />} 
+              label={t('nav.templates')} 
+              isCollapsed={isCollapsed}
+            />
+          </NavGroup>
+        )}
 
-        {/* Demandas Group */}
+        {/* Demandas Group - Visualizador (V) não vê submenu Demanda Técnica */}
         <NavGroup
           icon={<FileText className="h-5 w-5" />}
           label={t('nav.demands')}
           isCollapsed={isCollapsed}
           defaultOpen
+          pathPrefix="/demandas"
+          onExpandSidebar={() => isCollapsed && onToggleSidebar()}
         >
+          {user?.perfil !== 'V' && (
+            <NavItem 
+              to="/demandas" 
+              icon={<FileText className="h-4 w-4" />} 
+              label={t('nav.technicalDemand')} 
+              isCollapsed={isCollapsed}
+              end
+            />
+          )}
           <NavItem 
-            to="/demandas" 
-            icon={<FileText className="h-4 w-4" />} 
-            label={t('nav.technicalDemand')} 
+            to="/demandas/health-map" 
+            icon={<HeartPulse className="h-4 w-4" />} 
+            label={t('nav.healthMap')} 
             isCollapsed={isCollapsed}
             end
           />
-          <NavItem 
-            to="/demandas/termo-abertura" 
-            icon={<FilePlus className="h-4 w-4" />} 
-            label={t('nav.openingTerm')} 
-            isCollapsed={isCollapsed}
-          />
-          <NavItem 
-            to="/demandas/termo-planejamento" 
-            icon={<FileCheck className="h-4 w-4" />} 
-            label={t('nav.planningTerm')} 
-            isCollapsed={isCollapsed}
-          />
-          <NavItem 
-            to="/demandas/termo-encerramento" 
-            icon={<FileX className="h-4 w-4" />} 
-            label={t('nav.closingTerm')} 
-            isCollapsed={isCollapsed}
-          />
         </NavGroup>
       </nav>
+
+      {/* Botão expandir/recolher - semicírculo projetando para fora da sidebar */}
+      <div className="absolute left-full top-3 z-10 w-[14px] overflow-hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleSidebar}
+          className={cn(
+            '-ml-[14px] h-7 w-7 rounded-full border border-sidebar-border bg-sidebar shadow-sm',
+            'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            'transition-all duration-200 flex items-center justify-end pr-1.5'
+          )}
+          title={t('header.toggleSidebar')}
+          aria-label={t('header.toggleSidebar')}
+        >
+          {isCollapsed ? (
+            <ChevronRight className="h-3.5 w-3.5 stroke-[1]" />
+          ) : (
+            <ChevronLeft className="h-3.5 w-3.5 stroke-[1]" />
+          )}
+        </Button>
+      </div>
     </aside>
   );
 }

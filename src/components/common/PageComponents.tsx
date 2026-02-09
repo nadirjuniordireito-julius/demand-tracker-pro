@@ -26,9 +26,9 @@ export function PageHeader({ title, description, onAdd, addLabel, children }: Pa
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-lg font-normal tracking-tight">{title}</h1>
         {description && (
-          <p className="text-muted-foreground">{description}</p>
+          <p className="text-sm font-light text-muted-foreground">{description}</p>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export function SearchFilterBar({
       </div>
       {children}
       {onRefresh && (
-        <Button variant="outline" size="icon" onClick={onRefresh} title={t('common.refresh')}>
+        <Button variant="outline" size="icon" onClick={onRefresh} title={t('common.refresh')} aria-label={t('common.refresh')}>
           <RefreshCw className="h-4 w-4" />
         </Button>
       )}
@@ -182,6 +182,7 @@ export function TablePagination({
           className="h-8 w-8"
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
+          aria-label={t('pagination.first')}
         >
           <ChevronsLeft className="h-4 w-4" />
         </Button>
@@ -191,6 +192,7 @@ export function TablePagination({
           className="h-8 w-8"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
+          aria-label={t('pagination.previous')}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -206,6 +208,7 @@ export function TablePagination({
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => onPageChange(page as number)}
+                aria-label={t('pagination.pageNumber', { number: page })}
               >
                 {page}
               </Button>
@@ -219,6 +222,7 @@ export function TablePagination({
           className="h-8 w-8"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages || totalPages === 0}
+          aria-label={t('pagination.next')}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -228,6 +232,7 @@ export function TablePagination({
           className="h-8 w-8"
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages || totalPages === 0}
+          aria-label={t('pagination.last')}
         >
           <ChevronsRight className="h-4 w-4" />
         </Button>
@@ -337,7 +342,7 @@ export function StatsCard({ title, value, icon, description, trend }: StatsCardP
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-normal text-muted-foreground">
           {title}
         </CardTitle>
         <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center text-primary">
@@ -345,7 +350,7 @@ export function StatsCard({ title, value, icon, description, trend }: StatsCardP
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-lg font-normal">{value}</div>
         {description && (
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         )}

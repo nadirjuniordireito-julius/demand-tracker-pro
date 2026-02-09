@@ -16,31 +16,27 @@ export default function HomePage() {
   const quickLinks = [
     {
       title: t('nav.dashboard'),
-      description: 'Visualize estatísticas e métricas do sistema',
+      description: t('common.dashboardDescription'),
       icon: TrendingUp,
       to: '/dashboard',
-      color: 'bg-info/10 text-info',
     },
     {
       title: t('nav.demands'),
-      description: 'Gerencie demandas técnicas dos projetos',
+      description: t('common.demandsDescription'),
       icon: FileText,
       to: '/demandas',
-      color: 'bg-primary/10 text-primary',
     },
     {
       title: t('nav.projects'),
-      description: 'Cadastre e gerencie projetos',
+      description: t('common.projectsDescription'),
       icon: FolderKanban,
       to: '/cadastros/projetos',
-      color: 'bg-success/10 text-success',
     },
     {
       title: t('nav.users'),
-      description: 'Gerencie usuários do sistema',
+      description: t('common.usersDescription'),
       icon: Users,
       to: '/cadastros/usuarios',
-      color: 'bg-warning/10 text-warning',
     },
   ];
 
@@ -48,11 +44,11 @@ export default function HomePage() {
     <div className="space-y-8">
       {/* Welcome Section */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Bem-vindo ao {t('common.appName')}
+        <h1 className="text-lg font-normal tracking-tight">
+          {t('common.welcomeMessage', { appName: t('common.appName') })}
         </h1>
         <p className="text-muted-foreground">
-          Gerencie demandas técnicas de forma eficiente e organizada.
+          {t('common.welcomeDescription')}
         </p>
       </div>
 
@@ -61,16 +57,14 @@ export default function HomePage() {
         {quickLinks.map((link) => (
           <Card key={link.to} className="hover:shadow-elevated transition-shadow duration-200">
             <CardHeader className="pb-2">
-              <div className={`w-10 h-10 rounded-md flex items-center justify-center ${link.color}`}>
-                <link.icon className="h-5 w-5" />
-              </div>
+              <link.icon className="h-10 w-10 text-foreground" strokeWidth={1.5} />
             </CardHeader>
             <CardContent className="space-y-2">
-              <CardTitle className="text-lg">{link.title}</CardTitle>
+              <CardTitle className="text-base font-normal text-primary">{link.title}</CardTitle>
               <CardDescription>{link.description}</CardDescription>
               <Button variant="ghost" size="sm" asChild className="p-0 h-auto">
                 <Link to={link.to} className="flex items-center gap-1 text-primary">
-                  Acessar <ArrowRight className="h-4 w-4" />
+                  {t('common.access')} <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>
@@ -81,50 +75,50 @@ export default function HomePage() {
       {/* Instructions Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Como usar o sistema</CardTitle>
+          <CardTitle>{t('common.howToUseTitle')}</CardTitle>
           <CardDescription>
-            Siga o fluxo abaixo para gerenciar suas demandas técnicas
+            {t('common.howToUseDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-4">
             <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/50">
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold mb-2">
+              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-normal mb-2">
                 1
               </div>
-              <h4 className="font-medium">Criar Demanda</h4>
+              <h4 className="font-medium">{t('common.step1Title')}</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Cadastre uma nova demanda técnica vinculada a um projeto
+                {t('common.step1Description')}
               </p>
             </div>
             
             <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/50">
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold mb-2">
+              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-normal mb-2">
                 2
               </div>
-              <h4 className="font-medium">Termo de Abertura</h4>
+              <h4 className="font-medium">{t('common.step2Title')}</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Formalize a demanda com descrição detalhada
+                {t('common.step2Description')}
               </p>
             </div>
             
             <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/50">
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold mb-2">
+              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-normal mb-2">
                 3
               </div>
-              <h4 className="font-medium">Termo de Planejamento</h4>
+              <h4 className="font-medium">{t('common.step3Title')}</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Defina especificações, cronograma e custos
+                {t('common.step3Description')}
               </p>
             </div>
             
             <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/50">
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold mb-2">
+              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-normal mb-2">
                 4
               </div>
-              <h4 className="font-medium">Termo de Encerramento</h4>
+              <h4 className="font-medium">{t('common.step4Title')}</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Registre os resultados e custos realizados
+                {t('common.step4Description')}
               </p>
             </div>
           </div>

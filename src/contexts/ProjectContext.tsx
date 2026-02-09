@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { projetoService } from '@/services/projetoService';
+import { usuarioProjetoService } from '@/services';
 import type { Projeto } from '@/types';
 
 interface ProjectContextType {
@@ -36,36 +36,91 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
-    // Carrega projeto salvo do localStorage
-    const savedProject = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (savedProject) {
+    const savedProjectRaw = localStorage.getItem(PROJECT_STORAGE_KEY);
+    let savedProject: Projeto | null = null;
+
+    if (savedProjectRaw) {
       try {
-        const project = JSON.parse(savedProject);
-        setSelectedProject(project);
-        setShowSelectionModal(false); // Não mostra modal se já tem projeto salvo
+        savedProject = JSON.parse(savedProjectRaw);
       } catch (error) {
         console.error('Erro ao carregar projeto salvo:', error);
         localStorage.removeItem(PROJECT_STORAGE_KEY);
-        setShowSelectionModal(true); // Mostra modal se não conseguiu carregar
+        savedProject = null;
       }
-    } else {
-      // Se não tem projeto salvo, mostra o modal
-      setShowSelectionModal(true);
     }
 
-    // Carrega projetos do usuário
+    let cancelled = false;
     setIsLoading(true);
-    projetoService.findByUsuario(user.id)
-      .then(projects => {
+
+    usuarioProjetoService.findByUsuario(user.id)
+      .then(usuarioProjetos => {
+        if (cancelled) return;
+
+        const projects = usuarioProjetos
+          .map(up => up.projeto)
+          .filter((p): p is Projeto => Boolean(p));
+
         setUserProjects(projects);
-        setIsLoading(false);
+
+        if (!savedProject) {
+          // Nenhum projeto salvo ainda
+          if (projects.length === 1) {
+            // Apenas um projeto disponível: seleciona automaticamente
+            const [onlyProject] = projects;
+            setSelectedProject(onlyProject);
+            localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(onlyProject));
+            setShowSelectionModal(false);
+          } else if (projects.length > 1) {
+            // Mais de um projeto: pedir seleção
+            setShowSelectionModal(true);
+          } else {
+            // Nenhum projeto disponível: não há o que selecionar
+            setSelectedProject(null);
+            localStorage.removeItem(PROJECT_STORAGE_KEY);
+            setShowSelectionModal(false);
+          }
+        } else {
+          // Há um projeto salvo, verifica se ainda está na lista de projetos do usuário
+          const existsInList = projects.some(p => p.id === savedProject!.id);
+          if (existsInList) {
+            setSelectedProject(savedProject);
+            setShowSelectionModal(false);
+          } else if (projects.length === 1) {
+            // Projeto salvo não é mais válido, mas há um único projeto atual: seleciona-o
+            const [onlyProject] = projects;
+            setSelectedProject(onlyProject);
+            localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(onlyProject));
+            setShowSelectionModal(false);
+          } else if (projects.length > 1) {
+            // Vários projetos, mas o salvo não existe mais: pedir nova seleção
+            setSelectedProject(null);
+            localStorage.removeItem(PROJECT_STORAGE_KEY);
+            setShowSelectionModal(true);
+          } else {
+            // Nenhum projeto disponível
+            setSelectedProject(null);
+            localStorage.removeItem(PROJECT_STORAGE_KEY);
+            setShowSelectionModal(false);
+          }
+        }
       })
       .catch(error => {
+        if (cancelled) return;
         console.error('Erro ao carregar projetos do usuário:', error);
         setUserProjects([]);
-        setIsLoading(false);
+        setSelectedProject(null);
+        setShowSelectionModal(false);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       });
-  }, [isAuthenticated, user?.id]); // Apenas isAuthenticated e user?.id nas dependências
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?.id]);
 
   // Carrega projetos do usuário (função exposta para uso externo)
   const loadUserProjects = useCallback(async () => {
@@ -76,7 +131,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       setIsLoading(true);
-      const projects = await projetoService.findByUsuario(user.id);
+      const usuarioProjetos = await usuarioProjetoService.findByUsuario(user.id);
+      const projects = usuarioProjetos
+        .map(up => up.projeto)
+        .filter((p): p is Projeto => Boolean(p));
       setUserProjects(projects);
     } catch (error) {
       console.error('Erro ao carregar projetos do usuário:', error);

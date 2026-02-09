@@ -1,15 +1,32 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
+import { useTranslation } from "react-i18next";
+import { ptBR, enUS, es } from "date-fns/locale";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
+const localeMap: Record<string, Locale> = {
+  pt: ptBR,
+  "pt-BR": ptBR,
+  en: enUS,
+  "en-US": enUS,
+  es,
+  "es-ES": es,
+};
+
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
-function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+type Locale = typeof ptBR;
+
+function Calendar({ className, classNames, showOutsideDays = true, locale: localeProp, ...props }: CalendarProps) {
+  const { i18n } = useTranslation();
+  const locale = localeProp ?? localeMap[i18n.language] ?? localeMap[i18n.language?.split('-')[0]] ?? ptBR;
+
   return (
     <DayPicker
+      locale={locale}
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{

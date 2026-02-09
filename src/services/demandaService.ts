@@ -4,6 +4,7 @@
 // =====================================================
 
 import api from './api';
+import { demandaTecnicaSchema, paginatedDemandaTecnicaSchema } from '@/lib/schemas';
 import type { 
   DemandaTecnica, 
   DemandaTecnicaCreateDTO, 
@@ -15,6 +16,7 @@ import type {
 const ENDPOINTS = {
   base: '/demandas',
   byId: (id: number) => `/demandas/${id}`,
+  cancel: (id: number) => `/demandas/${id}/cancelar`,
 };
 
 export interface DemandaFilters {
@@ -43,14 +45,14 @@ export const demandaService = {
     if (filters.sort) params.append('sort', filters.sort);
 
     const query = params.toString() ? `?${params.toString()}` : '';
-    return api.get<PaginatedResponse<DemandaTecnica>>(`${ENDPOINTS.base}${query}`);
+    return api.get<PaginatedResponse<DemandaTecnica>>(`${ENDPOINTS.base}${query}`, { schema: paginatedDemandaTecnicaSchema });
   },
 
   /**
    * Busca uma demanda por ID
    */
   async findById(id: number): Promise<DemandaTecnica> {
-    return api.get<DemandaTecnica>(ENDPOINTS.byId(id));
+    return api.get<DemandaTecnica>(ENDPOINTS.byId(id), { schema: demandaTecnicaSchema });
   },
 
   /**
@@ -72,6 +74,13 @@ export const demandaService = {
    */
   async delete(id: number): Promise<void> {
     return api.delete(ENDPOINTS.byId(id));
+  },
+
+  /**
+   * Cancela uma demanda (status -> Z). Só permitido se status !== G
+   */
+  async cancel(id: number): Promise<DemandaTecnica> {
+    return api.put<DemandaTecnica>(ENDPOINTS.cancel(id));
   },
 };
 

@@ -1,34 +1,20 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { 
-  Edit, 
-  Trash2, 
-  MoreHorizontal,
-  FileCheck,
-  CheckCircle,
   Plus,
-  X
+  X,
+  Upload,
+  FileText,
+  Trash2,
+  Eye,
+  FileDown,
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -37,10 +23,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
+import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
+import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import {
   Select,
   SelectContent,
@@ -56,16 +43,27 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
-import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
-import { useApi } from '@/hooks/useApi';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { termoPlanejamentoService } from '@/services/termoService';
+import { termoPlanejamentoDocService } from '@/services/termoDocService';
 import { demandaService } from '@/services/demandaService';
 import { perfilService } from '@/services/perfilService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProject } from '@/contexts/ProjectContext';
 import { termoPlanejamentoSchema, type TermoPlanejamentoFormData } from '@/lib/validations';
-import type { TermoPlanejamento, TermoPlanejamentoCusto, DemandaTecnica, Perfil, PaginatedResponse } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/apiErrorHandler';
+import { canCreateTermoPlanejamento, canUploadTermoPlanejamento, canDeleteTermoPlanejamento, canSaveTermoPlanejamento, canDeleteDocTermoPlanejamento } from '@/lib/demandaStatus';
+import type { TermoPlanejamento, TermoPlanejamentoCusto, DemandaTecnica, Perfil, TermoPlanejamentoDocResponseDTO } from '@/types';
 
 interface CustoForm {
   perfilId: string;
@@ -75,158 +73,159 @@ interface CustoForm {
 
 export default function TermoPlanejamentoPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const [termos, setTermos] = useState<TermoPlanejamento[]>([]);
-  const [demandas, setDemandas] = useState<DemandaTecnica[]>([]);
+  const { selectedProject } = useProject();
+  const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
-  const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoPlanejamento | null>(null);
   const [custos, setCustos] = useState<CustoForm[]>([]);
   const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
-  const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-
-  // API states
-  const { isLoading, error, execute } = useApi<PaginatedResponse<TermoPlanejamento>>(null);
+  const [isLoadingDemanda, setIsLoadingDemanda] = useState(true);
+  const [isLoadingTermo, setIsLoadingTermo] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
-  const [isLoadingDemandas, setIsLoadingDemandas] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLoadingPerfis, setIsLoadingPerfis] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documento, setDocumento] = useState<TermoPlanejamentoDocResponseDTO | null>(null);
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
+  const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+  const [isViewDocOpen, setIsViewDocOpen] = useState(false);
+  const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Evita deslocamento de timezone: "2025-01-15" sem hora é interpretado como UTC meia-noite
+  const parseDateOnly = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
 
   const form = useForm<TermoPlanejamentoFormData>({
     resolver: zodResolver(termoPlanejamentoSchema),
     defaultValues: {
       demandaTecnicaId: '',
+      dataAbertura: new Date(),
       especificacao: '',
       cronograma: '',
+      dataInicioExecucao: undefined as Date | undefined,
+      dataFimExecucao: undefined as Date | undefined,
       resultadoEsperado: '',
     },
   });
 
-  // Carrega demandas e perfis para os selects
-  const loadDemandas = useCallback(async () => {
-    setIsLoadingDemandas(true);
-    try {
-      const response = await demandaService.findAll({ size: 1000 });
-      setDemandas(response.content);
-    } catch (err) {
-      console.error('Erro ao carregar demandas:', err);
-    } finally {
-      setIsLoadingDemandas(false);
-    }
-  }, []);
-
+  // Carrega perfis do projeto selecionado
   const loadPerfis = useCallback(async () => {
+    if (!selectedProject) return;
+    
     setIsLoadingPerfis(true);
     try {
-      const response = await perfilService.findAll({ size: 1000 });
+      const response = await perfilService.findAll({ 
+        projetoId: selectedProject.id,
+        size: 1000 
+      });
       setPerfis(response.content);
     } catch (err) {
       console.error('Erro ao carregar perfis:', err);
     } finally {
       setIsLoadingPerfis(false);
     }
-  }, []);
+  }, [selectedProject]);
 
-  // Carrega dados iniciais
+  // Carrega a demanda e o termo existente
   const loadData = useCallback(async () => {
-    await execute(
-      () => termoPlanejamentoService.findAll(currentPage, pageSize),
-      {
-        onSuccess: (data) => {
-          setTermos(data.content);
-          setTotalPages(data.totalPages);
-          setTotalElements(data.totalElements);
-        },
+    const demandaId = searchParams.get('demandaId');
+    
+    if (!demandaId) {
+      setError('Demanda não especificada');
+      setIsLoadingDemanda(false);
+      setIsLoadingTermo(false);
+      return;
+    }
+
+    try {
+      setIsLoadingDemanda(true);
+      setIsLoadingTermo(true);
+      setError(null);
+
+      // Carrega a demanda
+      const demandaData = await demandaService.findById(Number(demandaId));
+      setDemanda(demandaData);
+      
+      // Pré-preenche o campo de demanda no formulário
+      form.setValue('demandaTecnicaId', String(demandaId));
+
+      // Busca termo existente
+      const termoExistente = await termoPlanejamentoService.findByDemandaId(Number(demandaId));
+      
+      if (termoExistente) {
+        // Se existe, carrega os dados
+        setSelectedTermo(termoExistente);
+        form.reset({
+          demandaTecnicaId: String(termoExistente.demandaTecnicaId),
+          dataAbertura: termoExistente.dataAbertura ? parseDateOnly(termoExistente.dataAbertura) : new Date(),
+          especificacao: termoExistente.especificacao,
+          cronograma: termoExistente.cronograma,
+          dataInicioExecucao: termoExistente.dataInicioExecucao ? parseDateOnly(termoExistente.dataInicioExecucao) : undefined,
+          dataFimExecucao: termoExistente.dataFimExecucao ? parseDateOnly(termoExistente.dataFimExecucao) : undefined,
+          resultadoEsperado: termoExistente.resultadoEsperado,
+        });
+        setCustos((termoExistente.custos || []).map(c => ({
+          perfilId: String(c.perfilId),
+          qtdeHora: String(c.qtdeHora),
+          valorHora: String(c.valorHora),
+        })));
+        
+        // Busca documento se existir
+        setIsLoadingDoc(true);
+        try {
+          const doc = await termoPlanejamentoDocService.findByTermoPlanejamentoId(termoExistente.id);
+          setDocumento(doc);
+        } catch {
+          setDocumento(null);
+        } finally {
+          setIsLoadingDoc(false);
+        }
+      } else {
+        // Se não existe, cria em branco
+        setSelectedTermo(null);
+        setDocumento(null);
+        form.reset({
+          demandaTecnicaId: String(demandaId),
+          dataAbertura: new Date(),
+          especificacao: '',
+          cronograma: '',
+          dataInicioExecucao: undefined,
+          dataFimExecucao: undefined,
+          resultadoEsperado: '',
+        });
+        setCustos([]);
       }
-    );
-  }, [execute, currentPage, pageSize]);
+
+      // Abre o modal automaticamente
+      setIsFormOpen(true);
+    } catch (err: unknown) {
+      if (import.meta.env.DEV) console.error('Erro ao carregar dados:', err);
+      setError(getErrorMessage(err, 'Erro ao carregar dados da demanda'));
+    } finally {
+      setIsLoadingDemanda(false);
+      setIsLoadingTermo(false);
+    }
+  }, [searchParams, form]);
 
   useEffect(() => {
-    loadDemandas();
     loadPerfis();
-  }, [loadDemandas, loadPerfis]);
+  }, [loadPerfis]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const filteredTermos = useMemo(() => {
-    if (!search) return termos;
-    return termos.filter((termo) => {
-      const demanda = demandas.find(d => d.id === termo.demandaTecnicaId);
-      return demanda?.nome.toLowerCase().includes(search.toLowerCase()) ||
-             demanda?.codigo.toLowerCase().includes(search.toLowerCase());
-    });
-  }, [termos, search, demandas]);
-  
-  const paginatedTermos = filteredTermos;
-
-
-  const formatDateTime = (dateStr: string) => {
-    return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
-  const getDemandaNome = (demandaId: number) => {
-    const demanda = demandas.find(d => d.id === demandaId);
-    return demanda ? `${demanda.codigo} - ${demanda.nome}` : '-';
-  };
-
-  const calcularCustoTotal = (custosList: TermoPlanejamentoCusto[] = []) => {
-    return custosList.reduce((total, c) => total + (c.qtdeHora * c.valorHora), 0);
-  };
-
-  const handleAdd = () => {
-    setSelectedTermo(null);
-    form.reset({ demandaTecnicaId: '', especificacao: '', cronograma: '', resultadoEsperado: '' });
-    setCustos([]);
-    setCustoErrors({});
-    setIsFormOpen(true);
-  };
-
-  const handleEdit = (termo: TermoPlanejamento) => {
-    setSelectedTermo(termo);
-    form.reset({
-      demandaTecnicaId: String(termo.demandaTecnicaId),
-      especificacao: termo.especificacao,
-      cronograma: termo.cronograma,
-      resultadoEsperado: termo.resultadoEsperado,
-    });
-    setCustos((termo.custos || []).map(c => ({
-      perfilId: String(c.perfilId),
-      qtdeHora: String(c.qtdeHora),
-      valorHora: String(c.valorHora),
-    })));
-    setCustoErrors({});
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = (termo: TermoPlanejamento) => {
-    setSelectedTermo(termo);
-    setIsDeleteOpen(true);
-  };
-
-  const handleSign = async (termo: TermoPlanejamento) => {
-    setIsSigning(true);
-    try {
-      await termoPlanejamentoService.sign(termo.id);
-      loadData();
-    } finally {
-      setIsSigning(false);
-    }
-  };
 
   const handleAddCusto = () => {
     setCustos([...custos, { perfilId: '', qtdeHora: '', valorHora: '' }]);
@@ -240,9 +239,30 @@ export default function TermoPlanejamentoPage() {
   };
 
   const handleCustoChange = (index: number, field: keyof CustoForm, value: string) => {
-    setCustos(custos.map((c, i) => 
-      i === index ? { ...c, [field]: value } : c
-    ));
+    const updatedCustos = custos.map((c, i) => {
+      if (i === index) {
+        const updatedCusto = { ...c, [field]: value };
+        
+        // Preenche automaticamente o valor/hora quando perfil for selecionado
+        if (field === 'perfilId') {
+          const perfilId = value;
+          
+          if (perfilId) {
+            const perfil = perfis.find(p => p.id === Number(perfilId));
+            
+            if (perfil && perfil.valor) {
+              // Apenas preenche com o valor do perfil (sem multiplicar por horas)
+              updatedCusto.valorHora = perfil.valor.toFixed(2);
+            }
+          }
+        }
+        
+        return updatedCusto;
+      }
+      return c;
+    });
+    
+    setCustos(updatedCustos);
     if (custoErrors[index]) {
       const newErrors = { ...custoErrors };
       delete newErrors[index];
@@ -254,9 +274,9 @@ export default function TermoPlanejamentoPage() {
     const errors: Record<number, string> = {};
     custos.forEach((custo, index) => {
       if (!custo.perfilId || !custo.qtdeHora || !custo.valorHora) {
-        errors[index] = 'Preencha todos os campos do custo';
+        errors[index] = t('common.fillAllCostFields');
       } else if (Number(custo.qtdeHora) <= 0 || Number(custo.valorHora) <= 0) {
-        errors[index] = 'Valores devem ser maiores que zero';
+        errors[index] = t('common.valuesMustBePositive');
       }
     });
     setCustoErrors(errors);
@@ -265,6 +285,26 @@ export default function TermoPlanejamentoPage() {
 
   const onSubmit = async (data: TermoPlanejamentoFormData) => {
     if (!validateCustos() || !user) return;
+
+    // Regra: salvar só se status C ou D
+    if (!canSaveTermoPlanejamento(demanda?.status ?? demanda?.situacao)) {
+      toast({
+        title: t('common.error'),
+        description: t('planningTerm.statusRestrictionSave'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Regra: criar só se status C; editar se status D
+    if (!selectedTermo && !canCreateTermoPlanejamento(demanda?.status ?? demanda?.situacao)) {
+      toast({
+        title: t('common.error'),
+        description: t('planningTerm.statusRestrictionCreate'),
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -276,29 +316,80 @@ export default function TermoPlanejamentoPage() {
           valorHora: Number(c.valorHora),
         }));
 
+      const dataAberturaStr = data.dataAbertura.toISOString().split('T')[0];
+      const dataInicioExecucaoStr = data.dataInicioExecucao?.toISOString().split('T')[0];
+      const dataFimExecucaoStr = data.dataFimExecucao?.toISOString().split('T')[0];
+
+      let termoSalvo: TermoPlanejamento;
+
       if (selectedTermo) {
-        await termoPlanejamentoService.update(selectedTermo.id, {
+        termoSalvo = await termoPlanejamentoService.update(selectedTermo.id, {
           especificacao: data.especificacao,
           cronograma: data.cronograma,
           resultadoEsperado: data.resultadoEsperado,
+          dataAbertura: dataAberturaStr,
+          dataInicioExecucao: dataInicioExecucaoStr,
+          dataFimExecucao: dataFimExecucaoStr,
           custos: custosFormatted,
         });
       } else {
-        await termoPlanejamentoService.create({
+        termoSalvo = await termoPlanejamentoService.create({
           demandaTecnicaId: Number(data.demandaTecnicaId),
           especificacao: data.especificacao,
           cronograma: data.cronograma,
           resultadoEsperado: data.resultadoEsperado,
+          dataAbertura: dataAberturaStr,
+          dataInicioExecucao: dataInicioExecucaoStr,
+          dataFimExecucao: dataFimExecucaoStr,
           usuarioId: user.id,
           custos: custosFormatted,
         });
+        // Regra: ao criar Termo de Planejamento, demanda passa para status D
+        await demandaService.update(Number(data.demandaTecnicaId), { status: 'D' });
       }
-      setIsFormOpen(false);
-      form.reset();
-      setCustos([]);
-      loadData();
+      
+      // Atualiza o termo selecionado
+      setSelectedTermo(termoSalvo);
+      
+      // Recarrega demanda para obter status atualizado
+      if (demanda) {
+        const demandaAtualizada = await demandaService.findById(demanda.id);
+        setDemanda(demandaAtualizada);
+      }
+      
+      // Busca documento se existir
+      setIsLoadingDoc(true);
+      try {
+        const doc = await termoPlanejamentoDocService.findByTermoPlanejamentoId(termoSalvo.id);
+        setDocumento(doc);
+      } catch {
+        setDocumento(null);
+      } finally {
+        setIsLoadingDoc(false);
+      }
+      
+      // Não fecha o modal, apenas mostra sucesso
+      toast({
+        title: t('common.success'),
+        description: selectedTermo 
+          ? t('planningTerm.updatedSuccess')
+          : t('planningTerm.createdSuccess'),
+      });
+    } catch (error) {
+      // Erro já é tratado automaticamente pela API (toast será exibido)
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    setIsFormOpen(false);
+    navigate('/demandas');
+  };
+
+  const handleDelete = () => {
+    if (selectedTermo && canDeleteTermoPlanejamento(demanda?.status)) {
+      setIsDeleteOpen(true);
     }
   };
 
@@ -308,147 +399,200 @@ export default function TermoPlanejamentoPage() {
     setIsDeleting(true);
     try {
       await termoPlanejamentoService.delete(selectedTermo.id);
+      // Regra: ao excluir Termo de Planejamento, demanda volta para status C
+      if (demanda) {
+        await demandaService.update(demanda.id, { status: 'C' });
+      }
       setIsDeleteOpen(false);
-      loadData();
+      setIsFormOpen(false);
+      // Redireciona de volta para a página de demandas
+      navigate('/demandas');
+    } catch (error) {
+      // Erro já é tratado automaticamente pela API (toast será exibido)
     } finally {
       setIsDeleting(false);
     }
   };
 
+  const handleOpenUpload = () => {
+    if (!selectedTermo) {
+      toast({
+        title: t('common.error'),
+        description: 'É necessário salvar o termo antes de fazer upload do documento',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!canUploadTermoPlanejamento(demanda?.status)) {
+      toast({
+        title: t('common.error'),
+        description: t('planningTerm.statusRestrictionUpload'),
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSelectedFile(null);
+    setIsUploadOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Valida se é PDF
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: t('common.error'),
+          description: 'O arquivo deve ser um PDF',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedTermo) return;
+
+    setIsUploading(true);
+    try {
+      let docResponse: TermoPlanejamentoDocResponseDTO;
+      
+      // Verifica se já existe documento
+      const docExists = await termoPlanejamentoDocService.exists(selectedTermo.id);
+      
+      if (docExists && documento) {
+        // Atualiza documento existente
+        docResponse = await termoPlanejamentoDocService.update(documento.id, selectedFile);
+      } else {
+        // Cria novo documento
+        docResponse = await termoPlanejamentoDocService.upload(selectedTermo.id, selectedFile);
+      }
+
+      setDocumento(docResponse);
+      setIsUploadOpen(false);
+      setSelectedFile(null);
+      
+      // Regra: ao fazer upload do documento assinado, demanda passa para status E
+      if (demanda) {
+        await demandaService.update(demanda.id, { status: 'E' });
+        const demandaAtualizada = await demandaService.findById(demanda.id);
+        setDemanda(demandaAtualizada);
+      }
+      
+      // Recarrega o termo para atualizar a data de assinatura se houver
+      if (selectedTermo) {
+        const termoAtualizado = await termoPlanejamentoService.findById(selectedTermo.id);
+        setSelectedTermo(termoAtualizado);
+      }
+
+      toast({
+        title: t('common.success'),
+        description: t('planningTerm.uploadSuccess'),
+      });
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('planningTerm.uploadError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleViewDocument = () => {
+    if (documento) setIsViewDocOpen(true);
+  };
+
+  const handleGeneratePdf = () => {
+    if (!selectedTermo || !selectedProject || !demanda) {
+      toast({
+        title: t('common.error'),
+        description: t('planningTerm.generatePdfError'),
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsViewGeneratedPdfOpen(true);
+  };
+
+  const handleDeleteDocument = () => {
+    if (documento && canDeleteDocTermoPlanejamento(demanda?.status ?? demanda?.situacao)) {
+      setIsDeleteDocOpen(true);
+    }
+  };
+
+  const handleConfirmDeleteDocument = async () => {
+    if (!documento || !selectedTermo) return;
+    if (!canDeleteDocTermoPlanejamento(demanda?.status ?? demanda?.situacao)) return;
+
+    setIsDeletingDoc(true);
+    try {
+      await termoPlanejamentoDocService.delete(documento.id);
+      
+      // Limpa o documento do estado
+      setDocumento(null);
+      setIsDeleteDocOpen(false);
+      
+      // Recarrega o termo para atualizar a data de assinatura (deve estar null agora)
+      const termoAtualizado = await termoPlanejamentoService.findById(selectedTermo.id);
+      setSelectedTermo(termoAtualizado);
+      
+      toast({
+        title: t('common.success'),
+        description: t('planningTerm.documentDeletedSuccess'),
+      });
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('planningTerm.documentDeleteError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingDoc(false);
+    }
+  };
+
   // Estado de erro
-  if (error) {
+  if (error && !isLoadingDemanda && !isLoadingTermo) {
     return (
-      <div className="space-y-6">
-        <PageHeader title={t('planningTerm.title')} description="Gerencie os termos de planejamento das demandas" />
+      <div className="space-y-6 p-6">
         <ErrorState
           title={t('common.errorTitle')}
           message={error}
           onRetry={loadData}
           retryText={t('common.retry')}
         />
+        <Button onClick={() => navigate('/demandas')} variant="outline">
+          {t('common.back')}
+        </Button>
+      </div>
+    );
+  }
+
+  // Estado de carregamento
+  if (isLoadingDemanda || isLoadingTermo) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">{t('common.loading')}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t('planningTerm.title')}
-        description="Gerencie os termos de planejamento das demandas"
-        onAdd={handleAdd}
-        addLabel={t('planningTerm.newTerm')}
-      />
-
-      <SearchFilterBar
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Buscar por demanda..."
-        onRefresh={loadData}
-      />
-
-      {isLoading ? (
-        <TableSkeleton rows={5} columns={5} />
-      ) : filteredTermos.length === 0 ? (
-        <EmptyState
-          title={t('common.noResults')}
-          description="Nenhum termo de planejamento encontrado"
-          icon={<FileCheck className="h-6 w-6 text-muted-foreground" />}
-          action={
-            <Button onClick={handleAdd}>
-              {t('planningTerm.newTerm')}
-            </Button>
-          }
-        />
-      ) : (
-        <>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('planningTerm.demand')}</TableHead>
-                  <TableHead>{t('planningTerm.openingDate')}</TableHead>
-                  <TableHead>{t('planningTerm.totalCost')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedTermos.map((termo) => (
-                  <TableRow key={termo.id}>
-                    <TableCell className="font-medium max-w-[250px] truncate">
-                      {getDemandaNome(termo.demandaTecnicaId)}
-                    </TableCell>
-                    <TableCell>{formatDateTime(termo.dataAbertura)}</TableCell>
-                    <TableCell>{formatCurrency(calcularCustoTotal(termo.custos))}</TableCell>
-                    <TableCell>
-                      {termo.dataAssinatura ? (
-                        <Badge className="bg-success text-success-foreground">
-                          {t('planningTerm.signed')}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          {t('planningTerm.notSigned')}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" disabled={isSigning}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(termo)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            {t('common.edit')}
-                          </DropdownMenuItem>
-                          {!termo.dataAssinatura && (
-                            <DropdownMenuItem onClick={() => handleSign(termo)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              {t('planningTerm.sign')}
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(termo)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            {t('common.delete')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <TablePagination
-            currentPage={currentPage + 1}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={totalElements}
-            onPageChange={(p) => setCurrentPage(p - 1)}
-            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }}
+      {/* Form Dialog - sempre aberto quando a página carrega */}
+      <Dialog open={isFormOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeaderStandard
+            title={selectedTermo ? t('planningTerm.editTerm') : t('planningTerm.newTerm')}
+            description={selectedTermo 
+              ? t('common.editTerm')
+              : t('common.fillTerm')}
           />
-        </>
-      )}
-
-      {/* Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedTermo ? t('planningTerm.editTerm') : t('planningTerm.newTerm')}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedTermo 
-                ? 'Edite as informações do termo abaixo.'
-                : 'Preencha as informações para criar um novo termo.'}
-            </DialogDescription>
-          </DialogHeader>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -458,21 +602,17 @@ export default function TermoPlanejamentoPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('planningTerm.demand')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma demanda" />
+                          <SelectValue placeholder={t('common.selectDemand')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {isLoadingDemandas ? (
-                          <SelectItem value="" disabled>Carregando...</SelectItem>
-                        ) : (
-                          demandas.map((demanda) => (
-                            <SelectItem key={demanda.id} value={String(demanda.id)}>
-                              {demanda.codigo} - {demanda.nome}
-                            </SelectItem>
-                          ))
+                        {demanda && (
+                          <SelectItem value={String(demanda.id)}>
+                            {demanda.codigo} - {demanda.nome}
+                          </SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -480,151 +620,367 @@ export default function TermoPlanejamentoPage() {
                   </FormItem>
                 )}
               />
-              
-              <FormField
-                control={form.control}
-                name="especificacao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('planningTerm.specification')} *</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Especificação técnica detalhada..."
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="cronograma"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('planningTerm.schedule')} *</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Cronograma de execução..."
-                        rows={3}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="resultadoEsperado"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('planningTerm.expectedResult')} *</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Resultado esperado ao final da execução..."
-                        rows={3}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              {/* Custos Planejados */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{t('planningTerm.costs')}</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t('planningTerm.addCost')}
+              <FormField
+                control={form.control}
+                name="dataAbertura"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('planningTerm.openingDate')} *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          defaultMonth={field.value ?? new Date()}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Abas para organizar os campos */}
+              <Tabs defaultValue="especificacao" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="especificacao">{t('planningTerm.specification')}</TabsTrigger>
+                  <TabsTrigger value="cronograma">{t('planningTerm.schedule')}</TabsTrigger>
+                  <TabsTrigger value="resultado">{t('planningTerm.expectedResult')}</TabsTrigger>
+                  <TabsTrigger value="custos">{t('planningTerm.costs')}</TabsTrigger>
+                </TabsList>
+                
+                {/* Aba: Especificação */}
+                <TabsContent value="especificacao" className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="especificacao"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('planningTerm.specification')} *</FormLabel>
+                        <FormControl>
+                          <RichTextEditor
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            placeholder={t('common.specificationPlaceholder')}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                
+                {/* Aba: Cronograma */}
+                <TabsContent value="cronograma" className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="dataInicioExecucao"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('planningTerm.executionStartDate')}</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value ?? undefined}
+                                onSelect={field.onChange}
+                                defaultMonth={field.value ?? new Date()}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="dataFimExecucao"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('planningTerm.executionEndDate')}</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value ?? undefined}
+                                onSelect={field.onChange}
+                                defaultMonth={field.value ?? new Date()}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="cronograma"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('planningTerm.schedule')} *</FormLabel>
+                        <FormControl>
+                          <RichTextEditor
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            placeholder={t('common.schedulePlaceholder')}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                
+                {/* Aba: Resultado Esperado */}
+                <TabsContent value="resultado" className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="resultadoEsperado"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('planningTerm.expectedResult')} *</FormLabel>
+                        <FormControl>
+                          <RichTextEditor
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            placeholder={t('common.expectedResultPlaceholder')}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                
+                {/* Aba: Custos */}
+                <TabsContent value="custos" className="mt-4">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{t('planningTerm.costs')}</CardTitle>
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          {t('planningTerm.addCost')}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {custos.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          {t('common.noCostsAdded')}
+                        </p>
+                      ) : (
+                        custos.map((custo, index) => (
+                          <div key={'id' in custo && custo.id != null ? custo.id : `custo-${index}`} className="space-y-2">
+                            <div className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
+                              <div className="flex-1 grid grid-cols-3 gap-2">
+                                <div>
+                                  <Label className="text-xs">{t('planningTerm.profile')}</Label>
+                                  <Select 
+                                    value={custo.perfilId} 
+                                    onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
+                                  >
+                                    <SelectTrigger className="h-8">
+                                      <SelectValue placeholder={t('common.selectProfile')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {isLoadingPerfis ? (
+                                        <SelectItem value="" disabled>{t('common.loading')}</SelectItem>
+                                      ) : (
+                                        perfis.map((perfil) => (
+                                          <SelectItem key={perfil.id} value={String(perfil.id)}>
+                                            {perfil.nome}
+                                          </SelectItem>
+                                        ))
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-xs">{t('planningTerm.hours')}</Label>
+                                  <Input
+                                    type="number"
+                                    className="h-8"
+                                    value={custo.qtdeHora}
+                                    onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
+                                    placeholder={t('common.hoursPlaceholder')}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">{t('planningTerm.hourlyRate')}</Label>
+                                  <Input
+                                    type="number"
+                                    className="h-8"
+                                    value={custo.valorHora}
+                                    onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
+                                    placeholder={t('common.currencyPlaceholder')}
+                                  />
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => handleRemoveCusto(index)}
+                                aria-label={t('common.remove')}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            {custoErrors[index] && (
+                              <p className="text-xs text-destructive">{custoErrors[index]}</p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+              
+              {/* Documento anexado - indicador visual */}
+              {selectedTermo && documento && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-border">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{documento.nomeArquivo}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {documento.dataAssinatura 
+                        ? `${t('planningTerm.signatureDate')}: ${new Date(documento.dataAssinatura).toLocaleDateString('pt-BR')}`
+                        : t('planningTerm.notSigned')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleViewDocument}
+                      disabled={isDeletingDoc || isSaving || isDeleting}
+                      className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                      title={t('planningTerm.viewDocument')}
+                      aria-label={t('planningTerm.viewDocument')}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDeleteDocument}
+                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoPlanejamento(demanda?.status ?? demanda?.situacao)}
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title={t('planningTerm.deleteDocument')}
+                      aria-label={t('planningTerm.deleteDocument')}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {custos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Nenhum custo adicionado
-                    </p>
-                  ) : (
-                    custos.map((custo, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
-                          <div className="flex-1 grid grid-cols-3 gap-2">
-                            <div>
-                              <Label className="text-xs">{t('planningTerm.profile')}</Label>
-                              <Select 
-                                value={custo.perfilId} 
-                                onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
-                              >
-                                <SelectTrigger className="h-8">
-                                  <SelectValue placeholder="Perfil" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {isLoadingPerfis ? (
-                                    <SelectItem value="" disabled>Carregando...</SelectItem>
-                                  ) : (
-                                    perfis.map((perfil) => (
-                                      <SelectItem key={perfil.id} value={String(perfil.id)}>
-                                        {perfil.nome}
-                                      </SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">{t('planningTerm.hours')}</Label>
-                              <Input
-                                type="number"
-                                className="h-8"
-                                value={custo.qtdeHora}
-                                onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
-                                placeholder="Horas"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">{t('planningTerm.hourlyRate')}</Label>
-                              <Input
-                                type="number"
-                                className="h-8"
-                                value={custo.valorHora}
-                                onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
-                                placeholder="R$"
-                              />
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => handleRemoveCusto(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {custoErrors[index] && (
-                          <p className="text-xs text-destructive">{custoErrors[index]}</p>
-                        )}
-                      </div>
-                    ))
+                </div>
+              )}
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <div className="flex gap-2">
+                  {selectedTermo && (
+                    <>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={handleGeneratePdf}
+                        disabled={isSaving || isDeleting || !selectedProject}
+                        className="flex items-center gap-2"
+                        title={t('planningTerm.generatePdf')}
+                      >
+                        <FileDown className="h-4 w-4" />
+                        {t('planningTerm.generatePdf')}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={handleOpenUpload}
+                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoPlanejamento(demanda?.status)}
+                        className="flex items-center gap-2"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {documento ? t('planningTerm.replaceDocument') : t('planningTerm.uploadDocument')}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        onClick={handleDelete} 
+                        disabled={isSaving || isDeleting || !canDeleteTermoPlanejamento(demanda?.status)}
+                      >
+                        {t('common.delete')}
+                      </Button>
+                    </>
                   )}
-                </CardContent>
-              </Card>
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
-                  {t('common.cancel')}
-                </Button>
-                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
-                  {t('common.save')}
-                </LoadingButton>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
+                    {t('common.cancel')}
+                  </Button>
+                  <LoadingButton 
+                    type="submit" 
+                    isLoading={isSaving} 
+                    loadingText={t('common.saving')} 
+                    disabled={isDeleting || !canSaveTermoPlanejamento(demanda?.status ?? demanda?.situacao)}
+                  >
+                    {t('common.save')}
+                  </LoadingButton>
+                </div>
               </DialogFooter>
             </form>
           </Form>
@@ -655,6 +1011,123 @@ export default function TermoPlanejamentoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Document Dialog */}
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('planningTerm.uploadDocumentTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('planningTerm.uploadDocumentDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="pdf-upload" className="text-sm font-medium">
+                {t('planningTerm.selectFile')}
+              </label>
+              <Input
+                id="pdf-upload"
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handleFileChange}
+                disabled={isUploading}
+                className="cursor-pointer"
+              />
+              {selectedFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span>{selectedFile.name}</span>
+                  <span className="text-xs">({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+              )}
+              {!selectedFile && (
+                <p className="text-sm text-muted-foreground">
+                  {t('planningTerm.noFileSelected')}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUploadOpen(false)} disabled={isUploading}>
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton 
+              onClick={handleUpload}
+              isLoading={isUploading}
+              loadingText={t('common.saving')}
+              disabled={!selectedFile}
+            >
+              {t('common.save')}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Document Confirmation Dialog */}
+      <Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('planningTerm.deleteDocumentConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('planningTerm.deleteDocumentConfirm')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDocOpen(false)} disabled={isDeletingDoc}>
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton 
+              variant="destructive" 
+              onClick={handleConfirmDeleteDocument}
+              isLoading={isDeletingDoc}
+              loadingText={t('common.deleting')}
+            >
+              {t('common.delete')}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PdfPreviewDialog
+        open={isViewDocOpen}
+        onOpenChange={setIsViewDocOpen}
+        title={t('planningTerm.viewDocumentTitle')}
+        description={documento?.nomeArquivo}
+        fetchPdf={() => termoPlanejamentoDocService.downloadById(documento!.id)}
+        loadingLabel={t('common.loading')}
+        errorMessage={t('planningTerm.documentViewError')}
+        closeLabel={t('common.close')}
+        onError={(err: unknown) =>
+          toast({
+            title: t('common.error'),
+            description: getErrorMessage(err, t('planningTerm.documentViewError')),
+            variant: 'destructive',
+          })
+        }
+      />
+
+      <PdfPreviewDialog
+        open={isViewGeneratedPdfOpen}
+        onOpenChange={setIsViewGeneratedPdfOpen}
+        title={t('planningTerm.viewGeneratedPdfTitle')}
+        description={t('planningTerm.viewGeneratedPdfDescription')}
+        fetchPdf={() =>
+          termoPlanejamentoService.gerarPdf(selectedTermo!.id, selectedProject!.id, 'P')
+        }
+        loadingLabel={t('planningTerm.generatingPdf')}
+        errorMessage={t('planningTerm.generatePdfError')}
+        downloadFileName={selectedTermo ? `termo-planejamento-${selectedTermo.id}.pdf` : undefined}
+        closeLabel={t('common.close')}
+        downloadLabel={t('common.download')}
+        onError={(err: unknown) =>
+          toast({
+            title: t('common.error'),
+            description: getErrorMessage(err, t('planningTerm.generatePdfError')),
+            variant: 'destructive',
+          })
+        }
+      />
     </div>
   );
 }

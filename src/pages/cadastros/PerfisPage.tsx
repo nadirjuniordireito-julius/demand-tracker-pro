@@ -4,21 +4,22 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit, Trash2, MoreHorizontal, UserCircle, Calendar } from 'lucide-react';
+import { Edit, Trash2, UserCircle, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { DataTable, type Column, type Action } from '@/components/common/DataTable';
+import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { cn } from '@/lib/utils';
 import { perfilSchema, type PerfilFormData } from '@/lib/validations';
 import { useApi } from '@/hooks/useApi';
 import { perfilService } from '@/services/perfilService';
+import { projetoService } from '@/services/projetoService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import type { Perfil, PaginatedResponse } from '@/types';
@@ -44,15 +45,20 @@ export default function PerfisPage() {
 
   const form = useForm<PerfilFormData>({
     resolver: zodResolver(perfilSchema),
-    defaultValues: { nome: '', termoInicial: undefined, termoFinal: undefined }
+    defaultValues: { nome: '', termoInicial: undefined, termoFinal: undefined, valor: 0 }
   });
 
-  // Carrega dados iniciais
+  // Carrega dados iniciais - filtra apenas perfis do projeto selecionado
   const loadData = useCallback(async () => {
+    if (!selectedProject) return;
+    const requestedPage = currentPage;
+    // Backend espera página 1-based (1 = primeira, 2 = segunda)
+    const pageParam = requestedPage + 1;
     await execute(
       () => perfilService.findAll({ 
         nome: search || undefined,
-        page: currentPage, 
+        projetoId: selectedProject.id,
+        page: pageParam,
         size: pageSize 
       }),
       {
@@ -63,7 +69,7 @@ export default function PerfisPage() {
         },
       }
     );
-  }, [execute, search, currentPage, pageSize]);
+  }, [execute, search, currentPage, pageSize, selectedProject]);
 
   useEffect(() => {
     loadData();
@@ -71,24 +77,56 @@ export default function PerfisPage() {
 
   const paginatedPerfis = perfis;
 
-  const formatDate = (dateStr: string) => format(new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
+  // Mesmo parse da ProjetosPage: evita deslocamento de timezone (ISO sem hora = UTC meia-noite)
+  const parseDateOnly = (dateStr: string) => {
+    const part = String(dateStr).split('T')[0];
+    const [y, m, d] = part.split('-').map(Number);
+    if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return undefined;
+    return new Date(y, m - 1, d);
+  };
 
-  const handleAdd = () => {
-    if (!selectedProject) {
-      // TODO: Mostrar mensagem de erro ou redirecionar para seleção de projeto
-      return;
-    }
+  const formatDate = (dateStr: string) => format(parseDateOnly(dateStr) ?? new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const handleAdd = async () => {
+    if (!selectedProject) return;
     setSelectedPerfil(null);
-    form.reset({ nome: '', termoInicial: undefined, termoFinal: undefined });
+    // Busca o registro do projeto na API para usar exatamente as constantes termoInicial e termoFinal da tabela Projeto
+    let termoInicial: Date | undefined;
+    let termoFinal: Date | undefined;
+    try {
+      const projeto = await projetoService.findById(selectedProject.id);
+      // Backend pode retornar camelCase (termoInicial) ou snake_case (termo_inicial)
+      const raw = projeto as unknown as Record<string, unknown>;
+      const ti = raw.termoInicial ?? raw.termo_inicial;
+      const tf = raw.termoFinal ?? raw.termo_final;
+      if (ti) termoInicial = parseDateOnly(String(ti));
+      if (tf) termoFinal = parseDateOnly(String(tf));
+    } catch {
+      // Fallback: contexto (evitar datas de outro projeto ou desatualizadas)
+      const ti = selectedProject.termoInicial;
+      const tf = selectedProject.termoFinal;
+      if (ti) termoInicial = parseDateOnly(ti);
+      if (tf) termoFinal = parseDateOnly(tf);
+    }
+    form.reset({ nome: '', termoInicial: termoInicial ?? undefined, termoFinal: termoFinal ?? undefined, valor: 0 });
     setIsFormOpen(true);
   };
 
   const handleEdit = (perfil: Perfil) => {
     setSelectedPerfil(perfil);
+    // No modo de edição, mantém as datas originais do perfil
     form.reset({
       nome: perfil.nome,
       termoInicial: new Date(perfil.termoInicial),
-      termoFinal: new Date(perfil.termoFinal)
+      termoFinal: new Date(perfil.termoFinal),
+      valor: perfil.valor
     });
     setIsFormOpen(true);
   };
@@ -97,6 +135,48 @@ export default function PerfisPage() {
     setSelectedPerfil(perfil);
     setIsDeleteOpen(true);
   };
+
+  // Definição das colunas da tabela
+  const columns: Column<Perfil>[] = useMemo(() => [
+    {
+      key: 'nome',
+      label: t('profiles.name'),
+    },
+    {
+      key: 'valor',
+      label: t('planningTerm.hourlyRate'),
+      render: (perfil) => perfil.valor ? formatCurrency(perfil.valor) : '-',
+      hideOnMobile: true,
+    },
+    {
+      key: 'termoInicial',
+      label: t('profiles.startDate'),
+      render: (perfil) => formatDate(perfil.termoInicial),
+      hideOnMobile: true,
+    },
+    {
+      key: 'termoFinal',
+      label: t('profiles.endDate'),
+      render: (perfil) => formatDate(perfil.termoFinal),
+      hideOnMobile: true,
+    },
+  ], [t]);
+
+  // Definição das ações da tabela
+  const actions: Action<Perfil>[] = useMemo(() => [
+    {
+      label: t('common.edit'),
+      icon: <Edit className="h-4 w-4" />,
+      onClick: handleEdit,
+    },
+    {
+      label: t('common.delete'),
+      icon: <Trash2 className="h-4 w-4" />,
+      onClick: handleDelete,
+      variant: 'destructive',
+      separator: true,
+    },
+  ], [t, handleEdit, handleDelete]);
 
   const onSubmit = async (data: PerfilFormData) => {
     if (!user || !selectedProject) return;
@@ -108,17 +188,17 @@ export default function PerfisPage() {
           nome: data.nome,
           termoInicial: data.termoInicial.toISOString().split('T')[0],
           termoFinal: data.termoFinal.toISOString().split('T')[0],
+          valor: data.valor,
           projetoId: selectedProject.id,
-          projeto: selectedProject,
         });
       } else {
         await perfilService.create({
           nome: data.nome,
           termoInicial: data.termoInicial.toISOString().split('T')[0],
           termoFinal: data.termoFinal.toISOString().split('T')[0],
+          valor: data.valor,
           usuarioId: user.id,
           projetoId: selectedProject.id,
-          projeto: selectedProject,
         });
       }
       setIsFormOpen(false);
@@ -146,7 +226,7 @@ export default function PerfisPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t('profiles.title')} description="Gerencie os perfis de custo do sistema" />
+        <PageHeader title={t('profiles.title')} description={t('common.manageProfiles')} />
         <ErrorState
           title={t('common.errorTitle')}
           message={error}
@@ -161,7 +241,7 @@ export default function PerfisPage() {
     <div className="space-y-6">
       <PageHeader 
         title={t('profiles.title')} 
-        description="Gerencie os perfis de custo do sistema" 
+          description={t('common.manageProfiles')}
         onAdd={handleAdd} 
         addLabel={t('profiles.newProfile')} 
       />
@@ -169,62 +249,27 @@ export default function PerfisPage() {
       <SearchFilterBar 
         searchValue={search} 
         onSearchChange={(v) => { setSearch(v); setCurrentPage(0); }} 
-        searchPlaceholder="Buscar por nome..." 
+        searchPlaceholder={t('common.searchByName')} 
         onRefresh={loadData} 
       />
 
       {isLoading ? (
-        <TableSkeleton rows={5} columns={5} />
+        <TableSkeleton rows={5} columns={4} />
       ) : paginatedPerfis.length === 0 ? (
         <EmptyState 
           title={t('common.noResults')} 
-          description="Nenhum perfil encontrado" 
+          description={t('common.noProfilesFound')} 
           icon={<UserCircle className="h-6 w-6 text-muted-foreground" />} 
           action={<Button onClick={handleAdd}>{t('profiles.newProfile')}</Button>} 
         />
       ) : (
         <>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('profiles.name')}</TableHead>
-                  <TableHead>Projeto</TableHead>
-                  <TableHead>{t('profiles.startDate')}</TableHead>
-                  <TableHead>{t('profiles.endDate')}</TableHead>
-                  <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedPerfis.map((perfil) => (
-                  <TableRow key={perfil.id}>
-                    <TableCell className="font-medium">{perfil.nome}</TableCell>
-                    <TableCell>{perfil.projeto?.nome || '-'}</TableCell>
-                    <TableCell>{formatDate(perfil.termoInicial)}</TableCell>
-                    <TableCell>{formatDate(perfil.termoFinal)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(perfil)}>
-                            <Edit className="h-4 w-4 mr-2" />{t('common.edit')}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDelete(perfil)} className="text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2" />{t('common.delete')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            data={paginatedPerfis}
+            columns={columns}
+            actions={actions}
+            actionsLabel={t('common.actions')}
+          />
           <TablePagination 
             currentPage={currentPage + 1} 
             totalPages={totalPages} 
@@ -238,13 +283,11 @@ export default function PerfisPage() {
 
       {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>{selectedPerfil ? t('profiles.editProfile') : t('profiles.newProfile')}</DialogTitle>
-            <DialogDescription>
-              {selectedPerfil ? 'Edite as informações do perfil.' : 'Preencha as informações para criar um novo perfil.'}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeaderStandard
+            title={selectedPerfil ? t('profiles.editProfile') : t('profiles.newProfile')}
+            description={selectedPerfil ? t('common.editProfile') : t('common.fillProfile')}
+          />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField 
@@ -253,17 +296,32 @@ export default function PerfisPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('profiles.name')} *</FormLabel>
-                    <FormControl><Input placeholder="Nome do perfil" {...field} /></FormControl>
+                    <FormControl><Input placeholder={t('common.profileNamePlaceholder')} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} 
               />
-              {selectedProject && (
-                <div className="p-3 bg-muted rounded-md">
-                  <p className="text-sm font-medium">Projeto selecionado:</p>
-                  <p className="text-sm text-muted-foreground">{selectedProject.nome}</p>
-                </div>
-              )}
+              <FormField 
+                control={form.control} 
+                name="valor" 
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('planningTerm.hourlyRate')} (R$) *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        min="0.01"
+                        placeholder={t('common.currencyValuePlaceholder')} 
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} 
+              />
               <div className="grid grid-cols-2 gap-4">
                 <FormField 
                   control={form.control} 
@@ -279,7 +337,7 @@ export default function PerfisPage() {
                               className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
                             >
                               <Calendar className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "dd/MM/yyyy") : "Selecionar"}
+                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
@@ -311,7 +369,7 @@ export default function PerfisPage() {
                               className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
                             >
                               <Calendar className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "dd/MM/yyyy") : "Selecionar"}
+                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>

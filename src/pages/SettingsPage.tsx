@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Monitor, Settings } from 'lucide-react';
+import { Moon, Sun, Monitor, Settings, Palette } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageComponents';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 
-type ThemeOption = 'light' | 'dark' | 'system';
+type ThemeOption = 'light' | 'dark' | 'light-blue' | 'system';
 
 interface ThemeCardProps {
   value: ThemeOption;
@@ -78,6 +78,12 @@ export default function SettingsPage() {
       icon: <Moon className="h-5 w-5" />,
     },
     {
+      value: 'light-blue',
+      labelKey: 'settings.lightBlueMode',
+      descriptionKey: 'settings.lightBlueModeDescription',
+      icon: <Palette className="h-5 w-5" />,
+    },
+    {
       value: 'system',
       labelKey: 'settings.systemMode',
       descriptionKey: 'settings.systemModeDescription',
@@ -104,7 +110,7 @@ export default function SettingsPage() {
           <RadioGroup
             value={theme}
             onValueChange={(value) => setTheme(value)}
-            className="grid gap-4 md:grid-cols-3"
+            className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
           >
             {themeOptions.map((option) => (
               <ThemeCard

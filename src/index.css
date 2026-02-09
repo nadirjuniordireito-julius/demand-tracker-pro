@@ -4,7 +4,7 @@
 
 /* 
  * Design System Corporativo - Cinza/Grafite
- * Sistema de Demandas Técnicas
+ * Julius – Plataforma de Gestão Operacional de Projetos
  * All colors MUST be HSL.
  */
 
@@ -86,6 +86,68 @@
     --table-border: 220 13% 91%;
   }
 
+  /* Tema Light Blue - Inspirado em identidade corporativa limpa com azul vibrante */
+  .light-blue {
+    --background: 210 17% 98%;
+    --foreground: 210 11% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 11% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 18%;
+
+    --primary: 221 98% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 17% 96%;
+    --secondary-foreground: 210 11% 18%;
+
+    --muted: 210 17% 96%;
+    --muted-foreground: 210 9% 46%;
+
+    --accent: 221 98% 95%;
+    --accent-foreground: 221 98% 50%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 210 11% 18%;
+
+    --info: 221 98% 50%;
+    --info-foreground: 0 0% 98%;
+
+    --border: 210 14% 90%;
+    --input: 210 14% 90%;
+    --ring: 221 98% 50%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 11% 18%;
+    --sidebar-primary: 221 98% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 221 98% 95%;
+    --sidebar-accent-foreground: 221 98% 50%;
+    --sidebar-border: 210 14% 90%;
+    --sidebar-ring: 221 98% 50%;
+    --sidebar-muted: 210 9% 46%;
+
+    --header-background: 0 0% 100%;
+    --header-foreground: 210 11% 18%;
+    --header-border: 210 14% 90%;
+
+    --footer-background: 210 17% 98%;
+    --footer-foreground: 210 9% 46%;
+    --footer-border: 210 14% 90%;
+
+    --table-header: 210 17% 96%;
+    --table-row-hover: 210 17% 98%;
+    --table-border: 210 14% 91%;
+  }
+
   .dark {
     --background: 220 13% 10%;
     --foreground: 220 9% 94%;
@@ -154,13 +216,13 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased text-sm font-light;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Typography */
+  /* Typography - padrão harmonioso com menu (menor e mais leve) */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-medium tracking-tight;
   }
 
   /* Form elements */
@@ -197,7 +259,7 @@
   .btn-corporate {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 
            bg-primary text-primary-foreground rounded-md
-           font-medium text-sm
+           font-normal text-sm
            transition-all duration-200
            hover:bg-primary/90
            focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
@@ -220,7 +282,7 @@
   }
 
   .table-corporate th {
-    @apply bg-table-header px-4 py-3 text-left font-medium text-foreground border-b border-table-border;
+    @apply bg-table-header px-4 py-3 text-left font-normal text-foreground border-b border-table-border;
   }
 
   .table-corporate td {
@@ -233,6 +295,14 @@
 }
 
 @layer utilities {
+  .flex-shrink-0 {
+    flex-shrink: 0;
+  }
+
+  .pr-1\.5 {
+    padding-right: 0.105rem;
+  }
+
   /* Animation utilities */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
@@ -276,4 +346,9 @@
       transform: translateX(0);
     }
   }
+}
+
+/* Tooltip do gráfico de pizza no Health Map: não intercepta o mouse ao passar sobre as fatias */
+[data-health-map-pie-tooltip].google-visualization-tooltip {
+  pointer-events: none !important;
 }

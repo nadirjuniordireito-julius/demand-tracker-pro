@@ -6,9 +6,9 @@ import enUS from './locales/en.json';
 import esES from './locales/es.json';
 
 export const LANGUAGES = [
-  { code: 'pt', name: 'Português', flag: '🇧🇷' },
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'pt', name: 'Português', flag: '/flags/pt.svg' },
+  { code: 'en', name: 'English', flag: '/flags/en.svg' },
+  { code: 'es', name: 'Español', flag: '/flags/es.svg' },
 ] as const;
 
 export type LanguageCode = typeof LANGUAGES[number]['code'];
@@ -26,7 +26,7 @@ i18n
     lng: savedLanguage,
     fallbackLng: 'pt',
     interpolation: {
-      escapeValue: false,
+      escapeValue: true,
     },
   });
 

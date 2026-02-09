@@ -70,7 +70,7 @@ export function ErrorState({
     <Card className={cn('border-destructive/50', className)}>
       <CardContent className="flex flex-col items-center justify-center py-10 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="font-semibold text-lg mb-2">{title}</h3>
+        <h3 className="font-normal text-base mb-2">{title}</h3>
         <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
         {onRetry && (
           <Button onClick={onRetry} variant="outline">
@@ -128,7 +128,7 @@ export function ConnectionError({ onRetry }: ConnectionErrorProps) {
     <Card className="border-destructive/50">
       <CardContent className="flex flex-col items-center justify-center py-10 text-center">
         <WifiOff className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="font-semibold text-lg mb-2">Erro de Conexão</h3>
+        <h3 className="font-normal text-base mb-2">Erro de Conexão</h3>
         <p className="text-muted-foreground mb-4 max-w-md">
           Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.
         </p>

@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LogIn } from 'lucide-react';
+import logoImage from '@/assets/logo.png';
+
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Usuário é obrigatório'),
@@ -47,7 +49,7 @@ const LoginPage = () => {
       });
       navigate(from, { replace: true });
     } catch (error) {
-      console.error('Login failed:', error);
+      if (import.meta.env.DEV) console.error('Login failed:', error);
       toast({
         variant: 'destructive',
         title: t('auth.loginError'),
@@ -62,10 +64,14 @@ const LoginPage = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
-            <LogIn className="h-6 w-6 text-primary-foreground" />
+          <div className="mx-auto mb-4">
+            <img 
+              src={logoImage} 
+              alt="Logo" 
+              className="h-[11rem] w-auto object-contain mx-auto"
+            />
           </div>
-          <CardTitle className="text-2xl">{t('auth.login')}</CardTitle>
+          <CardTitle className="text-lg font-normal">{t('auth.login')}</CardTitle>
           <CardDescription>{t('auth.loginDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -122,6 +128,12 @@ const LoginPage = () => {
             </form>
           </Form>
         </CardContent>
+        <footer className="border-t px-6 py-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+          <span className="min-w-0 truncate" title={`${t('common.appName')} – ${t('common.appNameDesc')}`}>
+            <span className="font-semibold text-foreground">{t('common.appName')}</span> – {t('common.appNameDesc')}
+          </span>
+          <span className="flex-shrink-0">{t('common.copyright')}</span>
+        </footer>
       </Card>
     </div>
   );

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,56 +7,82 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
+import { ProcessingProvider } from "@/contexts/ProcessingContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { LoadingSpinner } from "@/components/common/LoadingStates";
+import "@/lib/apiErrorHandler";
+
 import LoginPage from "./pages/LoginPage";
-import HomePage from "./pages/HomePage";
-import DashboardPage from "./pages/DashboardPage";
-import UsuariosPage from "./pages/cadastros/UsuariosPage";
-import ProjetosPage from "./pages/cadastros/ProjetosPage";
-import PerfisPage from "./pages/cadastros/PerfisPage";
-import DemandasPage from "./pages/demandas/DemandasPage";
-import TermoAberturaPage from "./pages/demandas/TermoAberturaPage";
-import TermoPlanejamentoPage from "./pages/demandas/TermoPlanejamentoPage";
-import TermoEncerramentoPage from "./pages/demandas/TermoEncerramentoPage";
-import ProfilePage from "./pages/ProfilePage";
-import SettingsPage from "./pages/SettingsPage";
-import NotFound from "./pages/NotFound";
+
+const HomePage = lazy(() => import("./pages/HomePage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const UsuariosPage = lazy(() => import("./pages/cadastros/UsuariosPage"));
+const ProjetosPage = lazy(() => import("./pages/cadastros/ProjetosPage"));
+const ProjetoMetaPage = lazy(() => import("./pages/cadastros/ProjetoMetaPage"));
+const PerfisPage = lazy(() => import("./pages/cadastros/PerfisPage"));
+const TemplatesPage = lazy(() => import("./pages/cadastros/TemplatesPage"));
+const DemandasPage = lazy(() => import("./pages/demandas/DemandasPage"));
+const TermoAberturaPage = lazy(() => import("./pages/demandas/TermoAberturaPage"));
+const TermoPlanejamentoPage = lazy(() => import("./pages/demandas/TermoPlanejamentoPage"));
+const TermoEncerramentoPage = lazy(() => import("./pages/demandas/TermoEncerramentoPage"));
+const AvaliacaoDemandaPage = lazy(() => import("./features/avaliacao-demanda").then((m) => ({ default: m.AvaliacaoDemandaPage })));
+const TedHealthMapPage = lazy(() => import("./pages/TedHealthMapPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+const PageFallback = () => (
+  <div className="flex min-h-[50vh] items-center justify-center p-8">
+    <LoadingSpinner size="lg" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem themes={['light', 'dark', 'light-blue', 'system']}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
             <ProjectProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<HomePage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
-              <Route path="/cadastros/projetos" element={<ProjetosPage />} />
-              <Route path="/cadastros/perfis" element={<PerfisPage />} />
-              <Route path="/demandas" element={<DemandasPage />} />
-              <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
-              <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
-              <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
-              <Route path="/perfil" element={<ProfilePage />} />
-              <Route path="/configuracoes" element={<SettingsPage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <ProcessingProvider>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageFallback />}>
+                    <Routes>
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route
+                        element={
+                          <ProtectedRoute>
+                            <MainLayout />
+                          </ProtectedRoute>
+                        }
+                      >
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
+                        <Route path="/cadastros/projetos" element={<ProjetosPage />} />
+                        <Route path="/cadastros/projeto-meta" element={<ProjetoMetaPage />} />
+                        <Route path="/cadastros/perfis" element={<PerfisPage />} />
+                        <Route path="/cadastros/templates" element={<TemplatesPage />} />
+                        <Route path="/demandas" element={<DemandasPage />} />
+                        <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
+                        <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
+                        <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
+                        <Route path="/demandas/avaliacao" element={<AvaliacaoDemandaPage />} />
+                        <Route path="/demandas/health-map" element={<TedHealthMapPage />} />
+                        <Route path="/perfil" element={<ProfilePage />} />
+                        <Route path="/configuracoes" element={<SettingsPage />} />
+                      </Route>
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </ErrorBoundary>
+              </ProcessingProvider>
             </ProjectProvider>
           </AuthProvider>
         </BrowserRouter>

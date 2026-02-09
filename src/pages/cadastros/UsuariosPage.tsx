@@ -1,31 +1,15 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { 
   Edit, 
   Trash2, 
-  MoreHorizontal, 
-  ChevronUp,
-  ChevronDown,
-  Users
+  Users,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -53,10 +37,13 @@ import {
 } from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { DataTable, type Column, type Action } from '@/components/common/DataTable';
 import { useApi } from '@/hooks/useApi';
 import { usuarioSchema, usuarioCreateSchema, type UsuarioFormData } from '@/lib/validations';
 import { usuarioService } from '@/services/usuarioService';
-import type { Usuario, UserProfile, UserStatus, PaginatedResponse } from '@/types';
+import { projetoService, usuarioProjetoService } from '@/services';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Usuario, UserProfile, UserStatus, PaginatedResponse, Projeto, UsuarioProjeto as UsuarioProjetoType } from '@/types';
 
 const getProfileLabel = (perfil: UserProfile, t: (key: string) => string) => {
   const labels: Record<UserProfile, string> = {
@@ -76,6 +63,7 @@ const getStatusBadge = (status: UserStatus, t: (key: string) => string) => {
 
 export default function UsuariosPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -88,10 +76,26 @@ export default function UsuariosPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
+  // Se o usuário logado não for administrador, bloqueia acesso à página
+  if (user && user.perfil !== 'A') {
+    return <Navigate to="/" replace />;
+  }
+
   // API states
   const { isLoading, error, execute } = useApi<PaginatedResponse<Usuario>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Estado para manutenção de projetos por usuário
+  const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+  const [projects, setProjects] = useState<Projeto[]>([]);
+  const [usuarioProjetos, setUsuarioProjetos] = useState<UsuarioProjetoType[]>([]);
+  const [assignedProjectIds, setAssignedProjectIds] = useState<number[]>([]);
+  const [initialAssignedProjectIds, setInitialAssignedProjectIds] = useState<number[]>([]);
+  const [selectedAvailableIds, setSelectedAvailableIds] = useState<number[]>([]);
+  const [selectedAssignedIds, setSelectedAssignedIds] = useState<number[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isSavingProjects, setIsSavingProjects] = useState(false);
 
   const form = useForm<UsuarioFormData>({
     resolver: zodResolver(selectedUsuario ? usuarioSchema : usuarioCreateSchema),
@@ -105,10 +109,11 @@ export default function UsuariosPage() {
 
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
+    const requestedPage = currentPage;
     await execute(
       () => usuarioService.findAll({ 
         nome: search || undefined,
-        page: currentPage, 
+        page: requestedPage + 1, // Backend espera 1-based
         size: pageSize,
         sort: `${sortField},${sortDirection}`
       }),
@@ -128,11 +133,12 @@ export default function UsuariosPage() {
 
   const paginatedUsuarios = usuarios;
 
-  const handleSort = (field: 'nome' | 'perfil') => {
-    if (sortField === field) {
+  const handleSort = (field: string) => {
+    const sortFieldTyped = field as 'nome' | 'perfil';
+    if (sortField === sortFieldTyped) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      setSortField(field);
+      setSortField(sortFieldTyped);
       setSortDirection('asc');
     }
     setCurrentPage(0);
@@ -155,10 +161,84 @@ export default function UsuariosPage() {
     setIsFormOpen(true);
   };
 
+  const handleManageProjects = async (usuario: Usuario) => {
+    setSelectedUsuario(usuario);
+    setIsProjectsOpen(true);
+    setIsLoadingProjects(true);
+    setSelectedAvailableIds([]);
+    setSelectedAssignedIds([]);
+
+    try {
+      // Carrega todos os projetos (página única grande)
+      const projetosResponse = await projetoService.findAll({
+        page: 0,
+        size: 1000,
+      });
+      setProjects(projetosResponse.content);
+
+      // Carrega vínculos do usuário
+      const vinculos = await usuarioProjetoService.findByUsuario(usuario.id);
+      setUsuarioProjetos(vinculos);
+
+      const assignedIds = vinculos.map((v) => v.projetoId);
+      setAssignedProjectIds(assignedIds);
+      setInitialAssignedProjectIds(assignedIds);
+    } catch (err) {
+      console.warn('Erro ao carregar projetos do usuário:', err);
+      setProjects([]);
+      setUsuarioProjetos([]);
+      setAssignedProjectIds([]);
+      setInitialAssignedProjectIds([]);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
   const handleDelete = (usuario: Usuario) => {
     setSelectedUsuario(usuario);
     setIsDeleteOpen(true);
   };
+
+  // Definição das colunas da tabela
+  const columns: Column<Usuario>[] = useMemo(() => [
+    {
+      key: 'nome',
+      label: t('users.name'),
+      sortable: true,
+    },
+    {
+      key: 'perfil',
+      label: t('users.profile'),
+      sortable: true,
+      render: (usuario) => getProfileLabel(usuario.perfil, t),
+    },
+    {
+      key: 'status',
+      label: t('users.status'),
+      render: (usuario) => getStatusBadge(usuario.status, t),
+    },
+  ], [t]);
+
+  // Definição das ações da tabela
+  const actions: Action<Usuario>[] = useMemo(() => [
+    {
+      label: t('common.edit'),
+      icon: <Edit className="h-4 w-4" />,
+      onClick: handleEdit,
+    },
+    {
+      label: t('users.manageProjects'),
+      icon: <ArrowLeftRight className="h-4 w-4" />,
+      onClick: handleManageProjects,
+    },
+    {
+      label: t('common.delete'),
+      icon: <Trash2 className="h-4 w-4" />,
+      onClick: handleDelete,
+      variant: 'destructive',
+      separator: true,
+    },
+  ], [t, handleEdit, handleDelete]);
 
   const onSubmit = async (data: UsuarioFormData) => {
     setIsSaving(true);
@@ -199,21 +279,79 @@ export default function UsuariosPage() {
     }
   };
 
+  const availableProjects = useMemo(
+    () => projects.filter((p) => !assignedProjectIds.includes(p.id)),
+    [projects, assignedProjectIds]
+  );
 
-  const SortIcon = ({ field }: { field: 'nome' | 'perfil' }) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? (
-      <ChevronUp className="h-4 w-4" />
-    ) : (
-      <ChevronDown className="h-4 w-4" />
-    );
+  const assignedProjects = useMemo(
+    () => projects.filter((p) => assignedProjectIds.includes(p.id)),
+    [projects, assignedProjectIds]
+  );
+
+  const toggleSelection = (id: number, list: 'available' | 'assigned') => {
+    if (list === 'available') {
+      setSelectedAvailableIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+    } else {
+      setSelectedAssignedIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+    }
   };
+
+  const moveToAssigned = () => {
+    if (selectedAvailableIds.length === 0) return;
+    setAssignedProjectIds((prev) => Array.from(new Set([...prev, ...selectedAvailableIds])));
+    setSelectedAvailableIds([]);
+  };
+
+  const moveToAvailable = () => {
+    if (selectedAssignedIds.length === 0) return;
+    setAssignedProjectIds((prev) => prev.filter((id) => !selectedAssignedIds.includes(id)));
+    setSelectedAssignedIds([]);
+  };
+
+  const handleSaveProjects = async () => {
+    if (!selectedUsuario) return;
+
+    setIsSavingProjects(true);
+    try {
+      const currentSet = new Set(assignedProjectIds);
+      const initialSet = new Set(initialAssignedProjectIds);
+
+      const toAdd = assignedProjectIds.filter((id) => !initialSet.has(id));
+      const toRemove = initialAssignedProjectIds.filter((id) => !currentSet.has(id));
+
+      // Cria novos vínculos
+      await Promise.all(
+        toAdd.map((projetoId) =>
+          usuarioProjetoService.create({ usuarioId: selectedUsuario.id, projetoId })
+        )
+      );
+
+      // Remove vínculos existentes
+      if (toRemove.length > 0 && usuarioProjetos.length > 0) {
+        const vinculosToRemove = usuarioProjetos.filter((v) => toRemove.includes(v.projetoId));
+        await Promise.all(vinculosToRemove.map((v) => usuarioProjetoService.delete(v.id)));
+      }
+
+      setIsProjectsOpen(false);
+    } catch (err) {
+      console.warn('Erro ao salvar projetos do usuário:', err);
+    } finally {
+      setIsSavingProjects(false);
+    }
+  };
+
+
 
   // Estado de erro
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title={t('users.title')} description="Gerencie os usuários do sistema" />
+        <PageHeader title={t('users.title')} description={t('common.manageUsers')} />
         <ErrorState
           title={t('common.errorTitle')}
           message={error}
@@ -228,7 +366,7 @@ export default function UsuariosPage() {
     <div className="space-y-6">
       <PageHeader
         title={t('users.title')}
-        description="Gerencie os usuários do sistema"
+        description={t('common.manageUsers')}
         onAdd={handleAdd}
         addLabel={t('users.newUser')}
       />
@@ -236,7 +374,7 @@ export default function UsuariosPage() {
       <SearchFilterBar
         searchValue={search}
         onSearchChange={(value) => { setSearch(value); setCurrentPage(0); }}
-        searchPlaceholder="Buscar por nome..."
+        searchPlaceholder={t('common.searchByName')}
         onRefresh={loadData}
       />
 
@@ -245,7 +383,7 @@ export default function UsuariosPage() {
       ) : usuarios.length === 0 ? (
         <EmptyState
           title={t('common.noResults')}
-          description="Nenhum usuário encontrado com os filtros aplicados"
+          description={t('common.noUsersFound')}
           icon={<Users className="h-6 w-6 text-muted-foreground" />}
           action={
             <Button onClick={handleAdd}>
@@ -255,66 +393,15 @@ export default function UsuariosPage() {
         />
       ) : (
         <>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('nome')}
-                  >
-                    <div className="flex items-center gap-2">
-                      {t('users.name')}
-                      <SortIcon field="nome" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('perfil')}
-                  >
-                    <div className="flex items-center gap-2">
-                      {t('users.profile')}
-                      <SortIcon field="perfil" />
-                    </div>
-                  </TableHead>
-                  <TableHead>{t('users.status')}</TableHead>
-                  <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedUsuarios.map((usuario) => (
-                  <TableRow key={usuario.id}>
-                    <TableCell className="font-medium">{usuario.nome}</TableCell>
-                    <TableCell>{getProfileLabel(usuario.perfil, t)}</TableCell>
-                    <TableCell>{getStatusBadge(usuario.status, t)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(usuario)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            {t('common.edit')}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(usuario)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            {t('common.delete')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            data={paginatedUsuarios}
+            columns={columns}
+            actions={actions}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            actionsLabel={t('common.actions')}
+          />
 
           <TablePagination
             currentPage={currentPage + 1}
@@ -336,8 +423,8 @@ export default function UsuariosPage() {
             </DialogTitle>
             <DialogDescription>
               {selectedUsuario 
-                ? 'Edite as informações do usuário abaixo.'
-                : 'Preencha as informações para criar um novo usuário.'}
+                ? t('common.editUser')
+                : t('common.fillUser')}
             </DialogDescription>
           </DialogHeader>
           
@@ -350,7 +437,7 @@ export default function UsuariosPage() {
                   <FormItem>
                     <FormLabel>{t('users.name')} *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Nome completo" {...field} />
+                      <Input placeholder={t('common.fullNamePlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -366,7 +453,7 @@ export default function UsuariosPage() {
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder={selectedUsuario ? 'Deixe em branco para manter' : 'Senha'}
+                        placeholder={selectedUsuario ? t('common.passwordKeepBlank') : t('common.passwordPlaceholder')}
                         {...field}
                       />
                     </FormControl>
@@ -453,6 +540,129 @@ export default function UsuariosPage() {
               loadingText={t('common.deleting')}
             >
               {t('common.delete')}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Projects Dialog */}
+      <Dialog open={isProjectsOpen} onOpenChange={setIsProjectsOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>{t('users.manageProjects')}</DialogTitle>
+            <DialogDescription>
+              {selectedUsuario?.nome}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
+            <div className="md:col-span-1">
+              <h4 className="text-sm font-medium mb-2">{t('users.availableProjects')}</h4>
+              <div className="border rounded-md h-64 overflow-auto">
+                {isLoadingProjects ? (
+                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                    {t('common.loading')}...
+                  </div>
+                ) : availableProjects.length === 0 ? (
+                  <div className="p-2 text-xs text-muted-foreground">
+                    {t('common.noResults')}
+                  </div>
+                ) : (
+                  <ul className="text-sm">
+                    {availableProjects.map((p) => {
+                      const selected = selectedAvailableIds.includes(p.id);
+                      return (
+                        <li
+                          key={p.id}
+                          className={`px-2 py-1 cursor-pointer flex items-center justify-between ${
+                            selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+                          }`}
+                          onClick={() => toggleSelection(p.id, 'available')}
+                        >
+                          <span className="truncate">
+                            {p.codTed} - {p.nome}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="md:col-span-1 flex flex-col items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={moveToAssigned}
+                disabled={selectedAvailableIds.length === 0 || isLoadingProjects}
+                aria-label="Adicionar"
+              >
+                &gt;
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={moveToAvailable}
+                disabled={selectedAssignedIds.length === 0 || isLoadingProjects}
+                aria-label="Remover"
+              >
+                &lt;
+              </Button>
+            </div>
+
+            <div className="md:col-span-1">
+              <h4 className="text-sm font-medium mb-2">{t('users.assignedProjects')}</h4>
+              <div className="border rounded-md h-64 overflow-auto">
+                {isLoadingProjects ? (
+                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                    {t('common.loading')}...
+                  </div>
+                ) : assignedProjects.length === 0 ? (
+                  <div className="p-2 text-xs text-muted-foreground">
+                    {t('common.noResults')}
+                  </div>
+                ) : (
+                  <ul className="text-sm">
+                    {assignedProjects.map((p) => {
+                      const selected = selectedAssignedIds.includes(p.id);
+                      return (
+                        <li
+                          key={p.id}
+                          className={`px-2 py-1 cursor-pointer flex items-center justify-between ${
+                            selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+                          }`}
+                          onClick={() => toggleSelection(p.id, 'assigned')}
+                        >
+                          <span className="truncate">
+                            {p.codTed} - {p.nome}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsProjectsOpen(false)}
+              disabled={isSavingProjects}
+            >
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton
+              onClick={handleSaveProjects}
+              isLoading={isSavingProjects}
+              loadingText={t('common.saving')}
+            >
+              {t('common.save')}
             </LoadingButton>
           </DialogFooter>
         </DialogContent>

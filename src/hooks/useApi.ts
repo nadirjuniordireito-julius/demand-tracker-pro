@@ -4,6 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { setErrorHandledByHook } from '@/services/api';
 
 export interface ApiState<T> {
   data: T | null;
@@ -37,6 +38,9 @@ export function useApi<T>(initialData: T | null = null, options: UseApiOptions =
     ): Promise<R | null> => {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
       
+      // Marca que o erro será tratado por este hook (evita toast duplicado na API)
+      setErrorHandledByHook(true);
+      
       try {
         const result = await apiCall();
         setState(prev => ({ ...prev, data: result as unknown as T, isLoading: false }));
@@ -54,7 +58,8 @@ export function useApi<T>(initialData: T | null = null, options: UseApiOptions =
         const errorMessage = extractErrorMessage(err);
         setState(prev => ({ ...prev, error: errorMessage, isLoading: false }));
         
-        if (showErrorToast) {
+        const isAllowed404 = err && typeof err === 'object' && 'allow404' in err && (err as { allow404?: boolean }).allow404;
+        if (showErrorToast && !isAllowed404) {
           toast({
             title: 'Erro',
             description: errorMessage,
@@ -64,6 +69,9 @@ export function useApi<T>(initialData: T | null = null, options: UseApiOptions =
         
         opts?.onError?.(errorMessage);
         return null;
+      } finally {
+        // Reseta a flag após o tratamento
+        setErrorHandledByHook(false);
       }
     },
     [toast, showErrorToast, options.successMessage]
@@ -136,12 +144,41 @@ function extractErrorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
   
   if (error && typeof error === 'object') {
+    // Trata ApiError (classe customizada)
+    if (error instanceof Error && 'status' in error) {
+      const apiError = error as { message: string; status: number; errors?: Record<string, string> };
+      if (apiError.errors && Object.keys(apiError.errors).length > 0) {
+        const errorMessages = Object.values(apiError.errors).filter(Boolean);
+        if (errorMessages.length > 0) {
+          return errorMessages.join(', ');
+        }
+      }
+      return apiError.message || 'Ocorreu um erro na requisição.';
+    }
+    
+    // Trata objetos de erro genéricos
     if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
       return (error as { message: string }).message;
     }
+    
+    // Trata erros com campo 'errors'
     if ('errors' in error && typeof (error as { errors: unknown }).errors === 'object') {
       const errors = (error as { errors: Record<string, string> }).errors;
-      return Object.values(errors).join(', ');
+      const errorMessages = Object.values(errors).filter(Boolean);
+      if (errorMessages.length > 0) {
+        return errorMessages.join(', ');
+      }
+    }
+    
+    // Trata erros com campo 'error'
+    if ('error' in error) {
+      const errorValue = (error as { error: unknown }).error;
+      if (typeof errorValue === 'string') {
+        return errorValue;
+      }
+      if (errorValue && typeof errorValue === 'object' && 'message' in errorValue) {
+        return String((errorValue as { message: unknown }).message);
+      }
     }
   }
   

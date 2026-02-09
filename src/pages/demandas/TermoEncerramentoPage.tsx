@@ -1,34 +1,20 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { 
-  Edit, 
-  Trash2, 
-  MoreHorizontal,
-  FileX,
-  CheckCircle,
   Plus,
-  X
+  X,
+  Upload,
+  FileText,
+  Trash2,
+  Eye,
+  FileDown,
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -37,10 +23,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
+import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
+import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import {
   Select,
   SelectContent,
@@ -56,16 +43,26 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
-import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
-import { useApi } from '@/hooks/useApi';
-import { termoEncerramentoService } from '@/services/termoService';
+import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
+import { termoEncerramentoService, termoPlanejamentoService } from '@/services/termoService';
+import { termoEncerramentoDocService } from '@/services/termoDocService';
 import { demandaService } from '@/services/demandaService';
 import { perfilService } from '@/services/perfilService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProject } from '@/contexts/ProjectContext';
 import { termoEncerramentoSchema, type TermoEncerramentoFormData } from '@/lib/validations';
-import type { TermoEncerramento, TermoEncerramentoCusto, DemandaTecnica, Perfil, PaginatedResponse } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/apiErrorHandler';
+import { canCreateTermoEncerramento, canUploadTermoEncerramento, canDeleteTermoEncerramento, canSaveTermoEncerramento, canDeleteDocTermoEncerramento } from '@/lib/demandaStatus';
+import type { TermoEncerramento, TermoEncerramentoCusto, DemandaTecnica, Perfil, TermoEncerramentoDocResponseDTO } from '@/types';
 
 interface CustoForm {
   perfilId: string;
@@ -75,154 +72,179 @@ interface CustoForm {
 
 export default function TermoEncerramentoPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const [termos, setTermos] = useState<TermoEncerramento[]>([]);
-  const [demandas, setDemandas] = useState<DemandaTecnica[]>([]);
+  const { selectedProject } = useProject();
+  const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
-  const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoEncerramento | null>(null);
   const [custos, setCustos] = useState<CustoForm[]>([]);
   const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
-  const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-
-  // API states
-  const { isLoading, error, execute } = useApi<PaginatedResponse<TermoEncerramento>>(null);
+  const [isLoadingDemanda, setIsLoadingDemanda] = useState(true);
+  const [isLoadingTermo, setIsLoadingTermo] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
-  const [isLoadingDemandas, setIsLoadingDemandas] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLoadingPerfis, setIsLoadingPerfis] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documento, setDocumento] = useState<TermoEncerramentoDocResponseDTO | null>(null);
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
+  const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+  const [isViewDocOpen, setIsViewDocOpen] = useState(false);
+  const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Evita deslocamento de timezone: "2025-01-15" sem hora é interpretado como UTC meia-noite
+  const parseDateOnly = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
 
   const form = useForm<TermoEncerramentoFormData>({
     resolver: zodResolver(termoEncerramentoSchema),
     defaultValues: {
       demandaTecnicaId: '',
+      dataTermo: new Date(),
+      dataInicioExecucao: undefined as Date | undefined,
+      dataFimExecucao: undefined as Date | undefined,
       resultadoEntregue: '',
     },
   });
 
-  // Carrega demandas e perfis para os selects
-  const loadDemandas = useCallback(async () => {
-    setIsLoadingDemandas(true);
-    try {
-      const response = await demandaService.findAll({ size: 1000 });
-      setDemandas(response.content);
-    } catch (err) {
-      console.error('Erro ao carregar demandas:', err);
-    } finally {
-      setIsLoadingDemandas(false);
-    }
-  }, []);
-
+  // Carrega perfis do projeto selecionado
   const loadPerfis = useCallback(async () => {
+    if (!selectedProject) return;
+    
     setIsLoadingPerfis(true);
     try {
-      const response = await perfilService.findAll({ size: 1000 });
+      const response = await perfilService.findAll({ 
+        projetoId: selectedProject.id,
+        size: 1000 
+      });
       setPerfis(response.content);
     } catch (err) {
       console.error('Erro ao carregar perfis:', err);
     } finally {
       setIsLoadingPerfis(false);
     }
-  }, []);
+  }, [selectedProject]);
 
-  // Carrega dados iniciais
+  // Carrega a demanda e o termo existente
   const loadData = useCallback(async () => {
-    await execute(
-      () => termoEncerramentoService.findAll(currentPage, pageSize),
-      {
-        onSuccess: (data) => {
-          setTermos(data.content);
-          setTotalPages(data.totalPages);
-          setTotalElements(data.totalElements);
-        },
+    const demandaId = searchParams.get('demandaId');
+    
+    if (!demandaId) {
+      setError('Demanda não especificada');
+      setIsLoadingDemanda(false);
+      setIsLoadingTermo(false);
+      return;
+    }
+
+    try {
+      setIsLoadingDemanda(true);
+      setIsLoadingTermo(true);
+      setError(null);
+
+      // Carrega a demanda
+      const demandaData = await demandaService.findById(Number(demandaId));
+      setDemanda(demandaData);
+      
+      // Pré-preenche o campo de demanda no formulário
+      form.setValue('demandaTecnicaId', String(demandaId));
+
+      // Busca termo existente
+      const termoExistente = await termoEncerramentoService.findByDemandaId(Number(demandaId));
+      
+      if (termoExistente) {
+        // Se existe, carrega os dados
+        setSelectedTermo(termoExistente);
+        form.reset({
+          demandaTecnicaId: String(termoExistente.demandaTecnicaId),
+          dataTermo: termoExistente.dataTermo ? parseDateOnly(termoExistente.dataTermo) : new Date(),
+          dataInicioExecucao: termoExistente.dataInicioExecucao ? parseDateOnly(termoExistente.dataInicioExecucao) : undefined,
+          dataFimExecucao: termoExistente.dataFimExecucao ? parseDateOnly(termoExistente.dataFimExecucao) : undefined,
+          resultadoEntregue: termoExistente.resultadoEntregue,
+        });
+        setCustos((termoExistente.custos || []).map(c => ({
+          perfilId: String(c.perfilId),
+          qtdeHora: String(c.qtdeHora),
+          valorHora: String(c.valorHora),
+        })));
+        
+        // Busca documento se existir
+        setIsLoadingDoc(true);
+        try {
+          const doc = await termoEncerramentoDocService.findByTermoEncerramentoId(termoExistente.id);
+          setDocumento(doc);
+        } catch {
+          setDocumento(null);
+        } finally {
+          setIsLoadingDoc(false);
+        }
+      } else {
+        // Se não existe, busca o Termo de Planejamento para copiar os custos
+        setSelectedTermo(null);
+        setDocumento(null);
+        form.reset({
+          demandaTecnicaId: String(demandaId),
+          dataTermo: new Date(),
+          dataInicioExecucao: undefined,
+          dataFimExecucao: undefined,
+          resultadoEntregue: '',
+        });
+        
+        // Busca o Termo de Planejamento para copiar os custos
+        try {
+          const termoPlanejamento = await termoPlanejamentoService.findByDemandaId(Number(demandaId));
+          
+          if (termoPlanejamento && termoPlanejamento.custos && termoPlanejamento.custos.length > 0) {
+            // Copia os custos do Termo de Planejamento
+            setCustos(termoPlanejamento.custos.map(c => ({
+              perfilId: String(c.perfilId),
+              qtdeHora: String(c.qtdeHora),
+              valorHora: String(c.valorHora),
+            })));
+            
+            // Mostra uma mensagem informativa
+            toast({
+              title: t('common.success'),
+              description: t('closingTerm.costsCopiedFromPlanning'),
+            });
+          } else {
+            // Se não há custos no planejamento, deixa vazio
+            setCustos([]);
+          }
+        } catch (err) {
+          // Se não encontrar termo de planejamento ou der erro, deixa vazio
+          console.warn('Erro ao buscar termo de planejamento para copiar custos:', err);
+          setCustos([]);
+        }
       }
-    );
-  }, [execute, currentPage, pageSize]);
+
+      // Abre o modal automaticamente
+      setIsFormOpen(true);
+    } catch (err: unknown) {
+      if (import.meta.env.DEV) console.error('Erro ao carregar dados:', err);
+      setError(getErrorMessage(err, 'Erro ao carregar dados da demanda'));
+    } finally {
+      setIsLoadingDemanda(false);
+      setIsLoadingTermo(false);
+    }
+  }, [searchParams, form]);
 
   useEffect(() => {
-    loadDemandas();
     loadPerfis();
-  }, [loadDemandas, loadPerfis]);
+  }, [loadPerfis]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const filteredTermos = useMemo(() => {
-    if (!search) return termos;
-    return termos.filter((termo) => {
-      const demanda = demandas.find(d => d.id === termo.demandaTecnicaId);
-      return demanda?.nome.toLowerCase().includes(search.toLowerCase()) ||
-             demanda?.codigo.toLowerCase().includes(search.toLowerCase());
-    });
-  }, [termos, search, demandas]);
-  
-  const paginatedTermos = filteredTermos;
-
-
-  const formatDateTime = (dateStr: string) => {
-    return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
-  const getDemandaNome = (demandaId: number) => {
-    const demanda = demandas.find(d => d.id === demandaId);
-    return demanda ? `${demanda.codigo} - ${demanda.nome}` : '-';
-  };
-
-  const calcularCustoTotal = (custosList: TermoEncerramentoCusto[] = []) => {
-    return custosList.reduce((total, c) => total + (c.qtdeHora * c.valorHora), 0);
-  };
-
-  const handleAdd = () => {
-    setSelectedTermo(null);
-    form.reset({ demandaTecnicaId: '', resultadoEntregue: '' });
-    setCustos([]);
-    setCustoErrors({});
-    setIsFormOpen(true);
-  };
-
-  const handleEdit = (termo: TermoEncerramento) => {
-    setSelectedTermo(termo);
-    form.reset({
-      demandaTecnicaId: String(termo.demandaTecnicaId),
-      resultadoEntregue: termo.resultadoEntregue,
-    });
-    setCustos((termo.custos || []).map(c => ({
-      perfilId: String(c.perfilId),
-      qtdeHora: String(c.qtdeHora),
-      valorHora: String(c.valorHora),
-    })));
-    setCustoErrors({});
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = (termo: TermoEncerramento) => {
-    setSelectedTermo(termo);
-    setIsDeleteOpen(true);
-  };
-
-  const handleSign = async (termo: TermoEncerramento) => {
-    setIsSigning(true);
-    try {
-      await termoEncerramentoService.sign(termo.id);
-      loadData();
-    } finally {
-      setIsSigning(false);
-    }
-  };
 
   const handleAddCusto = () => {
     setCustos([...custos, { perfilId: '', qtdeHora: '', valorHora: '' }]);
@@ -236,9 +258,30 @@ export default function TermoEncerramentoPage() {
   };
 
   const handleCustoChange = (index: number, field: keyof CustoForm, value: string) => {
-    setCustos(custos.map((c, i) => 
-      i === index ? { ...c, [field]: value } : c
-    ));
+    const updatedCustos = custos.map((c, i) => {
+      if (i === index) {
+        const updatedCusto = { ...c, [field]: value };
+        
+        // Preenche automaticamente o valor/hora quando perfil for selecionado
+        if (field === 'perfilId') {
+          const perfilId = value;
+          
+          if (perfilId) {
+            const perfil = perfis.find(p => p.id === Number(perfilId));
+            
+            if (perfil && perfil.valor) {
+              // Apenas preenche com o valor do perfil (sem multiplicar por horas)
+              updatedCusto.valorHora = perfil.valor.toFixed(2);
+            }
+          }
+        }
+        
+        return updatedCusto;
+      }
+      return c;
+    });
+    
+    setCustos(updatedCustos);
     if (custoErrors[index]) {
       const newErrors = { ...custoErrors };
       delete newErrors[index];
@@ -250,9 +293,9 @@ export default function TermoEncerramentoPage() {
     const errors: Record<number, string> = {};
     custos.forEach((custo, index) => {
       if (!custo.perfilId || !custo.qtdeHora || !custo.valorHora) {
-        errors[index] = 'Preencha todos os campos do custo';
+        errors[index] = t('common.fillAllCostFields');
       } else if (Number(custo.qtdeHora) <= 0 || Number(custo.valorHora) <= 0) {
-        errors[index] = 'Valores devem ser maiores que zero';
+        errors[index] = t('common.valuesMustBePositive');
       }
     });
     setCustoErrors(errors);
@@ -261,6 +304,26 @@ export default function TermoEncerramentoPage() {
 
   const onSubmit = async (data: TermoEncerramentoFormData) => {
     if (!validateCustos() || !user) return;
+
+    // Regra: salvar só se status E ou F
+    if (!canSaveTermoEncerramento(demanda?.status ?? demanda?.situacao)) {
+      toast({
+        title: t('common.error'),
+        description: t('closingTerm.statusRestrictionSave'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Regra: criar só se status E; editar se status F
+    if (!selectedTermo && !canCreateTermoEncerramento(demanda?.status ?? demanda?.situacao)) {
+      toast({
+        title: t('common.error'),
+        description: t('closingTerm.statusRestrictionCreate'),
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -272,25 +335,76 @@ export default function TermoEncerramentoPage() {
           valorHora: Number(c.valorHora),
         }));
 
+      const dataTermoStr = data.dataTermo.toISOString().split('T')[0];
+      const dataInicioExecucaoStr = data.dataInicioExecucao?.toISOString().split('T')[0];
+      const dataFimExecucaoStr = data.dataFimExecucao?.toISOString().split('T')[0];
+
+      let termoSalvo: TermoEncerramento;
+
       if (selectedTermo) {
-        await termoEncerramentoService.update(selectedTermo.id, {
+        termoSalvo = await termoEncerramentoService.update(selectedTermo.id, {
           resultadoEntregue: data.resultadoEntregue,
+          dataTermo: dataTermoStr,
+          dataInicioExecucao: dataInicioExecucaoStr,
+          dataFimExecucao: dataFimExecucaoStr,
           custos: custosFormatted,
         });
       } else {
-        await termoEncerramentoService.create({
+        termoSalvo = await termoEncerramentoService.create({
           demandaTecnicaId: Number(data.demandaTecnicaId),
           resultadoEntregue: data.resultadoEntregue,
+          dataTermo: dataTermoStr,
+          dataInicioExecucao: dataInicioExecucaoStr,
+          dataFimExecucao: dataFimExecucaoStr,
           usuarioId: user.id,
           custos: custosFormatted,
         });
+        // Regra: ao criar Termo de Encerramento, demanda passa para status F
+        await demandaService.update(Number(data.demandaTecnicaId), { status: 'F' });
       }
-      setIsFormOpen(false);
-      form.reset();
-      setCustos([]);
-      loadData();
+      
+      // Atualiza o termo selecionado
+      setSelectedTermo(termoSalvo);
+      
+      // Recarrega demanda para obter status atualizado
+      if (demanda) {
+        const demandaAtualizada = await demandaService.findById(demanda.id);
+        setDemanda(demandaAtualizada);
+      }
+      
+      // Busca documento se existir
+      setIsLoadingDoc(true);
+      try {
+        const doc = await termoEncerramentoDocService.findByTermoEncerramentoId(termoSalvo.id);
+        setDocumento(doc);
+      } catch {
+        setDocumento(null);
+      } finally {
+        setIsLoadingDoc(false);
+      }
+      
+      // Não fecha o modal, apenas mostra sucesso
+      toast({
+        title: t('common.success'),
+        description: selectedTermo 
+          ? t('closingTerm.updatedSuccess')
+          : t('closingTerm.createdSuccess'),
+      });
+    } catch (error) {
+      // Erro já é tratado automaticamente pela API (toast será exibido)
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    setIsFormOpen(false);
+    navigate('/demandas');
+  };
+
+  const handleDelete = () => {
+    if (selectedTermo && canDeleteTermoEncerramento(demanda?.status)) {
+      setIsDeleteOpen(true);
     }
   };
 
@@ -300,147 +414,200 @@ export default function TermoEncerramentoPage() {
     setIsDeleting(true);
     try {
       await termoEncerramentoService.delete(selectedTermo.id);
+      // Regra: ao excluir Termo de Encerramento, demanda volta para status E
+      if (demanda) {
+        await demandaService.update(demanda.id, { status: 'E' });
+      }
       setIsDeleteOpen(false);
-      loadData();
+      setIsFormOpen(false);
+      // Redireciona de volta para a página de demandas
+      navigate('/demandas');
+    } catch (error) {
+      // Erro já é tratado automaticamente pela API (toast será exibido)
     } finally {
       setIsDeleting(false);
     }
   };
 
+  const handleOpenUpload = () => {
+    if (!selectedTermo) {
+      toast({
+        title: t('common.error'),
+        description: 'É necessário salvar o termo antes de fazer upload do documento',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!canUploadTermoEncerramento(demanda?.status)) {
+      toast({
+        title: t('common.error'),
+        description: t('closingTerm.statusRestrictionUpload'),
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSelectedFile(null);
+    setIsUploadOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Valida se é PDF
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: t('common.error'),
+          description: 'O arquivo deve ser um PDF',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedTermo) return;
+
+    setIsUploading(true);
+    try {
+      let docResponse: TermoEncerramentoDocResponseDTO;
+      
+      // Verifica se já existe documento
+      const docExists = await termoEncerramentoDocService.exists(selectedTermo.id);
+      
+      if (docExists && documento) {
+        // Atualiza documento existente
+        docResponse = await termoEncerramentoDocService.update(documento.id, selectedFile);
+      } else {
+        // Cria novo documento
+        docResponse = await termoEncerramentoDocService.upload(selectedTermo.id, selectedFile);
+      }
+
+      setDocumento(docResponse);
+      setIsUploadOpen(false);
+      setSelectedFile(null);
+      
+      // Regra: ao fazer upload do documento assinado, demanda passa para status G
+      if (demanda) {
+        await demandaService.update(demanda.id, { status: 'G' });
+        const demandaAtualizada = await demandaService.findById(demanda.id);
+        setDemanda(demandaAtualizada);
+      }
+      
+      // Recarrega o termo para atualizar a data de assinatura se houver
+      if (selectedTermo) {
+        const termoAtualizado = await termoEncerramentoService.findById(selectedTermo.id);
+        setSelectedTermo(termoAtualizado);
+      }
+
+      toast({
+        title: t('common.success'),
+        description: t('closingTerm.uploadSuccess'),
+      });
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('closingTerm.uploadError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleViewDocument = () => {
+    if (documento) setIsViewDocOpen(true);
+  };
+
+  const handleGeneratePdf = () => {
+    if (!selectedTermo || !selectedProject || !demanda) {
+      toast({
+        title: t('common.error'),
+        description: t('closingTerm.generatePdfError'),
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsViewGeneratedPdfOpen(true);
+  };
+
+  const handleDeleteDocument = () => {
+    if (documento && canDeleteDocTermoEncerramento(demanda?.status ?? demanda?.situacao)) {
+      setIsDeleteDocOpen(true);
+    }
+  };
+
+  const handleConfirmDeleteDocument = async () => {
+    if (!documento || !selectedTermo) return;
+    if (!canDeleteDocTermoEncerramento(demanda?.status ?? demanda?.situacao)) return;
+
+    setIsDeletingDoc(true);
+    try {
+      await termoEncerramentoDocService.delete(documento.id);
+      
+      // Limpa o documento do estado
+      setDocumento(null);
+      setIsDeleteDocOpen(false);
+      
+      // Recarrega o termo para atualizar a data de assinatura (deve estar null agora)
+      const termoAtualizado = await termoEncerramentoService.findById(selectedTermo.id);
+      setSelectedTermo(termoAtualizado);
+      
+      toast({
+        title: t('common.success'),
+        description: t('closingTerm.documentDeletedSuccess'),
+      });
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('closingTerm.documentDeleteError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingDoc(false);
+    }
+  };
+
   // Estado de erro
-  if (error) {
+  if (error && !isLoadingDemanda && !isLoadingTermo) {
     return (
-      <div className="space-y-6">
-        <PageHeader title={t('closingTerm.title')} description="Gerencie os termos de encerramento das demandas" />
+      <div className="space-y-6 p-6">
         <ErrorState
           title={t('common.errorTitle')}
           message={error}
           onRetry={loadData}
           retryText={t('common.retry')}
         />
+        <Button onClick={() => navigate('/demandas')} variant="outline">
+          {t('common.back')}
+        </Button>
+      </div>
+    );
+  }
+
+  // Estado de carregamento
+  if (isLoadingDemanda || isLoadingTermo) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">{t('common.loading')}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t('closingTerm.title')}
-        description="Gerencie os termos de encerramento das demandas"
-        onAdd={handleAdd}
-        addLabel={t('closingTerm.newTerm')}
-      />
-
-      <SearchFilterBar
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Buscar por demanda..."
-        onRefresh={loadData}
-      />
-
-      {isLoading ? (
-        <TableSkeleton rows={5} columns={5} />
-      ) : filteredTermos.length === 0 ? (
-        <EmptyState
-          title={t('common.noResults')}
-          description="Nenhum termo de encerramento encontrado"
-          icon={<FileX className="h-6 w-6 text-muted-foreground" />}
-          action={
-            <Button onClick={handleAdd}>
-              {t('closingTerm.newTerm')}
-            </Button>
-          }
-        />
-      ) : (
-        <>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('closingTerm.demand')}</TableHead>
-                  <TableHead>{t('closingTerm.termDate')}</TableHead>
-                  <TableHead>{t('closingTerm.totalCost')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedTermos.map((termo) => (
-                  <TableRow key={termo.id}>
-                    <TableCell className="font-medium max-w-[250px] truncate">
-                      {getDemandaNome(termo.demandaTecnicaId)}
-                    </TableCell>
-                    <TableCell>{formatDateTime(termo.dataTermo)}</TableCell>
-                    <TableCell>{formatCurrency(calcularCustoTotal(termo.custos))}</TableCell>
-                    <TableCell>
-                      {termo.dataAssinatura ? (
-                        <Badge className="bg-success text-success-foreground">
-                          {t('closingTerm.signed')}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          {t('closingTerm.notSigned')}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" disabled={isSigning}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(termo)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            {t('common.edit')}
-                          </DropdownMenuItem>
-                          {!termo.dataAssinatura && (
-                            <DropdownMenuItem onClick={() => handleSign(termo)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              {t('closingTerm.sign')}
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(termo)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            {t('common.delete')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <TablePagination
-            currentPage={currentPage + 1}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={totalElements}
-            onPageChange={(p) => setCurrentPage(p - 1)}
-            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }}
+      {/* Form Dialog - sempre aberto quando a página carrega */}
+      <Dialog open={isFormOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeaderStandard
+            title={selectedTermo ? t('closingTerm.editTerm') : t('closingTerm.newTerm')}
+            description={selectedTermo 
+              ? t('common.editTerm')
+              : t('common.fillTerm')}
           />
-        </>
-      )}
-
-      {/* Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedTermo ? t('closingTerm.editTerm') : t('closingTerm.newTerm')}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedTermo 
-                ? 'Edite as informações do termo abaixo.'
-                : 'Preencha as informações para criar um novo termo.'}
-            </DialogDescription>
-          </DialogHeader>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -450,21 +617,17 @@ export default function TermoEncerramentoPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('closingTerm.demand')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma demanda" />
+                          <SelectValue placeholder={t('common.selectDemand')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {isLoadingDemandas ? (
-                          <SelectItem value="" disabled>Carregando...</SelectItem>
-                        ) : (
-                          demandas.map((demanda) => (
-                            <SelectItem key={demanda.id} value={String(demanda.id)}>
-                              {demanda.codigo} - {demanda.nome}
-                            </SelectItem>
-                          ))
+                        {demanda && (
+                          <SelectItem value={String(demanda.id)}>
+                            {demanda.codigo} - {demanda.nome}
+                          </SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -472,6 +635,118 @@ export default function TermoEncerramentoPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="dataTermo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('closingTerm.termDate')} *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          defaultMonth={field.value ?? new Date()}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dataInicioExecucao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('closingTerm.executionStartDate')}</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value ?? undefined}
+                            onSelect={field.onChange}
+                            defaultMonth={field.value ?? new Date()}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dataFimExecucao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('closingTerm.executionEndDate')}</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value ?? undefined}
+                            onSelect={field.onChange}
+                            defaultMonth={field.value ?? new Date()}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
@@ -480,10 +755,10 @@ export default function TermoEncerramentoPage() {
                   <FormItem>
                     <FormLabel>{t('closingTerm.deliveredResult')} *</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Descreva os resultados entregues..."
-                        rows={6}
-                        {...field}
+                      <RichTextEditor
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        placeholder={t('common.deliveredResultPlaceholder')}
                       />
                     </FormControl>
                     <FormMessage />
@@ -505,11 +780,11 @@ export default function TermoEncerramentoPage() {
                 <CardContent className="space-y-3">
                   {custos.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      Nenhum custo adicionado
+                      {t('common.noCostsAdded')}
                     </p>
                   ) : (
                     custos.map((custo, index) => (
-                      <div key={index} className="space-y-2">
+                      <div key={'id' in custo && custo.id != null ? custo.id : `custo-${index}`} className="space-y-2">
                         <div className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
                           <div className="flex-1 grid grid-cols-3 gap-2">
                             <div>
@@ -519,11 +794,11 @@ export default function TermoEncerramentoPage() {
                                 onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
                               >
                                 <SelectTrigger className="h-8">
-                                  <SelectValue placeholder="Perfil" />
+                                  <SelectValue placeholder={t('common.selectProfile')} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {isLoadingPerfis ? (
-                                    <SelectItem value="" disabled>Carregando...</SelectItem>
+                                    <SelectItem value="" disabled>{t('common.loading')}</SelectItem>
                                   ) : (
                                     perfis.map((perfil) => (
                                       <SelectItem key={perfil.id} value={String(perfil.id)}>
@@ -541,7 +816,7 @@ export default function TermoEncerramentoPage() {
                                 className="h-8"
                                 value={custo.qtdeHora}
                                 onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
-                                placeholder="Horas"
+                                placeholder={t('common.hoursPlaceholder')}
                               />
                             </div>
                             <div>
@@ -551,7 +826,7 @@ export default function TermoEncerramentoPage() {
                                 className="h-8"
                                 value={custo.valorHora}
                                 onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
-                                placeholder="R$"
+                                placeholder={t('common.currencyPlaceholder')}
                               />
                             </div>
                           </div>
@@ -561,6 +836,7 @@ export default function TermoEncerramentoPage() {
                             size="icon"
                             className="h-8 w-8 text-destructive"
                             onClick={() => handleRemoveCusto(index)}
+                            aria-label={t('common.remove')}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -574,13 +850,96 @@ export default function TermoEncerramentoPage() {
                 </CardContent>
               </Card>
               
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
-                  {t('common.cancel')}
-                </Button>
-                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
-                  {t('common.save')}
-                </LoadingButton>
+              {/* Documento anexado - indicador visual */}
+              {selectedTermo && documento && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-border">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{documento.nomeArquivo}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {documento.dataAssinatura 
+                        ? `${t('closingTerm.signatureDate')}: ${new Date(documento.dataAssinatura).toLocaleDateString('pt-BR')}`
+                        : t('closingTerm.notSigned')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleViewDocument}
+                      disabled={isDeletingDoc || isSaving || isDeleting}
+                      className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                      title={t('closingTerm.viewDocument')}
+                      aria-label={t('closingTerm.viewDocument')}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDeleteDocument}
+                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoEncerramento(demanda?.status ?? demanda?.situacao)}
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title={t('closingTerm.deleteDocument')}
+                      aria-label={t('closingTerm.deleteDocument')}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <div className="flex gap-2">
+                  {selectedTermo && (
+                    <>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={handleGeneratePdf}
+                        disabled={isSaving || isDeleting || !selectedProject}
+                        className="flex items-center gap-2"
+                        title={t('closingTerm.generatePdf')}
+                      >
+                        <FileDown className="h-4 w-4" />
+                        {t('closingTerm.generatePdf')}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={handleOpenUpload}
+                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoEncerramento(demanda?.status)}
+                        className="flex items-center gap-2"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {documento ? t('closingTerm.replaceDocument') : t('closingTerm.uploadDocument')}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        onClick={handleDelete} 
+                        disabled={isSaving || isDeleting || !canDeleteTermoEncerramento(demanda?.status)}
+                      >
+                        {t('common.delete')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
+                    {t('common.cancel')}
+                  </Button>
+                  <LoadingButton 
+                    type="submit" 
+                    isLoading={isSaving} 
+                    loadingText={t('common.saving')} 
+                    disabled={isDeleting || !canSaveTermoEncerramento(demanda?.status ?? demanda?.situacao)}
+                  >
+                    {t('common.save')}
+                  </LoadingButton>
+                </div>
               </DialogFooter>
             </form>
           </Form>
@@ -611,6 +970,123 @@ export default function TermoEncerramentoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Document Dialog */}
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('closingTerm.uploadDocumentTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('closingTerm.uploadDocumentDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="pdf-upload" className="text-sm font-medium">
+                {t('closingTerm.selectFile')}
+              </label>
+              <Input
+                id="pdf-upload"
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handleFileChange}
+                disabled={isUploading}
+                className="cursor-pointer"
+              />
+              {selectedFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span>{selectedFile.name}</span>
+                  <span className="text-xs">({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+              )}
+              {!selectedFile && (
+                <p className="text-sm text-muted-foreground">
+                  {t('closingTerm.noFileSelected')}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUploadOpen(false)} disabled={isUploading}>
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton 
+              onClick={handleUpload}
+              isLoading={isUploading}
+              loadingText={t('common.saving')}
+              disabled={!selectedFile}
+            >
+              {t('common.save')}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Document Confirmation Dialog */}
+      <Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('closingTerm.deleteDocumentConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('closingTerm.deleteDocumentConfirm')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDocOpen(false)} disabled={isDeletingDoc}>
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton 
+              variant="destructive" 
+              onClick={handleConfirmDeleteDocument}
+              isLoading={isDeletingDoc}
+              loadingText={t('common.deleting')}
+            >
+              {t('common.delete')}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PdfPreviewDialog
+        open={isViewDocOpen}
+        onOpenChange={setIsViewDocOpen}
+        title={t('closingTerm.viewDocumentTitle')}
+        description={documento?.nomeArquivo}
+        fetchPdf={() => termoEncerramentoDocService.downloadById(documento!.id)}
+        loadingLabel={t('common.loading')}
+        errorMessage={t('closingTerm.documentViewError')}
+        closeLabel={t('common.close')}
+        onError={(err: unknown) =>
+          toast({
+            title: t('common.error'),
+            description: getErrorMessage(err, t('closingTerm.documentViewError')),
+            variant: 'destructive',
+          })
+        }
+      />
+
+      <PdfPreviewDialog
+        open={isViewGeneratedPdfOpen}
+        onOpenChange={setIsViewGeneratedPdfOpen}
+        title={t('closingTerm.viewGeneratedPdfTitle')}
+        description={t('closingTerm.viewGeneratedPdfDescription')}
+        fetchPdf={() =>
+          termoEncerramentoService.gerarPdf(selectedTermo!.id, selectedProject!.id, 'E')
+        }
+        loadingLabel={t('closingTerm.generatingPdf')}
+        errorMessage={t('closingTerm.generatePdfError')}
+        downloadFileName={selectedTermo ? `termo-encerramento-${selectedTermo.id}.pdf` : undefined}
+        closeLabel={t('common.close')}
+        downloadLabel={t('common.download')}
+        onError={(err: unknown) =>
+          toast({
+            title: t('common.error'),
+            description: getErrorMessage(err, t('closingTerm.generatePdfError')),
+            variant: 'destructive',
+          })
+        }
+      />
     </div>
   );
 }

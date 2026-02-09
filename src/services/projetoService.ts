@@ -4,6 +4,7 @@
 // =====================================================
 
 import api from './api';
+import { projetoSchema, paginatedProjetoSchema } from '@/lib/schemas';
 import type { 
   Projeto, 
   ProjetoCreateDTO, 
@@ -14,7 +15,7 @@ import type {
 const ENDPOINTS = {
   base: '/projetos',
   byId: (id: number) => `/projetos/${id}`,
-  byUsuario: (usuarioId: number) => `/usuario-projeto/usuario/${usuarioId}`,
+  totais: (id: number) => `/projetos/${id}/totais`,
 };
 
 export interface ProjetoFilters {
@@ -41,14 +42,21 @@ export const projetoService = {
     if (filters.sort) params.append('sort', filters.sort);
 
     const query = params.toString() ? `?${params.toString()}` : '';
-    return api.get<PaginatedResponse<Projeto>>(`${ENDPOINTS.base}${query}`);
+    return api.get<PaginatedResponse<Projeto>>(`${ENDPOINTS.base}${query}`, { schema: paginatedProjetoSchema });
   },
 
   /**
    * Busca um projeto por ID
    */
   async findById(id: number): Promise<Projeto> {
-    return api.get<Projeto>(ENDPOINTS.byId(id));
+    return api.get<Projeto>(ENDPOINTS.byId(id), { schema: projetoSchema });
+  },
+
+  /**
+   * Busca totais financeiros do projeto (valor total projeto e valor total executado)
+   */
+  async getTotais(id: number): Promise<{ valorTotalProjeto: number; valorTotalExecutado: number }> {
+    return api.get<{ valorTotalProjeto: number; valorTotalExecutado: number }>(ENDPOINTS.totais(id));
   },
 
   /**
@@ -73,47 +81,19 @@ export const projetoService = {
   },
 
   /**
-   * Busca projetos vinculados a um usuário (tabela UsuarioProjeto)
-   * Tenta vários endpoints possíveis
+   * Busca projetos vinculados a um usuário
+   * Usa findAll com filtro usuarioId (endpoint que existe no backend)
    */
   async findByUsuario(usuarioId: number): Promise<Projeto[]> {
-    // Lista de endpoints possíveis para tentar
-    const possibleEndpoints = [
-      `/usuario-projeto/usuario/${usuarioId}`,
-      `/usuario-projeto?usuarioId=${usuarioId}`,
-      `/usuarios/${usuarioId}/projetos`,
-      `/projetos/usuario/${usuarioId}`,
-    ];
-
-    // Tenta cada endpoint até encontrar um que funcione
-    for (const endpoint of possibleEndpoints) {
-      try {
-        const result = await api.get<Projeto[]>(endpoint);
-        if (Array.isArray(result)) {
-          return result;
-        }
-      } catch (error: any) {
-        // Se for 404 ou 500, tenta o próximo endpoint
-        if (error?.status === 404 || error?.status === 500) {
-          continue;
-        }
-        // Se for outro erro, continua tentando
-        continue;
-      }
-    }
-
-    // Se nenhum endpoint funcionou, tenta usar findAll com filtro como último recurso
-    // Nota: Isso pode retornar projetos onde o usuário é dono, não necessariamente vinculados
     try {
-      console.warn('Nenhum endpoint específico encontrado, usando findAll com filtro como fallback');
       const response = await this.findAll({ 
         usuarioId, 
         page: 0, 
         size: 1000
       });
       return response.content;
-    } catch (fallbackError) {
-      console.error('Erro ao buscar projetos do usuário:', fallbackError);
+    } catch (error) {
+      console.warn('Erro ao buscar projetos do usuário:', error);
       return [];
     }
   },
