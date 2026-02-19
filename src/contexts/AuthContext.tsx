@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '@/services/authService';
+import { silentRefresh } from '@/services/api';
 import type { Usuario, LoginRequest } from '@/types';
 
 interface AuthContextType {
@@ -8,7 +9,6 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,54 +17,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<Usuario | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadUser = useCallback(async () => {
-    if (authService.isAuthenticated()) {
+  useEffect(() => {
+    const init = async () => {
       try {
+        // 1) tenta silent refresh primeiro
+        await silentRefresh();
+
+        // 2) agora token existe → pode chamar /me
         const userData = await authService.getCurrentUser();
         setUser(userData);
-      } catch (error) {
-        if (import.meta.env.DEV) console.error('Failed to load user:', error);
+      } catch (e) {
         await authService.logout();
         setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
-  }, []);
+    };
 
-  useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+    init();
+  }, []);
 
   const login = async (credentials: LoginRequest) => {
     const response = await authService.login(credentials);
-    // Usa o usuário da resposta do login para evitar chamada adicional
     setUser(response.usuario);
   };
 
   const logout = async () => {
-    try {
-      await authService.logout();
-    } catch (error) {
-      if (import.meta.env.DEV) console.warn('Erro durante logout:', error);
-    } finally {
-      // Sempre limpa o estado do usuário
-      setUser(null);
-    }
+    await authService.logout();
+    setUser(null);
   };
-
-  const refreshUser = useCallback(async () => {
-    if (!authService.isAuthenticated()) {
-      setUser(null);
-      return;
-    }
-
-    try {
-      const userData = await authService.getCurrentUser();
-      setUser(userData);
-    } catch (error) {
-      if (import.meta.env.DEV) console.error('Failed to refresh user:', error);
-    }
-  }, []);
 
   return (
     <AuthContext.Provider
@@ -74,7 +55,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
-        refreshUser,
       }}
     >
       {children}
@@ -84,8 +64,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };

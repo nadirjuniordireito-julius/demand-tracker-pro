@@ -144,58 +144,64 @@ export default function AvaliacaoDemandaPage() {
     const riscosLabels = (values.riscos ?? []).map(
       (r) => TIPO_RISCO_OPTIONS.find((o) => o.value === r)?.labelKey ?? r
     ).map((key) => t(key));
+    const row = (label: string, value: string) => ({ label, value });
+    const rowStars = (label: string, rating: number) => ({
+      label,
+      value: String(rating),
+      valueStars: Math.min(5, Math.max(0, Math.round(rating))),
+    });
     const sections: AvaliacaoPdfSection[] = [
       {
         sectionTitle: t('avaliacaoDemanda.stepPrazoCusto'),
         rows: [
-          { label: t('avaliacaoDemanda.labelAtraso'), value: simNao(values.atraso) },
-          { label: t('avaliacaoDemanda.labelImpactoAtraso'), value: String(values.impactoAtraso) },
-          { label: t('avaliacaoDemanda.labelDesvioPrazo'), value: `${values.desvioPrazoPercentual}%` },
-          { label: t('avaliacaoDemanda.labelDesvioCusto'), value: `${values.desvioCustoPercentual}%` },
-          { label: t('avaliacaoDemanda.labelImpactoFinanceiro'), value: String(values.impactoFinanceiro) },
+          row(t('avaliacaoDemanda.labelAtraso'), simNao(values.atraso)),
+          rowStars(t('avaliacaoDemanda.labelImpactoAtraso'), values.impactoAtraso),
+          row(t('avaliacaoDemanda.labelDesvioPrazo'), `${values.desvioPrazoPercentual}%`),
+          row(t('avaliacaoDemanda.labelDesvioCusto'), `${values.desvioCustoPercentual}%`),
+          rowStars(t('avaliacaoDemanda.labelImpactoFinanceiro'), values.impactoFinanceiro),
         ],
       },
       {
         sectionTitle: t('avaliacaoDemanda.stepQualidade'),
         rows: [
-          { label: t(QUALIDADE_LABEL_KEYS.atendimentoRequisitos), value: String(values.atendimentoRequisitos) },
-          { label: t(QUALIDADE_LABEL_KEYS.estabilidade), value: String(values.estabilidade) },
-          { label: t(QUALIDADE_LABEL_KEYS.retrabalho), value: String(values.retrabalho) },
-          { label: t(QUALIDADE_LABEL_KEYS.satisfacaoUsuario), value: String(values.satisfacaoUsuario) },
-          { label: t(QUALIDADE_LABEL_KEYS.clarezaRequisitos), value: String(values.clarezaRequisitos) },
+          rowStars(t(QUALIDADE_LABEL_KEYS.atendimentoRequisitos), values.atendimentoRequisitos),
+          rowStars(t(QUALIDADE_LABEL_KEYS.estabilidade), values.estabilidade),
+          rowStars(t(QUALIDADE_LABEL_KEYS.retrabalho), values.retrabalho),
+          rowStars(t(QUALIDADE_LABEL_KEYS.satisfacaoUsuario), values.satisfacaoUsuario),
+          rowStars(t(QUALIDADE_LABEL_KEYS.clarezaRequisitos), values.clarezaRequisitos),
         ],
       },
       {
         sectionTitle: t('avaliacaoDemanda.stepMaturidade'),
         rows: [
-          { label: t(MATURIDADE_LABEL_KEYS.qualidadePlanejamento), value: String(values.qualidadePlanejamento) },
-          { label: t(MATURIDADE_LABEL_KEYS.aderenciaCronograma), value: String(values.aderenciaCronograma) },
-          { label: t(MATURIDADE_LABEL_KEYS.comunicacao), value: String(values.comunicacao) },
+          rowStars(t(MATURIDADE_LABEL_KEYS.qualidadePlanejamento), values.qualidadePlanejamento),
+          rowStars(t(MATURIDADE_LABEL_KEYS.aderenciaCronograma), values.aderenciaCronograma),
+          rowStars(t(MATURIDADE_LABEL_KEYS.comunicacao), values.comunicacao),
         ],
       },
       {
         sectionTitle: t('avaliacaoDemanda.stepRiscos'),
         rows: [
-          { label: t('avaliacaoDemanda.labelRiscosIdentificados'), value: riscosLabels.length ? riscosLabels.join(', ') : '—' },
+          row(t('avaliacaoDemanda.labelRiscosIdentificados'), riscosLabels.length ? riscosLabels.join(', ') : '—'),
         ],
       },
       {
         sectionTitle: t('avaliacaoDemanda.stepEquipe'),
         rows: [
-          { label: t('avaliacaoDemanda.labelCapacidadeEquipe'), value: String(values.capacidadeEquipe) },
-          { label: t('avaliacaoDemanda.labelDisponibilidadeEquipe'), value: String(values.disponibilidadeEquipe) },
-          { label: t('avaliacaoDemanda.labelPossuiBackupCritico'), value: simNao(values.possuiBackupCritico) },
-          { label: t('avaliacaoDemanda.labelRotatividadeImpactou'), value: simNao(values.rotatividadeImpactou) },
+          rowStars(t('avaliacaoDemanda.labelCapacidadeEquipe'), values.capacidadeEquipe),
+          rowStars(t('avaliacaoDemanda.labelDisponibilidadeEquipe'), values.disponibilidadeEquipe),
+          row(t('avaliacaoDemanda.labelPossuiBackupCritico'), simNao(values.possuiBackupCritico)),
+          row(t('avaliacaoDemanda.labelRotatividadeImpactou'), simNao(values.rotatividadeImpactou)),
         ],
       },
       {
         sectionTitle: t('avaliacaoDemanda.stepImpacto'),
         rows: [
-          { label: t('avaliacaoDemanda.labelValorPercebido'), value: String(values.valorPercebido) },
-          { label: t('avaliacaoDemanda.labelAlinhamentoMeta'), value: String(values.alinhamentoMeta) },
-          { label: t('avaliacaoDemanda.labelReutilizacao'), value: reutilizacaoLabel(values.reutilizacao) },
-          { label: t('avaliacaoDemanda.labelAvaliacaoGeral'), value: String(values.avaliacaoGeral) },
-          { label: t('avaliacaoDemanda.labelRepetiriaModelo'), value: simNao(values.repetiriaModelo) },
+          rowStars(t('avaliacaoDemanda.labelValorPercebido'), values.valorPercebido),
+          rowStars(t('avaliacaoDemanda.labelAlinhamentoMeta'), values.alinhamentoMeta),
+          row(t('avaliacaoDemanda.labelReutilizacao'), reutilizacaoLabel(values.reutilizacao)),
+          rowStars(t('avaliacaoDemanda.labelAvaliacaoGeral'), values.avaliacaoGeral),
+          row(t('avaliacaoDemanda.labelRepetiriaModelo'), simNao(values.repetiriaModelo)),
         ],
       },
       {
@@ -256,7 +262,7 @@ export default function AvaliacaoDemandaPage() {
               avaliacaoGeral: avaliacaoRes.avaliacaoGeral,
               repetiriaModelo: avaliacaoRes.repetiriaModelo,
               riscos: avaliacaoRes.riscos ?? [],
-              textos: textosFromAvaliacaoResponse(avaliacaoRes as Record<string, unknown>),
+              textos: textosFromAvaliacaoResponse(avaliacaoRes as unknown as Record<string, unknown>),
             });
           }
         }

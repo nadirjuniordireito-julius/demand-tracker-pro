@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,32 +34,15 @@ import { usuarioFotoService } from '@/services';
 import { usuarioService } from '@/services/usuarioService';
 import { LoadingButton } from '@/components/common/LoadingStates';
 
-// Schema para dados pessoais
-const profileSchema = z.object({
-  nome: z.string()
-    .min(3, 'Nome deve ter pelo menos 3 caracteres')
-    .max(100, 'Nome deve ter no máximo 100 caracteres'),
-  email: z.string()
-    .email('E-mail inválido')
-    .max(255, 'E-mail deve ter no máximo 255 caracteres'),
-});
-
-// Schema para alteração de senha
-const passwordSchema = z.object({
-  currentPassword: z.string()
-    .min(1, 'Senha atual é obrigatória'),
-  newPassword: z.string()
-    .min(6, 'Nova senha deve ter pelo menos 6 caracteres')
-    .max(50, 'Nova senha deve ter no máximo 50 caracteres'),
-  confirmPassword: z.string()
-    .min(1, 'Confirmação de senha é obrigatória'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'As senhas não coincidem',
-  path: ['confirmPassword'],
-});
-
-type ProfileFormData = z.infer<typeof profileSchema>;
-type PasswordFormData = z.infer<typeof passwordSchema>;
+type ProfileFormData = {
+  nome: string;
+  email: string;
+};
+type PasswordFormData = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -79,6 +62,39 @@ export default function ProfilePage() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const profileSchema = useMemo(
+    () =>
+      z.object({
+        nome: z
+          .string()
+          .min(3, t('validation.minLength', { min: 3 }))
+          .max(100, t('validation.maxLength', { max: 100 })),
+        email: z
+          .string()
+          .email(t('validation.email'))
+          .max(255, t('validation.maxLength', { max: 255 })),
+      }),
+    [t]
+  );
+
+  const passwordSchema = useMemo(
+    () =>
+      z
+        .object({
+          currentPassword: z.string().min(1, t('validation.required')),
+          newPassword: z
+            .string()
+            .min(6, t('validation.minLength', { min: 6 }))
+            .max(50, t('validation.maxLength', { max: 50 })),
+          confirmPassword: z.string().min(1, t('validation.required')),
+        })
+        .refine((data) => data.newPassword === data.confirmPassword, {
+          message: t('profile.passwordMismatch'),
+          path: ['confirmPassword'],
+        }),
+    [t]
+  );
 
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -418,7 +434,7 @@ export default function ProfilePage() {
                 </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">ID</span>
+                <span className="text-sm text-muted-foreground">{t('profile.id')}</span>
                 <span className="text-sm font-mono">#{user?.id}</span>
               </div>
             </div>

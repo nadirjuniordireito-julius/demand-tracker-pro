@@ -86,9 +86,10 @@
     --table-border: 220 13% 91%;
   }
 
-  /* Tema Light Blue - Inspirado em identidade corporativa limpa com azul vibrante */
+  /* Tema Light Blue - Inspirado em identidade corporativa limpa com azul vibrante.
+   * Fundo do main: antes 210 17% 98% (azul bem claro); alterado para cinza bem claro. */
   .light-blue {
-    --background: 210 17% 98%;
+    --background: 220 6% 97%;
     --foreground: 210 11% 18%;
 
     --card: 0 0% 100%;

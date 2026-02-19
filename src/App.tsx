@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,7 +13,7 @@ import { MainLayout } from "@/components/layout";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { LoadingSpinner } from "@/components/common/LoadingStates";
 import "@/lib/apiErrorHandler";
-
+import { useEffect } from "react";
 import LoginPage from "./pages/LoginPage";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -32,6 +32,7 @@ const TedHealthMapPage = lazy(() => import("./pages/TedHealthMapPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const ProjetoSemaforoPage = lazy(() => import("./pages/ProjetoSemaforoPage"));
 
 const PageFallback = () => (
   <div className="flex min-h-[50vh] items-center justify-center p-8">
@@ -41,54 +42,57 @@ const PageFallback = () => (
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem themes={['light', 'dark', 'light-blue', 'system']}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <ProjectProvider>
-              <ProcessingProvider>
-                <ErrorBoundary>
-                  <Suspense fallback={<PageFallback />}>
-                    <Routes>
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route
-                        element={
-                          <ProtectedRoute>
-                            <MainLayout />
-                          </ProtectedRoute>
-                        }
-                      >
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/dashboard" element={<DashboardPage />} />
-                        <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
-                        <Route path="/cadastros/projetos" element={<ProjetosPage />} />
-                        <Route path="/cadastros/projeto-meta" element={<ProjetoMetaPage />} />
-                        <Route path="/cadastros/perfis" element={<PerfisPage />} />
-                        <Route path="/cadastros/templates" element={<TemplatesPage />} />
-                        <Route path="/demandas" element={<DemandasPage />} />
-                        <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
-                        <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
-                        <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
-                        <Route path="/demandas/avaliacao" element={<AvaliacaoDemandaPage />} />
-                        <Route path="/demandas/health-map" element={<TedHealthMapPage />} />
-                        <Route path="/perfil" element={<ProfilePage />} />
-                        <Route path="/configuracoes" element={<SettingsPage />} />
-                      </Route>
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </ErrorBoundary>
-              </ProcessingProvider>
-            </ProjectProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem themes={['light', 'dark', 'light-blue', 'system']}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <ProjectProvider>
+                <ProcessingProvider>
+                  <ErrorBoundary>
+                    <Suspense fallback={<PageFallback />}>
+                      <Routes>
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route
+                          element={
+                            <ProtectedRoute>
+                              <MainLayout />
+                            </ProtectedRoute>
+                          }
+                        >
+                          <Route path="/" element={<HomePage />} />
+                          <Route path="/dashboard" element={<DashboardPage />} />
+                          <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
+                          <Route path="/cadastros/projetos" element={<ProjetosPage />} />
+                          <Route path="/cadastros/projeto-meta" element={<ProjetoMetaPage />} />
+                          <Route path="/cadastros/perfis" element={<PerfisPage />} />
+                          <Route path="/cadastros/templates" element={<TemplatesPage />} />
+                          <Route path="/projetos/:id/semaforo" element={<ProjetoSemaforoPage />} />
+                          <Route path="/demandas" element={<DemandasPage />} />
+                          <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
+                          <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
+                          <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
+                          <Route path="/demandas/avaliacao" element={<AvaliacaoDemandaPage />} />
+                          <Route path="/demandas/health-map" element={<TedHealthMapPage />} />
+                          <Route path="/perfil" element={<ProfilePage />} />
+                          <Route path="/configuracoes" element={<SettingsPage />} />
+                        </Route>
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </ErrorBoundary>
+                </ProcessingProvider>
+              </ProjectProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  )
+};
 
 export default App;

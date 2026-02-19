@@ -175,11 +175,11 @@ export const perfilSchema = z.object({
 export type PerfilFormData = z.infer<typeof perfilSchema>;
 
 // ==================== Demanda ====================
+// codigo é opcional na inclusão: o backend calcula automaticamente (sem min(1))
 export const demandaSchema = z.object({
   codigo: z
     .string()
     .trim()
-    .min(1, { message: 'validation.codeRequired' })
     .max(50, { message: 'validation.codeMax50' }),
   nome: z
     .string()

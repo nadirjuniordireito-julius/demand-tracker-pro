@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { 
+import {
   Plus,
   X,
   Upload,
@@ -12,7 +12,8 @@ import {
   Trash2,
   Eye,
   FileDown,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,9 +52,12 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { termoEncerramentoService, termoPlanejamentoService } from '@/services/termoService';
-import { termoEncerramentoDocService } from '@/services/termoDocService';
+import { termoEncerramentoDocService, termoPlanejamentoDocService } from '@/services/termoDocService';
 import { demandaService } from '@/services/demandaService';
 import { perfilService } from '@/services/perfilService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -105,6 +109,9 @@ export default function TermoEncerramentoPage() {
     const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
     return new Date(y, m - 1, d);
   };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const form = useForm<TermoEncerramentoFormData>({
     resolver: zodResolver(termoEncerramentoSchema),
@@ -199,25 +206,33 @@ export default function TermoEncerramentoPage() {
           resultadoEntregue: '',
         });
         
-        // Busca o Termo de Planejamento para copiar os custos
+        // Busca o Termo de Planejamento para copiar custos e datas de início/fim (só para registro novo)
         try {
           const termoPlanejamento = await termoPlanejamentoService.findByDemandaId(Number(demandaId));
           
-          if (termoPlanejamento && termoPlanejamento.custos && termoPlanejamento.custos.length > 0) {
-            // Copia os custos do Termo de Planejamento
-            setCustos(termoPlanejamento.custos.map(c => ({
-              perfilId: String(c.perfilId),
-              qtdeHora: String(c.qtdeHora),
-              valorHora: String(c.valorHora),
-            })));
-            
-            // Mostra uma mensagem informativa
-            toast({
-              title: t('common.success'),
-              description: t('closingTerm.costsCopiedFromPlanning'),
-            });
+          if (termoPlanejamento) {
+            if (termoPlanejamento.custos && termoPlanejamento.custos.length > 0) {
+              // Copia os custos do Termo de Planejamento
+              setCustos(termoPlanejamento.custos.map(c => ({
+                perfilId: String(c.perfilId),
+                qtdeHora: String(c.qtdeHora),
+                valorHora: String(c.valorHora),
+              })));
+              toast({
+                title: t('common.success'),
+                description: t('closingTerm.costsCopiedFromPlanning'),
+              });
+            } else {
+              setCustos([]);
+            }
+            // Aproveita datas de início e fim de execução do Termo de Planejamento
+            if (termoPlanejamento.dataInicioExecucao) {
+              form.setValue('dataInicioExecucao', parseDateOnly(termoPlanejamento.dataInicioExecucao));
+            }
+            if (termoPlanejamento.dataFimExecucao) {
+              form.setValue('dataFimExecucao', parseDateOnly(termoPlanejamento.dataFimExecucao));
+            }
           } else {
-            // Se não há custos no planejamento, deixa vazio
             setCustos([]);
           }
         } catch (err) {
@@ -616,240 +631,314 @@ export default function TermoEncerramentoPage() {
                 name="demandaTecnicaId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('closingTerm.demand')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('common.selectDemand')} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {demanda && (
-                          <SelectItem value={String(demanda.id)}>
-                            {demanda.codigo} - {demanda.nome}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="dataTermo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('closingTerm.termDate')} *</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            <Calendar className="mr-2 h-4 w-4" />
-                            {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          defaultMonth={field.value ?? new Date()}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="dataInicioExecucao"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('closingTerm.executionStartDate')}</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value ?? undefined}
-                            onSelect={field.onChange}
-                            defaultMonth={field.value ?? new Date()}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dataFimExecucao"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('closingTerm.executionEndDate')}</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value ?? undefined}
-                            onSelect={field.onChange}
-                            defaultMonth={field.value ?? new Date()}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="resultadoEntregue"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('closingTerm.deliveredResult')} *</FormLabel>
                     <FormControl>
-                      <RichTextEditor
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        placeholder={t('common.deliveredResultPlaceholder')}
-                      />
+                      <input type="hidden" {...field} value={field.value ?? ''} />
                     </FormControl>
+                    {demanda && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('common.demandCodeLabel')}</TableHead>
+                            <TableHead>{t('common.demandDescriptionLabel')}</TableHead>
+                            <TableHead>{t('common.metaCodeLabel')}</TableHead>
+                            <TableHead>{t('common.productCodeLabel')}</TableHead>
+                            <TableHead>{t('common.productTotalPlannedLabel')}</TableHead>
+                            <TableHead>{t('common.productTotalExecutedLabel')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell>{demanda.codigo}</TableCell>
+                            <TableCell>{demanda.nome}</TableCell>
+                            <TableCell>{demanda.metaProduto?.projetoMeta?.codigo ?? '—'}</TableCell>
+                            <TableCell>{demanda.metaProduto?.codigo ?? '—'}</TableCell>
+                            <TableCell>
+                              {demanda.metaProduto != null && typeof demanda.metaProduto.quantidade === 'number' && typeof demanda.metaProduto.valorUnitario === 'number'
+                                ? formatCurrency(demanda.metaProduto.quantidade * demanda.metaProduto.valorUnitario)
+                                : '—'}
+                            </TableCell>
+                            <TableCell>
+                              {typeof demanda.totalExecutadoProduto === 'number'
+                                ? formatCurrency(demanda.totalExecutadoProduto)
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Custos Realizados */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{t('closingTerm.costs')}</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t('closingTerm.addCost')}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {custos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      {t('common.noCostsAdded')}
-                    </p>
-                  ) : (
-                    custos.map((custo, index) => (
-                      <div key={'id' in custo && custo.id != null ? custo.id : `custo-${index}`} className="space-y-2">
-                        <div className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
-                          <div className="flex-1 grid grid-cols-3 gap-2">
-                            <div>
-                              <Label className="text-xs">{t('closingTerm.profile')}</Label>
-                              <Select 
-                                value={custo.perfilId} 
-                                onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
+              <Tabs defaultValue="datas" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="datas">{t('closingTerm.datesTab')}</TabsTrigger>
+                  <TabsTrigger value="resultado">{t('closingTerm.resultTab')}</TabsTrigger>
+                  <TabsTrigger value="custos">{t('closingTerm.costsTab')}</TabsTrigger>
+                </TabsList>
+
+                {/* Aba: Datas */}
+                <TabsContent value="datas" className="mt-4 space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="dataTermo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('closingTerm.termDate')} *</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
                               >
-                                <SelectTrigger className="h-8">
-                                  <SelectValue placeholder={t('common.selectProfile')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {isLoadingPerfis ? (
-                                    <SelectItem value="" disabled>{t('common.loading')}</SelectItem>
-                                  ) : (
-                                    perfis.map((perfil) => (
-                                      <SelectItem key={perfil.id} value={String(perfil.id)}>
-                                        {perfil.nome}
-                                      </SelectItem>
-                                    ))
+                                <Calendar className="mr-2 h-4 w-4" />
+                                {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              defaultMonth={field.value ?? new Date()}
+                              initialFocus
+                              className="pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="dataInicioExecucao"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('closingTerm.executionStartDate')}</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
                                   )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">{t('closingTerm.hours')}</Label>
-                              <Input
-                                type="number"
-                                className="h-8"
-                                value={custo.qtdeHora}
-                                onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
-                                placeholder={t('common.hoursPlaceholder')}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value ?? undefined}
+                                onSelect={field.onChange}
+                                defaultMonth={field.value ?? new Date()}
+                                initialFocus
+                                className="pointer-events-auto"
                               />
-                            </div>
-                            <div>
-                              <Label className="text-xs">{t('closingTerm.hourlyRate')}</Label>
-                              <Input
-                                type="number"
-                                className="h-8"
-                                value={custo.valorHora}
-                                onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
-                                placeholder={t('common.currencyPlaceholder')}
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="dataFimExecucao"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('closingTerm.executionEndDate')}</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={field.value ?? undefined}
+                                onSelect={field.onChange}
+                                defaultMonth={field.value ?? new Date()}
+                                initialFocus
+                                className="pointer-events-auto"
                               />
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => handleRemoveCusto(index)}
-                            aria-label={t('common.remove')}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {custoErrors[index] && (
-                          <p className="text-xs text-destructive">{custoErrors[index]}</p>
-                        )}
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+
+                {/* Aba: Resultado Entregue */}
+                <TabsContent value="resultado" className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="resultadoEntregue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('closingTerm.deliveredResult')} *</FormLabel>
+                        <FormControl>
+                          <RichTextEditor
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            placeholder={t('common.deliveredResultPlaceholder')}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Aba: Custos Realizados - 4 colunas (Perfil, Horas, Valor/Hora read-only, Total read-only) + total geral */}
+                <TabsContent value="custos" className="mt-4 space-y-4">
+                  {demanda?.metaProduto != null && typeof demanda.metaProduto.quantidade === 'number' && typeof demanda.metaProduto.valorUnitario === 'number' && (() => {
+                    const totalPlanned = demanda.metaProduto!.quantidade * demanda.metaProduto!.valorUnitario;
+                    const totalExecuted = typeof demanda.totalExecutadoProduto === 'number' ? demanda.totalExecutadoProduto : 0;
+                    const totalFormCosts = custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0);
+                    if (totalExecuted + totalFormCosts > totalPlanned) {
+                      return (
+                        <Alert variant="destructive">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle>{t('common.costExceedsPlannedTitle')}</AlertTitle>
+                          <AlertDescription>
+                            {t('common.costExceedsPlannedDescription', {
+                              formTotal: formatCurrency(totalFormCosts),
+                              executedTotal: formatCurrency(totalExecuted),
+                              plannedTotal: formatCurrency(totalPlanned),
+                            })}
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{t('closingTerm.costs')}</CardTitle>
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          {t('closingTerm.addCost')}
+                        </Button>
                       </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-              
+                    </CardHeader>
+                    <CardContent className="space-y-1.5">
+                      {custos.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          {t('common.noCostsAdded')}
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex gap-2 pb-1.5 border-b">
+                            <div className="flex-1 grid grid-cols-4 gap-2">
+                              <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.profile')}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.hours')}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.hourlyRate')}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.lineTotal')}</span>
+                            </div>
+                            <div className="w-8 shrink-0" aria-hidden />
+                          </div>
+                          {custos.map((custo, index) => {
+                            const horas = Number(custo.qtdeHora) || 0;
+                            const valorHora = Number(custo.valorHora) || 0;
+                            const totalLinha = horas * valorHora;
+                            return (
+                              <div key={'id' in custo && custo.id != null ? String(custo.id) : `custo-${index}`} className="space-y-1">
+                                <div className="flex items-center gap-2 py-1.5 px-2 bg-muted/50 rounded-md">
+                                  <div className="flex-1 grid grid-cols-4 gap-2">
+                                    <Select
+                                      value={custo.perfilId}
+                                      onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
+                                    >
+                                      <SelectTrigger className="h-8">
+                                        <SelectValue placeholder={t('common.selectProfile')} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {isLoadingPerfis ? (
+                                          <SelectItem value="" disabled>{t('common.loading')}</SelectItem>
+                                        ) : (
+                                          perfis.map((perfil) => (
+                                            <SelectItem key={perfil.id} value={String(perfil.id)}>
+                                              {perfil.nome}
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      className="h-8"
+                                      value={custo.qtdeHora}
+                                      onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
+                                      placeholder={t('common.hoursPlaceholder')}
+                                    />
+                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
+                                      {custo.valorHora ? formatCurrency(Number(custo.valorHora)) : '—'}
+                                    </div>
+                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm font-medium">
+                                      {totalLinha > 0 ? formatCurrency(totalLinha) : '—'}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-destructive"
+                                    onClick={() => handleRemoveCusto(index)}
+                                    aria-label={t('common.remove')}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {custoErrors[index] && (
+                                  <p className="text-xs text-destructive">{custoErrors[index]}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <div className="flex gap-2 pt-2 mt-2 border-t font-medium">
+                            <div className="flex-1 grid grid-cols-4 gap-2">
+                              <span className="col-span-2" />
+                              <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.totalCost')}</span>
+                              <span className="text-sm">
+                                {formatCurrency(
+                                  custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0)
+                                )}
+                              </span>
+                            </div>
+                            <div className="w-8 shrink-0" />
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+
               {/* Documento anexado - indicador visual */}
               {selectedTermo && documento && (
                 <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-border">
@@ -899,13 +988,14 @@ export default function TermoEncerramentoPage() {
                         type="button" 
                         variant="outline" 
                         onClick={handleGeneratePdf}
-                        disabled={isSaving || isDeleting || !selectedProject}
+                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoEncerramento(demanda?.status)}
                         className="flex items-center gap-2"
                         title={t('closingTerm.generatePdf')}
                       >
                         <FileDown className="h-4 w-4" />
                         {t('closingTerm.generatePdf')}
                       </Button>
+
                       <Button 
                         type="button" 
                         variant="outline" 
@@ -1068,25 +1158,40 @@ export default function TermoEncerramentoPage() {
 
       <PdfPreviewDialog
         open={isViewGeneratedPdfOpen}
-        onOpenChange={setIsViewGeneratedPdfOpen}
-        title={t('closingTerm.viewGeneratedPdfTitle')}
-        description={t('closingTerm.viewGeneratedPdfDescription')}
+        onOpenChange={(open) => {
+          setIsViewGeneratedPdfOpen(open);
+          if (!open && selectedTermo) {
+            termoEncerramentoDocService
+              .findByTermoEncerramentoId(selectedTermo.id)
+              .then(setDocumento)
+              .catch(() => setDocumento(null));
+          }
+        }}
+        title={t('planningTerm.viewGeneratedPdfTitle')}
+        description={t('planningTerm.viewGeneratedPdfDescription')}
         fetchPdf={() =>
-          termoEncerramentoService.gerarPdf(selectedTermo!.id, selectedProject!.id, 'E')
+          termoEncerramentoService.gerarTermoAssinatura(
+            selectedTermo!.id,
+            selectedProject!.id,
+            'E'
+          )
         }
-        loadingLabel={t('closingTerm.generatingPdf')}
-        errorMessage={t('closingTerm.generatePdfError')}
+        loadingLabel={t('planningTerm.generatingPdf')}
+        errorMessage={t('planningTerm.generatePdfError')}
         downloadFileName={selectedTermo ? `termo-encerramento-${selectedTermo.id}.pdf` : undefined}
         closeLabel={t('common.close')}
         downloadLabel={t('common.download')}
         onError={(err: unknown) =>
           toast({
             title: t('common.error'),
-            description: getErrorMessage(err, t('closingTerm.generatePdfError')),
+            description: getErrorMessage(err, t('planningTerm.generatePdfError')),
             variant: 'destructive',
           })
         }
       />
+
+      
+
     </div>
   );
 }

@@ -7,6 +7,7 @@ export {
   termoAberturaSchema,
   termoPlanejamentoSchema,
   termoEncerramentoSchema,
+  semaforoNodeSchema,
   paginatedPerfilSchema,
   paginatedProjetoSchema,
   paginatedDemandaTecnicaSchema,

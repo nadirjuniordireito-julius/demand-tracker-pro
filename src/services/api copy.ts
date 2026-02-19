@@ -3,7 +3,6 @@
 // Configuração base para integração com backend Java
 // =====================================================
 
-import { constants } from 'node:crypto';
 import type { z } from 'zod';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
@@ -173,30 +172,6 @@ async function extractErrorFromResponse(response: Response): Promise<ApiError> {
   return new ApiError(errorMessage, status, errors, timestamp);
 }
 
-export const silentRefresh = async (): Promise<boolean> => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-
-   
-    if (!res.ok) return false;
-    if (res.headers.get('content-length') === '0' || res.status === 204) {
-      return true; // consideramos sucesso
-    }
-
-    const data = await res.json().catch(() => null); // evita travar se body estiver vazio
-    if (data?.accessToken) {
-      setAuthToken(data.accessToken); // se existir, atualiza token
-    }
-    
-    return true;
-  } catch (err) {
-    console.error('Silent refresh failed', err);
-    return false;
-  }
-}
 // Função para mostrar toast de erro (importada dinamicamente para evitar dependência circular)
 let showErrorToastFn: ((error: ApiError) => void) | null = null;
 
@@ -213,19 +188,23 @@ export const setErrorHandledByHook = (handled: boolean) => {
 
 /** Opções extras para request (silent, allow404, schema Zod para validar resposta) */
 export type RequestOptions = RequestInit & {
-  credentials?: RequestCredentials;
+  silent?: boolean;
+  allow404?: boolean;
+  allow500?: boolean;
+  /** Schema Zod para validar o body da resposta antes de retornar */
+  schema?: z.ZodType<unknown>;
 };
+
 // Função genérica para fazer requisições
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { credentials, ...fetchOptions } = options;
+  const { silent, allow404, schema, ...fetchOptions } = options;
   const url = `${API_BASE_URL}${endpoint}`;
 
   const config: RequestInit = {
     ...fetchOptions,
-    credentials: 'include', // <<<<<< ENVIA O COOKIE refresh_token
     headers: {
       ...getHeaders(),
       ...fetchOptions.headers,
@@ -236,13 +215,7 @@ async function request<T>(
     const response = await fetch(url, config);
 
     // Tratamento de erro de autenticação
-    if (response.status === 401 && authToken) {
-      const refreshed = await silentRefresh();
-    
-      if (refreshed) {
-        return request<T>(endpoint, options); // tenta de novo
-      }
-    
+    if (response.status === 401) {
       setAuthToken(null);
       window.location.href = '/login';
       throw new ApiError('Sessão expirada. Faça login novamente.', 401);
@@ -251,9 +224,9 @@ async function request<T>(
     // Tratamento de erros HTTP
     if (!response.ok) {
       const apiError = await extractErrorFromResponse(response);
-      if (credentials && response.status === 404) apiError.allow404 = true;
+      if (allow404 && response.status === 404) apiError.allow404 = true;
 
-      if (!credentials && import.meta.env.DEV) {
+      if (!silent && import.meta.env.DEV) {
         console.error(
           `[API Error] ${apiError.status} ${endpoint}:`,
           apiError.message,
@@ -264,7 +237,7 @@ async function request<T>(
       // Mostra toast automaticamente apenas se não estiver sendo tratado por hook
       // e não estiver em modo silencioso
       // Isso evita toasts duplicados quando useApi já trata o erro
-      if (!credentials && !isHandledByHook && showErrorToastFn) {
+      if (!silent && !isHandledByHook && showErrorToastFn) {
         showErrorToastFn(apiError);
       }
       
@@ -277,6 +250,9 @@ async function request<T>(
     }
 
     const data = await response.json();
+    if (schema) {
+      return schema.parse(data) as T;
+    }
     return data as T;
   } catch (error) {
     // Se já for um ApiError, apenas relança
@@ -289,27 +265,27 @@ async function request<T>(
     
     // Tratamento de erros de rede
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      if (!credentials && import.meta.env.DEV) {
+      if (!silent && import.meta.env.DEV) {
         console.error('Network Error:', error);
       }
       const networkError = new ApiError(
         'Erro de conexão. Verifique sua internet e tente novamente.',
         0
       );
-      if (!credentials && !isHandledByHook && showErrorToastFn) {
+      if (!silent && !isHandledByHook && showErrorToastFn) {
         showErrorToastFn(networkError);
       }
       throw networkError;
     }
     
-    if (!credentials && import.meta.env.DEV) {
+    if (!silent && import.meta.env.DEV) {
       console.error('API Error:', error);
     }
     const genericError = new ApiError(
       error instanceof Error ? error.message : 'Ocorreu um erro inesperado. Tente novamente.',
       0
     );
-    if (!credentials && !isHandledByHook && showErrorToastFn) {
+    if (!silent && !isHandledByHook && showErrorToastFn) {
       showErrorToastFn(genericError);
     }
     throw genericError;

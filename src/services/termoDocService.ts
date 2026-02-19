@@ -5,6 +5,7 @@
 
 import api, { uploadFile, downloadBlob } from './api';
 import type { TermoAberturaDocResponseDTO, TermoPlanejamentoDocResponseDTO, TermoEncerramentoDocResponseDTO } from '@/types';
+import { withQuery } from "@/helpers/withQuery";
 
 // =====================================================
 // Termo de Abertura Doc
@@ -16,6 +17,7 @@ const ABERTURA_DOC_ENDPOINTS = {
   download: (id: number) => `/termos-abertura-doc/${id}/download`,
   downloadByTermo: (termoAberturaId: number) => `/termos-abertura-doc/termo/${termoAberturaId}/download`,
   exists: (termoAberturaId: number) => `/termos-abertura-doc/termo/${termoAberturaId}/exists`,
+  assinar: (id: number) => `/termos-abertura-doc/termo/${id}/assinar`,
 };
 
 export const termoAberturaDocService = {
@@ -52,7 +54,10 @@ export const termoAberturaDocService = {
    */
   async findByTermoAberturaId(termoAberturaId: number): Promise<TermoAberturaDocResponseDTO | null> {
     try {
-      return await api.get<TermoAberturaDocResponseDTO>(ABERTURA_DOC_ENDPOINTS.byTermo(termoAberturaId), { allow404: true });
+      return await api.get<TermoAberturaDocResponseDTO>(ABERTURA_DOC_ENDPOINTS.byTermo(termoAberturaId), {
+      allow404: true,
+      silent: true, // 404/500 = sem documento; evita log e toast
+    });
     } catch {
       return null;
     }
@@ -89,6 +94,18 @@ export const termoAberturaDocService = {
   async delete(id: number): Promise<void> {
     return api.delete(ABERTURA_DOC_ENDPOINTS.byId(id));
   },
+
+    /**
+   * Assinar o documento internamente
+   */
+    async assinar(id: number, hashPdf: string,
+      usuarioId: number): Promise<void> {
+        const endpoint = withQuery(
+          ABERTURA_DOC_ENDPOINTS.assinar(id),
+          { hashPdf, usuarioId }
+        );
+        return api.put(endpoint);
+    },
 };
 
 // =====================================================
@@ -101,6 +118,7 @@ const PLANEJAMENTO_DOC_ENDPOINTS = {
   download: (id: number) => `/termos-planejamento-doc/${id}/download`,
   downloadByTermo: (termoPlanejamentoId: number) => `/termos-planejamento-doc/termo/${termoPlanejamentoId}/download`,
   exists: (termoPlanejamentoId: number) => `/termos-planejamento-doc/termo/${termoPlanejamentoId}/exists`,
+  assinar: (id: number) => `/termos-planejamento-doc/termo/${id}/assinar`,
 };
 
 export const termoPlanejamentoDocService = {
@@ -174,11 +192,24 @@ export const termoPlanejamentoDocService = {
   async delete(id: number): Promise<void> {
     return api.delete(PLANEJAMENTO_DOC_ENDPOINTS.byId(id));
   },
+
+    /**
+   * Assinar o documento internamente
+   */
+  async assinar(id: number, hashPdf: string,
+    usuarioId: number): Promise<void> {
+      const endpoint = withQuery(
+        PLANEJAMENTO_DOC_ENDPOINTS.assinar(id),
+        { hashPdf, usuarioId }
+      );
+      return api.put(endpoint);
+  },
 };
 
 // =====================================================
 // Termo de Encerramento Doc
 // =====================================================
+
 const ENCERRAMENTO_DOC_ENDPOINTS = {
   base: '/termos-encerramento-doc',
   byId: (id: number) => `/termos-encerramento-doc/${id}`,
@@ -186,6 +217,7 @@ const ENCERRAMENTO_DOC_ENDPOINTS = {
   download: (id: number) => `/termos-encerramento-doc/${id}/download`,
   downloadByTermo: (termoEncerramentoId: number) => `/termos-encerramento-doc/termo/${termoEncerramentoId}/download`,
   exists: (termoEncerramentoId: number) => `/termos-encerramento-doc/termo/${termoEncerramentoId}/exists`,
+  assinar: (id: number) => `/termos-encerramento-doc/termo/${id}/assinar`,
 };
 
 export const termoEncerramentoDocService = {
@@ -259,4 +291,17 @@ export const termoEncerramentoDocService = {
   async delete(id: number): Promise<void> {
     return api.delete(ENCERRAMENTO_DOC_ENDPOINTS.byId(id));
   },
+
+  /**
+   * Assinar o documento internamente
+   */
+  async assinar(id: number, hashPdf: string,
+    usuarioId: number): Promise<void> {
+      const endpoint = withQuery(
+        ENCERRAMENTO_DOC_ENDPOINTS.assinar(id),
+        { hashPdf, usuarioId }
+      );
+      return api.put(endpoint);
+  },
+  
 };

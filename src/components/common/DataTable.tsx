@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Edit } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -174,14 +174,14 @@ export function DataTable<T extends Record<string, any>>({
                             className="h-8 w-8"
                             aria-label={defaultActionsLabel}
                           >
-                            <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-[120px]">
                           {actions.filter((a) => a.visible === undefined || a.visible(item)).map((action, index) => {
                             const isDisabled = action.disabled ? action.disabled(item) : false;
                             return (
-                              <div key={index}>
+                              <div key={`${action.label}-${index}`}>
                                 {action.separator && index > 0 && <DropdownMenuSeparator />}
                                 <DropdownMenuItem
                                   onClick={() => action.onClick(item)}

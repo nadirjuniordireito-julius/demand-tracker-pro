@@ -9,6 +9,8 @@ import { z } from 'zod';
 const userStatusSchema = z.enum(['A', 'I']);
 const userProfileSchema = z.enum(['A', 'O', 'V']);
 const demandStatusSchema = z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Z']);
+const semaforoNivelSchema = z.enum(['PROJETO', 'META', 'PRODUTO', 'DEMANDA']);
+const semaforoStatusSchema = z.enum(['VERDE', 'AMARELO', 'VERMELHO', 'CINZA']);
 
 const usuarioRefSchema = z.object({
   id: z.number(),
@@ -65,6 +67,7 @@ export const demandaTecnicaSchema = z.object({
   termoPlanejamento: z.unknown().optional().nullable(),
   termoEncerramento: z.unknown().optional().nullable(),
   avaliacao: z.record(z.unknown()).nullable().optional(),
+  totalExecutadoProduto: z.number().nullable().optional(),
 });
 
 // --- TermoAbertura (sem demandaTecnica aninhada para evitar ciclo) ---
@@ -130,6 +133,25 @@ export const termoEncerramentoSchema = z.object({
   usuario: usuarioRefSchema.optional(),
   custos: z.array(termoEncerramentoCustoSchema).optional(),
 });
+
+// --- Semáforo de Projeto (árvore PROJETO → META → PRODUTO → DEMANDA) ---
+export const semaforoNodeSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.object({
+    id: z.number(),
+    nivel: semaforoNivelSchema,
+    codigo: z.string(),
+    nome: z.string(),
+    status: semaforoStatusSchema,
+    dataInicio: z.string().nullable().optional(),
+    dataFim: z.string().nullable().optional(),
+    percentualExecutado: z.number().nullable().optional(),
+    qtdDemandas: z.number().nullable().optional(),
+    qtdDemandasEncerradas: z.number().nullable().optional(),
+    valorTotalPrevisto: z.number().nullable().optional(),
+    valorTotalExecutado: z.number().nullable().optional(),
+    children: z.array(semaforoNodeSchema),
+  })
+);
 
 // --- PaginatedResponse helper ---
 export function paginatedSchema<T extends z.ZodType>(itemSchema: T) {

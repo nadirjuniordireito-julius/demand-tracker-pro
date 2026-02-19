@@ -129,6 +129,14 @@
     "openingTermDescriptionPlaceholder": "Describa el objetivo y alcance de esta demanda con formato...",
     "tedCodePlaceholder": "TED-2024-XXX",
     "currencyValuePlaceholder": "0.00",
+    "demandCodeLabel": "Demanda",
+    "demandDescriptionLabel": "Descripción",
+    "metaCodeLabel": "Meta",
+    "productCodeLabel": "Producto",
+    "productTotalPlannedLabel": "Total Previsto",
+    "productTotalExecutedLabel": "Total Ejecutado",
+    "costExceedsPlannedTitle": "Atención: valor previsto del producto superado",
+    "costExceedsPlannedDescription": "El total de los costos informados ({{formTotal}}) más el total ya ejecutado del producto ({{executedTotal}}) supera el valor previsto del producto ({{plannedTotal}}).",
     "passwordPlaceholder": "Contraseña",
     "passwordKeepBlank": "Deje en blanco para mantener",
     "fillAllCostFields": "Complete todos los campos del costo",
@@ -151,6 +159,14 @@
     "step3Description": "Defina especificaciones, cronograma y costos",
     "step4Title": "Término de Cierre",
     "step4Description": "Registre resultados y costos realizados"
+  },
+  "home": {
+    "welcomeAdmin": "Área del Administrador",
+    "descriptionAdmin": "Acceso completo al sistema: usuarios, proyectos, demandas e informes.",
+    "welcomeOperador": "Área del Operador",
+    "descriptionOperador": "Gestione demandas y proyectos asignados a usted.",
+    "welcomeVisualizador": "Área del Visualizador",
+    "descriptionVisualizador": "Consulte demandas y proyectos según sus permisos."
   },
   "pagination": {
     "showing": "Mostrando",
@@ -337,6 +353,13 @@
   },
   "dashboard": {
     "title": "Panel",
+    "description": "Visión general de la plataforma de gestión operativa de proyectos",
+    "titleAdmin": "Panel Administrador",
+    "descriptionAdmin": "Visión completa: demandas, costos e indicadores del sistema.",
+    "titleOperador": "Panel Operador",
+    "descriptionOperador": "Resumen de demandas y proyectos bajo su actuación.",
+    "titleVisualizador": "Panel Visualizador",
+    "descriptionVisualizador": "Consulta de indicadores y demandas según sus permisos.",
     "totalDemands": "Total de Demandas",
     "openDemands": "Demandas Abiertas",
     "closedDemands": "Demandas Cerradas",
@@ -622,7 +645,7 @@
     "viewDocument": "Ver Documento",
     "viewDocumentTitle": "Ver Documento PDF",
     "documentViewError": "Error al cargar documento para visualización",
-    "generatePdf": "Generar PDF desde Documento",
+    "generatePdf": "Enviar para firma",
     "viewGeneratedPdfTitle": "PDF Generado desde Plantilla",
     "viewGeneratedPdfDescription": "PDF generado desde plantilla DOCX con los datos del Término de Apertura",
     "generatingPdf": "Generando PDF...",
@@ -634,7 +657,18 @@
     "createdSuccess": "Término de Apertura creado con éxito",
     "updatedSuccess": "Término de Apertura actualizado con éxito",
     "deletedSuccess": "Término de Apertura eliminado con éxito",
-    "signedSuccess": "Término de Apertura firmado con éxito"
+    "signedSuccess": "Término de Apertura firmado con éxito",
+    "report": {
+      "documentTitle": "TÉRMINO DE APERTURA DE DEMANDA TECNOLÓGICA",
+      "demandNumber": "Número Demanda:",
+      "demandDate": "Fecha Demanda:",
+      "descriptivo": "Descriptivo:",
+      "signature": "Firma:",
+      "signatureNote": "Fecha y hora en la firma electrónica",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "Gestor TED - IBAMA",
+      "pageOf": "Página {{page}} de {{total}}"
+    }
   },
   "planningTerm": {
     "title": "Término de Planificación",
@@ -654,6 +688,7 @@
     "hours": "Horas",
     "hourlyRate": "Valor/Hora",
     "totalCost": "Costo Total",
+    "lineTotal": "Total",
     "addCost": "Agregar Costo",
     "notSigned": "No firmado",
     "signed": "Firmado",
@@ -686,11 +721,25 @@
     "viewDocument": "Ver Documento",
     "viewDocumentTitle": "Ver Documento PDF",
     "documentViewError": "Error al cargar documento para visualización",
-    "generatePdf": "Generar PDF desde Documento",
+    "generatePdf": "Enviar para firma",
     "viewGeneratedPdfTitle": "PDF Generado desde Plantilla",
     "viewGeneratedPdfDescription": "PDF generado a partir de la plantilla DOCX con datos del Término de Planificación",
     "generatingPdf": "Generando PDF...",
-    "generatePdfError": "Error al generar PDF desde plantilla"
+    "generatePdfError": "Error al generar PDF desde plantilla",
+    "report": {
+      "documentTitle": "TÉRMINO DE PLANIFICACIÓN DE EJECUCIÓN DE DEMANDA TECNOLÓGICA",
+      "demandNumber": "Número Demanda:",
+      "planningDate": "Fecha Planificación:",
+      "specification": "Especificación:",
+      "schedule": "Cronograma:",
+      "expectedResult": "Resultado esperado:",
+      "costs": "Costos:",
+      "signature": "Firma:",
+      "signatureNote": "Fecha y hora en la firma electrónica",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "Gestor TED - IBAMA",
+      "pageOf": "Página {{page}} de {{total}}"
+    }
   },
   "closingTerm": {
     "title": "Término de Cierre",
@@ -708,6 +757,10 @@
     "hours": "Horas",
     "hourlyRate": "Valor/Hora",
     "totalCost": "Costo Total",
+    "datesTab": "Fechas",
+    "resultTab": "Resultado Entregado",
+    "costsTab": "Costos Realizados",
+    "lineTotal": "Total",
     "addCost": "Agregar Costo",
     "plannedVsActual": "Planificado vs Realizado",
     "notSigned": "No firmado",
@@ -742,11 +795,23 @@
     "viewDocument": "Ver Documento",
     "viewDocumentTitle": "Ver Documento PDF",
     "documentViewError": "Error al cargar documento para visualización",
-    "generatePdf": "Generar PDF desde Documento",
+    "generatePdf": "Enviar para firma",
     "viewGeneratedPdfTitle": "PDF Generado desde Plantilla",
     "viewGeneratedPdfDescription": "PDF generado a partir de la plantilla DOCX con datos del Término de Cierre",
     "generatingPdf": "Generando PDF...",
-    "generatePdfError": "Error al generar PDF desde plantilla"
+    "generatePdfError": "Error al generar PDF desde plantilla",
+    "report": {
+      "documentTitle": "TÉRMINO DE CIERRE DE DEMANDA TECNOLÓGICA",
+      "demandNumber": "Número de Demanda:",
+      "closingDate": "Fecha de Cierre:",
+      "resultsDelivered": "Resultado Entregado:",
+      "costs": "Costos:",
+      "signature": "Firma:",
+      "signatureNote": "Fecha y hora en la firma electrónica",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "Gestor TED - IBAMA",
+      "pageOf": "Página {{page}} de {{total}}"
+    }
   },
   "validation": {
     "required": "Campo obligatorio",
@@ -773,6 +838,7 @@
     "personalData": "Datos Personales",
     "changePassword": "Cambiar Contraseña",
     "userProfile": "Perfil de Acceso",
+    "id": "ID",
     "namePlaceholder": "Ingresa tu nombre completo",
     "emailPlaceholder": "Ingresa tu correo electrónico",
     "currentPassword": "Contraseña Actual",

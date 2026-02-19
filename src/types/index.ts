@@ -15,6 +15,17 @@ export type UserProfile = 'A' | 'O' | 'V'; // A = Admin, O = Operador, V = Visua
 export type DemandStatus = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'Z';
 
 // =====================================================
+// Entidade: DemandaTecnica (DTO para frontend)
+// =====================================================
+export interface DemandaTecnicaDTO {
+  id: number;
+  codigo: string;
+  nome: string;
+  status: DemandStatus;
+  dataAbertura: string;
+}
+
+// =====================================================
 // Entidade: Usuario
 // =====================================================
 export interface Usuario {
@@ -144,6 +155,9 @@ export interface MetaProduto {
   inicio: number;
   fim: number;
   status: 'A' | 'I';
+  /** Datas planejadas de início e fim da meta/produto (formato ISO date string, ex: '2026-01-31') */
+  dataInicio?: string | null;
+  dataFim?: string | null;
   projetoMeta?: ProjetoMeta;
 }
 
@@ -158,6 +172,8 @@ export interface MetaProdutoCreateDTO {
   inicio: number;
   fim: number;
   status: 'A' | 'I';
+  dataInicio?: string | null;
+  dataFim?: string | null;
 }
 
 export interface MetaProdutoUpdateDTO {
@@ -171,6 +187,8 @@ export interface MetaProdutoUpdateDTO {
   fim?: number;
   status?: 'A' | 'I';
   projetoMetaId?: number;
+  dataInicio?: string | null;
+  dataFim?: string | null;
 }
 
 // =====================================================
@@ -229,12 +247,15 @@ export interface DemandaTecnica {
   situacao?: string; // Alternativa: backend pode retornar "situacao" em vez de "status"
   /** Avaliação de qualidade (preenchida quando demanda encerrada); null = pendente */
   avaliacao?: Record<string, unknown> | null;
+  /** Valor total já executado para o produto (somatória de todas as demandas encerradas do produto). Preenchido pelo backend em GET /demandas/{id}. */
+  totalExecutadoProduto?: number | null;
 }
 
 export interface DemandaTecnicaCreateDTO {
   projetoId: number;
   metaProdutoId?: number | null;
-  codigo: string;
+  /** Omitido na inclusão: o backend calcula o código automaticamente */
+  codigo?: string;
   nome: string;
   usuarioId: number;
   descricao?: string; // Campo opcional para teste com editor de texto rico (HTML)
@@ -537,6 +558,32 @@ export interface DemandaPorStatus {
 }
 
 // =====================================================
+// Tipos para Semáforo de Projeto (árvore PROJETO → META → PRODUTO → DEMANDA)
+// =====================================================
+
+export type SemaforoNivel = 'PROJETO' | 'META' | 'PRODUTO' | 'DEMANDA';
+
+export type SemaforoStatus = 'VERDE' | 'AMARELO' | 'VERMELHO' | 'CINZA';
+
+export interface SemaforoNodeDTO {
+  id: number;
+  nivel: SemaforoNivel;
+  codigo: string;
+  nome: string;
+  status: SemaforoStatus;
+  dataInicio: string | null;
+  dataFim: string | null;
+  percentualExecutado: number | null;
+  qtdDemandas: number | null;
+  qtdDemandasEncerradas: number | null;
+  /** Valor total previsto (Meta ou Produto). Preenchido pelo backend quando disponível. */
+  valorTotalPrevisto?: number | null;
+  /** Valor total já executado (Meta ou Produto). Preenchido pelo backend quando disponível. */
+  valorTotalExecutado?: number | null;
+  children: SemaforoNodeDTO[];
+}
+
+// =====================================================
 // Tipos para Mensagens/Notificações
 // =====================================================
 export interface Mensagem {
@@ -546,4 +593,15 @@ export interface Mensagem {
   lida: boolean;
   dataCriacao: string;
   usuarioId: number;
+}
+
+// =====================================================
+// Wrapper de paginação (Spring Page)
+// =====================================================
+export interface Page<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
 }

@@ -129,6 +129,14 @@
     "openingTermDescriptionPlaceholder": "Describe the objective and scope of this demand with formatting...",
     "tedCodePlaceholder": "TED-2024-XXX",
     "currencyValuePlaceholder": "0.00",
+    "demandCodeLabel": "Demand",
+    "demandDescriptionLabel": "Description",
+    "metaCodeLabel": "Meta",
+    "productCodeLabel": "Product",
+    "productTotalPlannedLabel": "Total Planned",
+    "productTotalExecutedLabel": "Total Executed",
+    "costExceedsPlannedTitle": "Warning: product planned value exceeded",
+    "costExceedsPlannedDescription": "The total of the costs entered ({{formTotal}}) plus the total already executed for this product ({{executedTotal}}) exceeds the product planned value ({{plannedTotal}}).",
     "passwordPlaceholder": "Password",
     "passwordKeepBlank": "Leave blank to keep",
     "fillAllCostFields": "Fill in all cost fields",
@@ -151,6 +159,14 @@
     "step3Description": "Define specifications, schedule and costs",
     "step4Title": "Closing Term",
     "step4Description": "Record results and actual costs"
+  },
+  "home": {
+    "welcomeAdmin": "Administrator Area",
+    "descriptionAdmin": "Full access to the system: users, projects, demands and reports.",
+    "welcomeOperador": "Operator Area",
+    "descriptionOperador": "Manage demands and projects assigned to you.",
+    "welcomeVisualizador": "Viewer Area",
+    "descriptionVisualizador": "View demands and projects according to your permissions."
   },
   "pagination": {
     "showing": "Showing",
@@ -337,6 +353,13 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "description": "Overview of the project operational management platform",
+    "titleAdmin": "Administrator Dashboard",
+    "descriptionAdmin": "Full view: demands, costs and system indicators.",
+    "titleOperador": "Operator Dashboard",
+    "descriptionOperador": "Summary of demands and projects under your scope.",
+    "titleVisualizador": "Viewer Dashboard",
+    "descriptionVisualizador": "View indicators and demands according to your permissions.",
     "totalDemands": "Total Demands",
     "openDemands": "Open Demands",
     "closedDemands": "Closed Demands",
@@ -622,7 +645,7 @@
     "viewDocument": "View Document",
     "viewDocumentTitle": "View PDF Document",
     "documentViewError": "Error loading document for viewing",
-    "generatePdf": "Generate PDF from Document",
+    "generatePdf": "Submit for signature",
     "viewGeneratedPdfTitle": "Generated PDF from Template",
     "viewGeneratedPdfDescription": "PDF generated from DOCX template with Termo de Abertura data",
     "generatingPdf": "Generating PDF...",
@@ -635,7 +658,18 @@
     "createdSuccess": "Opening Term created successfully",
     "updatedSuccess": "Opening Term updated successfully",
     "deletedSuccess": "Opening Term deleted successfully",
-    "signedSuccess": "Opening Term signed successfully"
+    "signedSuccess": "Opening Term signed successfully",
+    "report": {
+      "documentTitle": "OPENING TERM FOR TECHNOLOGICAL DEMAND",
+      "demandNumber": "Demand Number:",
+      "demandDate": "Demand Date:",
+      "descriptivo": "Description:",
+      "signature": "Signature:",
+      "signatureNote": "Date and time on electronic signature",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "TED Manager - IBAMA",
+      "pageOf": "Page {{page}} of {{total}}"
+    }
   },
   "planningTerm": {
     "title": "Planning Term",
@@ -655,6 +689,7 @@
     "hours": "Hours",
     "hourlyRate": "Hourly Rate",
     "totalCost": "Total Cost",
+    "lineTotal": "Total",
     "addCost": "Add Cost",
     "notSigned": "Not signed",
     "signed": "Signed",
@@ -686,11 +721,25 @@
     "viewDocument": "View Document",
     "viewDocumentTitle": "View PDF Document",
     "documentViewError": "Error loading document for viewing",
-    "generatePdf": "Generate PDF from Document",
+    "generatePdf": "Submit for signature",
     "viewGeneratedPdfTitle": "Generated PDF from Template",
     "viewGeneratedPdfDescription": "PDF generated from DOCX template with Planning Term data",
     "generatingPdf": "Generating PDF...",
-    "generatePdfError": "Error generating PDF from template"
+    "generatePdfError": "Error generating PDF from template",
+    "report": {
+      "documentTitle": "PLANNING AND EXECUTION TERM FOR TECHNOLOGICAL DEMAND",
+      "demandNumber": "Demand Number:",
+      "planningDate": "Planning Date:",
+      "specification": "Specification:",
+      "schedule": "Schedule:",
+      "expectedResult": "Expected result:",
+      "costs": "Costs:",
+      "signature": "Signature:",
+      "signatureNote": "Date and time on electronic signature",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "TED Manager - IBAMA",
+      "pageOf": "Page {{page}} of {{total}}"
+    }
   },
   "closingTerm": {
     "title": "Closing Term",
@@ -708,6 +757,10 @@
     "hours": "Hours",
     "hourlyRate": "Hourly Rate",
     "totalCost": "Total Cost",
+    "datesTab": "Dates",
+    "resultTab": "Delivered Result",
+    "costsTab": "Actual Costs",
+    "lineTotal": "Total",
     "addCost": "Add Cost",
     "plannedVsActual": "Planned vs Actual",
     "notSigned": "Not signed",
@@ -742,11 +795,20 @@
     "viewDocument": "View Document",
     "viewDocumentTitle": "View PDF Document",
     "documentViewError": "Error loading document for viewing",
-    "generatePdf": "Generate PDF from Document",
+    "generatePdf": "Submit for signature",
     "viewGeneratedPdfTitle": "Generated PDF from Template",
     "viewGeneratedPdfDescription": "PDF generated from DOCX template with Closing Term data",
     "generatingPdf": "Generating PDF...",
-    "generatePdfError": "Error generating PDF from template"
+    "generatePdfError": "Error generating PDF from template",
+    "report": {
+      "documentTitle": "CLOSING TERM FOR TECHNOLOGICAL DEMAND",
+      "demandNumber": "Demand Number:",
+      "closingDate": "Closing Date:",
+      "resultsDelivered": "Results Delivered:",
+      "costs": "Costs:",
+      "signature": "Signature:",
+      "signatureNote": "Date and time on electronic signature"
+    }
   },
   "validation": {
     "required": "Required field",
@@ -773,6 +835,7 @@
     "personalData": "Personal Data",
     "changePassword": "Change Password",
     "userProfile": "Access Profile",
+    "id": "ID",
     "namePlaceholder": "Enter your full name",
     "emailPlaceholder": "Enter your email",
     "currentPassword": "Current Password",

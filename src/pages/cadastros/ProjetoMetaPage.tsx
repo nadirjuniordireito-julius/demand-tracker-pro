@@ -638,7 +638,7 @@ export default function ProjetoMetaPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="min-w-[120px]">
                                   {actions.map((action, index) => (
-                                    <div key={index}>
+                                    <div key={`${action.label}-${index}`}>
                                       {action.separator && index > 0 && <DropdownMenuSeparator />}
                                       <DropdownMenuItem
                                         onClick={() => action.onClick(meta)}

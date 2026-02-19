@@ -24,7 +24,7 @@ import { getDemandaStatusLabelKey, normalizeDemandaStatus } from '@/lib/demandaS
 import { termoAberturaService, termoEncerramentoService, termoPlanejamentoService } from '@/services/termoService';
 import { termoAberturaDocService, termoPlanejamentoDocService, termoEncerramentoDocService } from '@/services/termoDocService';
 import type { TermoEncerramento, TermoEncerramentoCusto, TermoPlanejamento, TermoPlanejamentoCusto } from '@/types';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { BalloonTooltip } from '@/components/tedHealthMap/BalloonTooltip';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -384,28 +384,26 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
                       totalExecutadoDemanda != null &&
                       Number.isFinite(Number(totalExecutadoDemanda)) && (
                         <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded"
-                                aria-label={t('healthMapDetail.demandExecutedPercentOfProduct', {
-                                  percent: new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
-                                    Number(totalExecutadoDemanda) / Number(productValorPrevisto)
-                                  ),
-                                })}
-                              >
-                                <Info className="h-3.5 w-3.5 shrink-0" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-[240px] text-left">
-                              {t('healthMapDetail.demandExecutedPercentOfProduct', {
+                          <BalloonTooltip
+                            content={t('healthMapDetail.demandExecutedPercentOfProduct', {
+                              percent: new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+                                Number(totalExecutadoDemanda) / Number(productValorPrevisto)
+                              ),
+                            })}
+                            side="top"
+                          >
+                            <button
+                              type="button"
+                              className="inline-flex text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded"
+                              aria-label={t('healthMapDetail.demandExecutedPercentOfProduct', {
                                 percent: new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
                                   Number(totalExecutadoDemanda) / Number(productValorPrevisto)
                                 ),
                               })}
-                            </TooltipContent>
-                          </Tooltip>
+                            >
+                              <Info className="h-3.5 w-3.5 shrink-0" />
+                            </button>
+                          </BalloonTooltip>
                         </TooltipProvider>
                       )}
                   </span>
@@ -657,7 +655,6 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
             variant: 'destructive',
           })
         }
-        downloadFileName={node?.codigo ? `avaliacao-${node.codigo}.pdf` : undefined}
       />
     )}
   </>

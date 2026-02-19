@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { 
+import {
   Plus,
   X,
   Upload,
@@ -12,7 +12,8 @@ import {
   Trash2,
   Eye,
   FileDown,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,7 +52,9 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { termoPlanejamentoService } from '@/services/termoService';
 import { termoPlanejamentoDocService } from '@/services/termoDocService';
@@ -106,6 +109,9 @@ export default function TermoPlanejamentoPage() {
     const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
     return new Date(y, m - 1, d);
   };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const form = useForm<TermoPlanejamentoFormData>({
     resolver: zodResolver(termoPlanejamentoSchema),
@@ -601,21 +607,41 @@ export default function TermoPlanejamentoPage() {
                 name="demandaTecnicaId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('planningTerm.demand')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('common.selectDemand')} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {demanda && (
-                          <SelectItem value={String(demanda.id)}>
-                            {demanda.codigo} - {demanda.nome}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <input type="hidden" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    {demanda && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('common.demandCodeLabel')}</TableHead>
+                            <TableHead>{t('common.demandDescriptionLabel')}</TableHead>
+                            <TableHead>{t('common.metaCodeLabel')}</TableHead>
+                            <TableHead>{t('common.productCodeLabel')}</TableHead>
+                            <TableHead>{t('common.productTotalPlannedLabel')}</TableHead>
+                            <TableHead>{t('common.productTotalExecutedLabel')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell>{demanda.codigo}</TableCell>
+                            <TableCell>{demanda.nome}</TableCell>
+                            <TableCell>{demanda.metaProduto?.projetoMeta?.codigo ?? '—'}</TableCell>
+                            <TableCell>{demanda.metaProduto?.codigo ?? '—'}</TableCell>
+                            <TableCell>
+                              {demanda.metaProduto != null && typeof demanda.metaProduto.quantidade === 'number' && typeof demanda.metaProduto.valorUnitario === 'number'
+                                ? formatCurrency(demanda.metaProduto.quantidade * demanda.metaProduto.valorUnitario)
+                                : '—'}
+                            </TableCell>
+                            <TableCell>
+                              {typeof demanda.totalExecutadoProduto === 'number'
+                                ? formatCurrency(demanda.totalExecutadoProduto)
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -805,7 +831,28 @@ export default function TermoPlanejamentoPage() {
                 </TabsContent>
                 
                 {/* Aba: Custos */}
-                <TabsContent value="custos" className="mt-4">
+                <TabsContent value="custos" className="mt-4 space-y-4">
+                  {demanda?.metaProduto != null && typeof demanda.metaProduto.quantidade === 'number' && typeof demanda.metaProduto.valorUnitario === 'number' && (() => {
+                    const totalPlanned = demanda.metaProduto!.quantidade * demanda.metaProduto!.valorUnitario;
+                    const totalExecuted = typeof demanda.totalExecutadoProduto === 'number' ? demanda.totalExecutadoProduto : 0;
+                    const totalFormCosts = custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0);
+                    if (totalExecuted + totalFormCosts > totalPlanned) {
+                      return (
+                        <Alert variant="destructive">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle>{t('common.costExceedsPlannedTitle')}</AlertTitle>
+                          <AlertDescription>
+                            {t('common.costExceedsPlannedDescription', {
+                              formTotal: formatCurrency(totalFormCosts),
+                              executedTotal: formatCurrency(totalExecuted),
+                              plannedTotal: formatCurrency(totalPlanned),
+                            })}
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    }
+                    return null;
+                  })()}
                   <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
@@ -816,75 +863,93 @@ export default function TermoPlanejamentoPage() {
                         </Button>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-1.5">
                       {custos.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">
                           {t('common.noCostsAdded')}
                         </p>
                       ) : (
-                        custos.map((custo, index) => (
-                          <div key={'id' in custo && custo.id != null ? custo.id : `custo-${index}`} className="space-y-2">
-                            <div className="flex items-end gap-2 p-3 bg-muted/50 rounded-lg">
-                              <div className="flex-1 grid grid-cols-3 gap-2">
-                                <div>
-                                  <Label className="text-xs">{t('planningTerm.profile')}</Label>
-                                  <Select 
-                                    value={custo.perfilId} 
-                                    onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
-                                  >
-                                    <SelectTrigger className="h-8">
-                                      <SelectValue placeholder={t('common.selectProfile')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {isLoadingPerfis ? (
-                                        <SelectItem value="" disabled>{t('common.loading')}</SelectItem>
-                                      ) : (
-                                        perfis.map((perfil) => (
-                                          <SelectItem key={perfil.id} value={String(perfil.id)}>
-                                            {perfil.nome}
-                                          </SelectItem>
-                                        ))
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div>
-                                  <Label className="text-xs">{t('planningTerm.hours')}</Label>
-                                  <Input
-                                    type="number"
-                                    className="h-8"
-                                    value={custo.qtdeHora}
-                                    onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
-                                    placeholder={t('common.hoursPlaceholder')}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">{t('planningTerm.hourlyRate')}</Label>
-                                  <Input
-                                    type="number"
-                                    className="h-8"
-                                    value={custo.valorHora}
-                                    onChange={(e) => handleCustoChange(index, 'valorHora', e.target.value)}
-                                    placeholder={t('common.currencyPlaceholder')}
-                                  />
-                                </div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => handleRemoveCusto(index)}
-                                aria-label={t('common.remove')}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                        <>
+                          <div className="flex gap-2 pb-1.5 border-b">
+                            <div className="flex-1 grid grid-cols-4 gap-2">
+                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.profile')}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.hours')}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.hourlyRate')}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.lineTotal')}</span>
                             </div>
-                            {custoErrors[index] && (
-                              <p className="text-xs text-destructive">{custoErrors[index]}</p>
-                            )}
+                            <div className="w-8 shrink-0" aria-hidden />
                           </div>
-                        ))
+                          {custos.map((custo, index) => {
+                            const horas = Number(custo.qtdeHora) || 0;
+                            const valorHora = Number(custo.valorHora) || 0;
+                            const totalLinha = horas * valorHora;
+                            return (
+                              <div key={'id' in custo && custo.id != null ? String(custo.id) : `custo-${index}`} className="space-y-1">
+                                <div className="flex items-center gap-2 py-1.5 px-2 bg-muted/50 rounded-md">
+                                  <div className="flex-1 grid grid-cols-4 gap-2">
+                                    <Select
+                                      value={custo.perfilId}
+                                      onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
+                                    >
+                                      <SelectTrigger className="h-8">
+                                        <SelectValue placeholder={t('common.selectProfile')} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {isLoadingPerfis ? (
+                                          <SelectItem value="" disabled>{t('common.loading')}</SelectItem>
+                                        ) : (
+                                          perfis.map((perfil) => (
+                                            <SelectItem key={perfil.id} value={String(perfil.id)}>
+                                              {perfil.nome}
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      className="h-8"
+                                      value={custo.qtdeHora}
+                                      onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
+                                      placeholder={t('common.hoursPlaceholder')}
+                                    />
+                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
+                                      {custo.valorHora ? formatCurrency(Number(custo.valorHora)) : '—'}
+                                    </div>
+                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm font-medium">
+                                      {totalLinha > 0 ? formatCurrency(totalLinha) : '—'}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-destructive"
+                                    onClick={() => handleRemoveCusto(index)}
+                                    aria-label={t('common.remove')}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {custoErrors[index] && (
+                                  <p className="text-xs text-destructive">{custoErrors[index]}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <div className="flex gap-2 pt-2 mt-2 border-t font-medium">
+                            <div className="flex-1 grid grid-cols-4 gap-2">
+                              <span className="col-span-2" />
+                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.totalCost')}</span>
+                              <span className="text-sm">
+                                {formatCurrency(
+                                  custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0)
+                                )}
+                              </span>
+                            </div>
+                            <div className="w-8 shrink-0" />
+                          </div>
+                        </>
                       )}
                     </CardContent>
                   </Card>
@@ -940,7 +1005,7 @@ export default function TermoPlanejamentoPage() {
                         type="button" 
                         variant="outline" 
                         onClick={handleGeneratePdf}
-                        disabled={isSaving || isDeleting || !selectedProject}
+                        disabled={isSaving || isDeleting || !selectedProject || !canUploadTermoPlanejamento(demanda?.status)}
                         className="flex items-center gap-2"
                         title={t('planningTerm.generatePdf')}
                       >
@@ -1109,11 +1174,23 @@ export default function TermoPlanejamentoPage() {
 
       <PdfPreviewDialog
         open={isViewGeneratedPdfOpen}
-        onOpenChange={setIsViewGeneratedPdfOpen}
+        onOpenChange={(open) => {
+          setIsViewGeneratedPdfOpen(open);
+          if (!open && selectedTermo) {
+            termoPlanejamentoDocService
+              .findByTermoPlanejamentoId(selectedTermo.id)
+              .then(setDocumento)
+              .catch(() => setDocumento(null));
+          }
+        }}
         title={t('planningTerm.viewGeneratedPdfTitle')}
         description={t('planningTerm.viewGeneratedPdfDescription')}
         fetchPdf={() =>
-          termoPlanejamentoService.gerarPdf(selectedTermo!.id, selectedProject!.id, 'P')
+          termoPlanejamentoService.gerarTermoAssinatura(
+            selectedTermo!.id,
+            selectedProject!.id,
+            'P'
+          )
         }
         loadingLabel={t('planningTerm.generatingPdf')}
         errorMessage={t('planningTerm.generatePdfError')}

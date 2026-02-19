@@ -11,6 +11,8 @@ import {
   View,
   StyleSheet,
   pdf,
+  Svg,
+  Path,
 } from '@react-pdf/renderer';
 import type { DemandaAvaliacaoResponse } from './types';
 
@@ -77,6 +79,11 @@ const styles = StyleSheet.create({
     fontSize: 9,
     minHeight: 24,
   },
+  starsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
 });
 
 export interface AvaliacaoPdfContext {
@@ -91,9 +98,16 @@ export interface AvaliacaoPdfContext {
   usuarioNome?: string;
 }
 
+/** Quando valueStars está definido (0-5), o PDF exibe estrelas em vez do texto em value. */
+export interface AvaliacaoPdfRow {
+  label: string;
+  value: string;
+  valueStars?: number;
+}
+
 export interface AvaliacaoPdfSection {
   sectionTitle: string;
-  rows: Array<{ label: string; value: string }>;
+  rows: AvaliacaoPdfRow[];
 }
 
 /** Rótulos do PDF (i18n aplicado na página e repassado aqui) */
@@ -113,6 +127,33 @@ export interface AvaliacaoDemandaPdfData {
   labels: AvaliacaoPdfLabels;
   context: AvaliacaoPdfContext;
   sections: AvaliacaoPdfSection[];
+}
+
+const STAR_YELLOW = '#EAB308';
+const STAR_GRAY = '#374151';
+const STAR_SIZE = 12;
+/** Estrela de 5 pontas em viewBox 0 0 10 10 */
+const STAR_PATH = 'M 5,0 L 6.04,3.75 L 9.58,3.75 L 6.67,5.83 L 7.92,9.58 L 5,7.5 L 2.08,9.58 L 3.33,5.83 L 0.42,3.75 L 3.96,3.75 Z';
+
+function StarRating({ rating }: { rating: number }) {
+  const filled = Math.min(5, Math.max(0, Math.round(rating)));
+  return (
+    <View style={styles.starsRow}>
+      {[1, 2, 3, 4, 5].map((i) => {
+        const fill = i <= filled ? STAR_YELLOW : STAR_GRAY;
+        return (
+          <Svg
+            key={i}
+            width={STAR_SIZE}
+            height={STAR_SIZE}
+            viewBox="0 0 10 10"
+          >
+            <Path d={STAR_PATH} fill={fill} />
+          </Svg>
+        );
+      })}
+    </View>
+  );
 }
 
 interface AvaliacaoDemandaPdfDocumentProps {
@@ -179,7 +220,11 @@ function AvaliacaoDemandaPdfDocument({ data }: AvaliacaoDemandaPdfDocumentProps)
             {section.rows.map((row, rIdx) => (
               <View key={rIdx} style={styles.row}>
                 <Text style={styles.label}>{row.label}</Text>
-                <Text style={styles.value}>{row.value}</Text>
+                {row.valueStars != null ? (
+                  <StarRating rating={row.valueStars} />
+                ) : (
+                  <Text style={styles.value}>{row.value}</Text>
+                )}
               </View>
             ))}
           </View>
@@ -267,58 +312,65 @@ export function buildAvaliacaoDemandaPdfDataFromResponse(
     .map((r) => TIPO_RISCO_OPTIONS.find((o) => o.value === r)?.labelKey ?? r)
     .map((key) => t(key));
   const textos = (v.textos ?? {}) as Record<string, string>;
+  const row = (label: string, value: string): AvaliacaoPdfRow => ({ label, value });
+  const rowStars = (label: string, rating: number): AvaliacaoPdfRow => ({
+    label,
+    value: String(rating),
+    valueStars: Math.min(5, Math.max(0, Math.round(rating))),
+  });
+
   const sections: AvaliacaoPdfSection[] = [
     {
       sectionTitle: t('avaliacaoDemanda.stepPrazoCusto'),
       rows: [
-        { label: t('avaliacaoDemanda.labelAtraso'), value: simNao(v.atraso) },
-        { label: t('avaliacaoDemanda.labelImpactoAtraso'), value: String(v.impactoAtraso) },
-        { label: t('avaliacaoDemanda.labelDesvioPrazo'), value: `${v.desvioPrazoPercentual}%` },
-        { label: t('avaliacaoDemanda.labelDesvioCusto'), value: `${v.desvioCustoPercentual}%` },
-        { label: t('avaliacaoDemanda.labelImpactoFinanceiro'), value: String(v.impactoFinanceiro) },
+        row(t('avaliacaoDemanda.labelAtraso'), simNao(v.atraso)),
+        rowStars(t('avaliacaoDemanda.labelImpactoAtraso'), v.impactoAtraso),
+        row(t('avaliacaoDemanda.labelDesvioPrazo'), `${v.desvioPrazoPercentual}%`),
+        row(t('avaliacaoDemanda.labelDesvioCusto'), `${v.desvioCustoPercentual}%`),
+        rowStars(t('avaliacaoDemanda.labelImpactoFinanceiro'), v.impactoFinanceiro),
       ],
     },
     {
       sectionTitle: t('avaliacaoDemanda.stepQualidade'),
       rows: [
-        { label: t(QUALIDADE_LABEL_KEYS.atendimentoRequisitos), value: String(v.atendimentoRequisitos) },
-        { label: t(QUALIDADE_LABEL_KEYS.estabilidade), value: String(v.estabilidade) },
-        { label: t(QUALIDADE_LABEL_KEYS.retrabalho), value: String(v.retrabalho) },
-        { label: t(QUALIDADE_LABEL_KEYS.satisfacaoUsuario), value: String(v.satisfacaoUsuario) },
-        { label: t(QUALIDADE_LABEL_KEYS.clarezaRequisitos), value: String(v.clarezaRequisitos) },
+        rowStars(t(QUALIDADE_LABEL_KEYS.atendimentoRequisitos), v.atendimentoRequisitos),
+        rowStars(t(QUALIDADE_LABEL_KEYS.estabilidade), v.estabilidade),
+        rowStars(t(QUALIDADE_LABEL_KEYS.retrabalho), v.retrabalho),
+        rowStars(t(QUALIDADE_LABEL_KEYS.satisfacaoUsuario), v.satisfacaoUsuario),
+        rowStars(t(QUALIDADE_LABEL_KEYS.clarezaRequisitos), v.clarezaRequisitos),
       ],
     },
     {
       sectionTitle: t('avaliacaoDemanda.stepMaturidade'),
       rows: [
-        { label: t(MATURIDADE_LABEL_KEYS.qualidadePlanejamento), value: String(v.qualidadePlanejamento) },
-        { label: t(MATURIDADE_LABEL_KEYS.aderenciaCronograma), value: String(v.aderenciaCronograma) },
-        { label: t(MATURIDADE_LABEL_KEYS.comunicacao), value: String(v.comunicacao) },
+        rowStars(t(MATURIDADE_LABEL_KEYS.qualidadePlanejamento), v.qualidadePlanejamento),
+        rowStars(t(MATURIDADE_LABEL_KEYS.aderenciaCronograma), v.aderenciaCronograma),
+        rowStars(t(MATURIDADE_LABEL_KEYS.comunicacao), v.comunicacao),
       ],
     },
     {
       sectionTitle: t('avaliacaoDemanda.stepRiscos'),
       rows: [
-        { label: t('avaliacaoDemanda.labelRiscosIdentificados'), value: riscosLabels.length ? riscosLabels.join(', ') : '—' },
+        row(t('avaliacaoDemanda.labelRiscosIdentificados'), riscosLabels.length ? riscosLabels.join(', ') : '—'),
       ],
     },
     {
       sectionTitle: t('avaliacaoDemanda.stepEquipe'),
       rows: [
-        { label: t('avaliacaoDemanda.labelCapacidadeEquipe'), value: String(v.capacidadeEquipe) },
-        { label: t('avaliacaoDemanda.labelDisponibilidadeEquipe'), value: String(v.disponibilidadeEquipe) },
-        { label: t('avaliacaoDemanda.labelPossuiBackupCritico'), value: simNao(v.possuiBackupCritico) },
-        { label: t('avaliacaoDemanda.labelRotatividadeImpactou'), value: simNao(v.rotatividadeImpactou) },
+        rowStars(t('avaliacaoDemanda.labelCapacidadeEquipe'), v.capacidadeEquipe),
+        rowStars(t('avaliacaoDemanda.labelDisponibilidadeEquipe'), v.disponibilidadeEquipe),
+        row(t('avaliacaoDemanda.labelPossuiBackupCritico'), simNao(v.possuiBackupCritico)),
+        row(t('avaliacaoDemanda.labelRotatividadeImpactou'), simNao(v.rotatividadeImpactou)),
       ],
     },
     {
       sectionTitle: t('avaliacaoDemanda.stepImpacto'),
       rows: [
-        { label: t('avaliacaoDemanda.labelValorPercebido'), value: String(v.valorPercebido) },
-        { label: t('avaliacaoDemanda.labelAlinhamentoMeta'), value: String(v.alinhamentoMeta) },
-        { label: t('avaliacaoDemanda.labelReutilizacao'), value: reutilizacaoLabel(v.reutilizacao) },
-        { label: t('avaliacaoDemanda.labelAvaliacaoGeral'), value: String(v.avaliacaoGeral) },
-        { label: t('avaliacaoDemanda.labelRepetiriaModelo'), value: simNao(v.repetiriaModelo) },
+        rowStars(t('avaliacaoDemanda.labelValorPercebido'), v.valorPercebido),
+        rowStars(t('avaliacaoDemanda.labelAlinhamentoMeta'), v.alinhamentoMeta),
+        row(t('avaliacaoDemanda.labelReutilizacao'), reutilizacaoLabel(v.reutilizacao)),
+        rowStars(t('avaliacaoDemanda.labelAvaliacaoGeral'), v.avaliacaoGeral),
+        row(t('avaliacaoDemanda.labelRepetiriaModelo'), simNao(v.repetiriaModelo)),
       ],
     },
     {

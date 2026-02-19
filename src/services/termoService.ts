@@ -3,7 +3,18 @@
 // Serviços de CRUD para TermoAbertura, TermoPlanejamento e TermoEncerramento
 // =====================================================
 
+import React from 'react';
+import { pdf } from '@react-pdf/renderer';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import api, { downloadBlob } from './api';
+import { termoAberturaDocService, termoPlanejamentoDocService, termoEncerramentoDocService } from './termoDocService';
+import { demandaService } from './demandaService';
+import { projetoService } from './projetoService';
+import i18n from '@/i18n';
+import { TermoAberturaReportInner } from '@/reports/TermoAbertura/TermoAberturaReport';
+import { TermoPlanejamentoReportInner } from '@/reports/TermoAbertura/TermoPlanejamentoReport';
+import { TermoEncerramentoReportInner } from '@/reports/TermoAbertura/TermoEncerramentoReport';
 import {
   termoAberturaSchema,
   termoPlanejamentoSchema,
@@ -24,6 +35,7 @@ import type {
   TermoEncerramentoUpdateDTO,
   PaginatedResponse 
 } from '@/types';
+import { validatePdfTree } from "@/helpers/validatePdfStyles";
 
 // =====================================================
 // Termo de Abertura
@@ -77,6 +89,67 @@ export const termoAberturaService = {
   async gerarPdf(id: number, projetoId: number, tipo: 'A' | 'P' | 'E'): Promise<Blob> {
     return downloadBlob(`/termos-abertura/${id}/gerar-pdf?projetoId=${projetoId}&tipo=${tipo}`);
   },
+
+  /**
+   * Gera o PDF do termo de abertura usando TermoAberturaReport, grava em TermoAberturaDoc e retorna o blob para preview.
+   */
+  async gerarTermoAssinatura(id: number, projetoId: number, _tipo: 'A' | 'P' | 'E'): Promise<Blob> {
+    
+ 
+    const termo = await this.findById(id);
+    const demanda = await demandaService.findById(termo.demandaTecnicaId);
+    const projeto = await projetoService.findById(projetoId);
+
+    const stripHtml = (s: string | null | undefined) =>
+      (s ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const dataAberturaFormatada =
+      termo.dataAbertura &&
+      (termo.dataAbertura.includes('T')
+        ? format(parseISO(termo.dataAbertura), 'dd/MM/yyyy', { locale: ptBR })
+        : format(new Date(termo.dataAbertura + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }));
+
+    const descricaoTexto =stripHtml (termo.descricao ?? '');
+
+    const reportProps = {
+      PROJETO_COD_TED: projeto.codTed ?? '',
+      PROJETO_NOME: projeto.nome ?? '',
+      DEMANDA_CODIGO: demanda.codigo ?? '',
+      DATA_ABERTURA: dataAberturaFormatada ?? '',
+      TERMO_DESCRICAO: descricaoTexto || '',
+      labels: {
+        documentTitle: i18n.t('openingTerm.report.documentTitle'),
+        demandNumber: i18n.t('openingTerm.report.demandNumber'),
+        demandDate: i18n.t('openingTerm.report.demandDate'),
+        descriptivo: i18n.t('openingTerm.report.descriptivo'),
+        signature: i18n.t('openingTerm.report.signature'),
+        signatureNote: i18n.t('openingTerm.report.signatureNote'),
+        signerName: i18n.t('openingTerm.report.signerName'),
+        signerRole: i18n.t('openingTerm.report.signerRole'),
+        pageOf: (page: number, total: number) => i18n.t('openingTerm.report.pageOf', { page, total }),
+      },
+    };
+
+    const doc = React.createElement(TermoAberturaReportInner, reportProps);
+
+    // TermoAberturaReportInner é puro (sem hooks), evitando useSyncExternalStore no contexto do react-pdf
+    const blob = await pdf(doc as React.ReactElement).toBlob();
+
+    validatePdfTree(doc);
+
+    const file = new File([blob], `termo-abertura-${id}.pdf`, { type: 'application/pdf' });
+
+    const docExists = await termoAberturaDocService.exists(id);
+    
+    if (docExists) {
+      const existing = await termoAberturaDocService.findByTermoAberturaId(id);
+      if (existing) await termoAberturaDocService.update(existing.id, file);
+    } else {
+      await termoAberturaDocService.upload(id, file);
+    }
+    
+    return blob;
+  },
 };
 
 // =====================================================
@@ -103,7 +176,10 @@ export const termoPlanejamentoService = {
 
   async findByDemandaId(demandaId: number): Promise<TermoPlanejamento | null> {
     try {
-      return await api.get<TermoPlanejamento>(PLANEJAMENTO_ENDPOINTS.byDemanda(demandaId), { allow404: true });
+      return await api.get<TermoPlanejamento>(PLANEJAMENTO_ENDPOINTS.byDemanda(demandaId), {
+        allow404: true,
+        silent: true, // 404/500 = termo ainda não existe (usuário vai preencher); evita log e toast
+      });
     } catch {
       return null;
     }
@@ -130,6 +206,73 @@ export const termoPlanejamentoService = {
    */
   async gerarPdf(id: number, projetoId: number, tipo: 'A' | 'P' | 'E'): Promise<Blob> {
     return downloadBlob(`/termos-planejamento/${id}/gerar-pdf?projetoId=${projetoId}&tipo=${tipo}`);
+  },
+
+  /**
+   * Gera o PDF do termo de planejamento usando TermoPlanejamentoReport, grava em TermoPlanejamentoDoc e retorna o blob para preview.
+   */
+  async gerarTermoAssinatura(id: number, projetoId: number, _tipo: 'A' | 'P' | 'E'): Promise<Blob> {
+    const termo = await this.findById(id);
+    const demanda = await demandaService.findById(termo.demandaTecnicaId);
+    const projeto = await projetoService.findById(projetoId);
+
+    const stripHtml = (s: string | null | undefined) =>
+      (s ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const dataFormatada =
+      termo.dataAbertura &&
+      (termo.dataAbertura.includes('T')
+        ? format(parseISO(termo.dataAbertura), 'dd/MM/yyyy', { locale: ptBR })
+        : format(new Date(termo.dataAbertura + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }));
+
+    const custosLinhas = (termo.custos ?? []).map((c) => {
+      const total = (c.qtdeHora ?? 0) * (c.valorHora ?? 0);
+      const perfilNome = c.perfil?.nome ?? '-';
+      return `${perfilNome}\t${c.qtdeHora ?? 0}\t${c.valorHora ?? 0}\t${total.toFixed(2)}`;
+    });
+    const CUSTOS_DETALHADOS = custosLinhas.length
+      ? custosLinhas.join('\n')
+      : '';
+
+    const reportProps = {
+      PROJETO_COD_TED: projeto.codTed ?? '',
+      PROJETO_NOME: projeto.nome ?? '',
+      DEMANDA_CODIGO: demanda.codigo ?? '',
+      DATA_ABERTURA: dataFormatada ?? '',
+      ESPECIFICACAO: stripHtml(termo.especificacao),
+      CRONOGRAMA: stripHtml(termo.cronograma),
+      RESULTADO_ESPERADO: stripHtml(termo.resultadoEsperado),
+      CUSTOS_DETALHADOS,
+      labels: {
+        documentTitle: i18n.t('planningTerm.report.documentTitle'),
+        demandNumber: i18n.t('planningTerm.report.demandNumber'),
+        planningDate: i18n.t('planningTerm.report.planningDate'),
+        specification: i18n.t('planningTerm.report.specification'),
+        schedule: i18n.t('planningTerm.report.schedule'),
+        expectedResult: i18n.t('planningTerm.report.expectedResult'),
+        costs: i18n.t('planningTerm.report.costs'),
+        signature: i18n.t('planningTerm.report.signature'),
+        signatureNote: i18n.t('planningTerm.report.signatureNote'),
+        signerName: i18n.t('planningTerm.report.signerName'),
+        signerRole: i18n.t('planningTerm.report.signerRole'),
+        pageOf: (page: number, total: number) => i18n.t('planningTerm.report.pageOf', { page, total }),
+      },
+    };
+
+    const doc = React.createElement(TermoPlanejamentoReportInner, reportProps);
+    validatePdfTree(doc);
+    const blob = await pdf(doc as React.ReactElement).toBlob();
+    const file = new File([blob], `termo-planejamento-${id}.pdf`, { type: 'application/pdf' });
+
+    const docExists = await termoPlanejamentoDocService.exists(id);
+    if (docExists) {
+      const existing = await termoPlanejamentoDocService.findByTermoPlanejamentoId(id);
+      if (existing) await termoPlanejamentoDocService.update(existing.id, file);
+    } else {
+      await termoPlanejamentoDocService.upload(id, file);
+    }
+
+    return blob;
   },
 };
 
@@ -185,4 +328,62 @@ export const termoEncerramentoService = {
   async gerarPdf(id: number, projetoId: number, tipo: 'A' | 'P' | 'E'): Promise<Blob> {
     return downloadBlob(`/termos-encerramento/${id}/gerar-pdf?projetoId=${projetoId}&tipo=${tipo}`);
   },
+
+  async gerarTermoAssinatura(id: number, projetoId: number, _tipo: 'A' | 'P' | 'E'): Promise<Blob> {
+    const termo = await this.findById(id);
+    const demanda = await demandaService.findById(termo.demandaTecnicaId);
+    const projeto = await projetoService.findById(projetoId);
+
+    const stripHtml = (s: string | null | undefined) =>
+      (s ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const dataFormatada =
+      termo.dataTermo &&
+      (termo.dataTermo.includes('T')
+        ? format(parseISO(termo.dataTermo), 'dd/MM/yyyy', { locale: ptBR })
+        : format(new Date(termo.dataTermo + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }));
+    
+    const CUSTOS = (termo.custos || []).map((c) => ({
+      perfil: c.perfil?.nome ?? `Perfil ${c.perfilId}`,
+      horas: Number(c.qtdeHora),
+      valorHora: Number(c.valorHora),
+    }));
+
+    const reportProps = {
+      PROJETO_COD_TED: projeto.codTed ?? '',
+      PROJETO_NOME: projeto.nome ?? '',
+      DEMANDA_CODIGO: demanda.codigo ?? '',
+      DATA_ABERTURA: dataFormatada ?? '',
+      RESULTADO_ENTREGUE: stripHtml(termo.resultadoEntregue),
+      CUSTOS_DETALHADOS : CUSTOS,
+      totalGeral: termo.custos?.reduce((acc, c) => acc + (c.qtdeHora ?? 0) * (c.valorHora ?? 0), 0) ?? 0,
+      labels: {
+        documentTitle: i18n.t('closingTerm.report.documentTitle'),
+        demandNumber: i18n.t('closingTerm.report.demandNumber'),
+        planningDate: i18n.t('closingTerm.report.closingDate'),
+        resultsDelivered: i18n.t('closingTerm.report.resultsDelivered'),
+        costs: i18n.t('closingTerm.report.costs'),
+        signature: i18n.t('closingTerm.report.signature'),
+        signatureNote: i18n.t('closingTerm.report.signatureNote'),
+        signerName: i18n.t('closingTerm.report.signerName'),
+        signerRole: i18n.t('closingTerm.report.signerRole'),
+        pageOf: (page: number, total: number) => i18n.t('closingTerm.report.pageOf', { page, total }),
+      },
+    };
+
+    const doc = React.createElement(TermoEncerramentoReportInner, reportProps);
+    const blob = await pdf(doc as React.ReactElement).toBlob();
+    const file = new File([blob], `termo-encerramento-${id}.pdf`, { type: 'application/pdf' });
+
+    const docExists = await termoEncerramentoDocService.exists(id);
+    if (docExists) {
+      const existing = await termoEncerramentoDocService.findByTermoEncerramentoId(id);
+      if (existing) await termoEncerramentoDocService.update(existing.id, file);
+    } else {
+      await termoEncerramentoDocService.upload(id, file);
+    }
+
+    return blob;
+  },
+
 };

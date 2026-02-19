@@ -29,6 +29,10 @@ export interface PdfPreviewDialogProps {
   downloadLabel?: string;
   /** Called when fetch fails (e.g. to show a toast). */
   onError?: (error: unknown) => void;
+
+  /** Footer customizado */
+  customFooter?: React.ReactNode;
+
 }
 
 export function PdfPreviewDialog({
@@ -43,6 +47,7 @@ export function PdfPreviewDialog({
   closeLabel = 'Fechar',
   downloadLabel = 'Download',
   onError,
+  customFooter,
 }: PdfPreviewDialogProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -131,17 +136,25 @@ export function PdfPreviewDialog({
             />
           ) : null}
         </div>
-        <DialogFooter className="px-6 py-4 border-t">
-          <Button variant="outline" onClick={handleClose}>
-            {closeLabel}
-          </Button>
-          {downloadFileName != null && url != null && (
-            <Button variant="default" onClick={handleDownload}>
-              <FileDown className="h-4 w-4 mr-2" />
-              {downloadLabel}
+
+        {customFooter ? (
+          <DialogFooter className="px-6 py-4 border-t">
+            {customFooter}
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="px-6 py-4 border-t">
+            <Button variant="outline" onClick={handleClose}>
+              {closeLabel}
             </Button>
-          )}
-        </DialogFooter>
+            {downloadFileName != null && url != null && (
+              <Button variant="default" onClick={handleDownload}>
+                <FileDown className="h-4 w-4 mr-2" />
+                {downloadLabel}
+              </Button>
+            )}
+          </DialogFooter>
+        )}
+      
       </DialogContent>
     </Dialog>
   );

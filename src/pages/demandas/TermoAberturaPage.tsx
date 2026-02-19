@@ -461,68 +461,71 @@ export default function TermoAberturaPage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="demandaTecnicaId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('openingTerm.demand')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('common.selectDemand')} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {demanda && (
-                          <SelectItem value={String(demanda.id)}>
-                            {demanda.codigo} - {demanda.nome}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="dataAbertura"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('openingTerm.openingDate')} *</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               
+                <FormField
+                  control={form.control}
+                  name="demandaTecnicaId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('openingTerm.demand')} *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled>
                         <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            <Calendar className="mr-2 h-4 w-4" />
-                            {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
-                          </Button>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t('common.selectDemand')} />
+                          </SelectTrigger>
                         </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          defaultMonth={field.value ?? new Date()}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
+                        <SelectContent>
+                          {demanda && (
+                            <SelectItem value={String(demanda.id)}>
+                              {demanda.codigo} - {demanda.nome}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dataAbertura"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('openingTerm.openingDate')} *</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "dd/MM/yyyy") : t('common.select')}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            defaultMonth={field.value ?? new Date()}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="descricao"
@@ -590,7 +593,7 @@ export default function TermoAberturaPage() {
                         type="button" 
                         variant="outline" 
                         onClick={handleGeneratePdf}
-                        disabled={isSaving || isDeleting || !selectedProject}
+                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoAbertura(demanda?.status)}
                         className="flex items-center gap-2"
                         title={t('openingTerm.generatePdf')}
                       >
@@ -634,6 +637,7 @@ export default function TermoAberturaPage() {
               </DialogFooter>
             </form>
           </Form>
+          
         </DialogContent>
       </Dialog>
 
@@ -759,11 +763,16 @@ export default function TermoAberturaPage() {
 
       <PdfPreviewDialog
         open={isViewGeneratedPdfOpen}
-        onOpenChange={setIsViewGeneratedPdfOpen}
+        onOpenChange={(next) => {
+          setIsViewGeneratedPdfOpen(next);
+          if (!next && selectedTermo) {
+            termoAberturaDocService.findByTermoAberturaId(selectedTermo.id).then(setDocumento).catch(() => setDocumento(null));
+          }
+        }}
         title={t('openingTerm.viewGeneratedPdfTitle')}
         description={t('openingTerm.viewGeneratedPdfDescription')}
         fetchPdf={() =>
-          termoAberturaService.gerarPdf(selectedTermo!.id, selectedProject!.id, 'A')
+          termoAberturaService.gerarTermoAssinatura(selectedTermo!.id, selectedProject!.id, 'A')
         }
         loadingLabel={t('openingTerm.generatingPdf')}
         errorMessage={t('openingTerm.generatePdfError')}

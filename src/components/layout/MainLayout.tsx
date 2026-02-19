@@ -35,10 +35,10 @@ export function MainLayout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background">
       <Header />
       
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         <Sidebar 
           isCollapsed={isSidebarCollapsed} 
           onToggleSidebar={handleToggleSidebar} 

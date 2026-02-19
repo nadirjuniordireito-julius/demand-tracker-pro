@@ -129,6 +129,14 @@
     "openingTermDescriptionPlaceholder": "Descreva o objetivo e escopo desta demanda com formatação...",
     "tedCodePlaceholder": "TED-2024-XXX",
     "currencyValuePlaceholder": "0.00",
+    "demandCodeLabel": "Demanda",
+    "demandDescriptionLabel": "Descrição",
+    "metaCodeLabel": "Meta",
+    "productCodeLabel": "Produto",
+    "productTotalPlannedLabel": "Total Previsto",
+    "productTotalExecutedLabel": "Total Executado",
+    "costExceedsPlannedTitle": "Atenção: valor previsto do produto ultrapassado",
+    "costExceedsPlannedDescription": "O total dos custos informados ({{formTotal}}) somado ao total já executado do produto ({{executedTotal}}) ultrapassa o valor previsto do produto ({{plannedTotal}}).",
     "passwordPlaceholder": "Senha",
     "passwordKeepBlank": "Deixe em branco para manter",
     "fillAllCostFields": "Preencha todos os campos do custo",
@@ -151,6 +159,14 @@
     "step3Description": "Defina especificações, cronograma e custos",
     "step4Title": "Termo de Encerramento",
     "step4Description": "Registre os resultados e custos realizados"
+  },
+  "home": {
+    "welcomeAdmin": "Área do Administrador",
+    "descriptionAdmin": "Acesso completo ao sistema: usuários, projetos, demandas e relatórios.",
+    "welcomeOperador": "Área do Operador",
+    "descriptionOperador": "Gerencie demandas e projetos liberados para você.",
+    "welcomeVisualizador": "Área do Visualizador",
+    "descriptionVisualizador": "Consulte demandas e projetos conforme suas permissões."
   },
   "pagination": {
     "showing": "Exibindo",
@@ -251,7 +267,8 @@
     "planningTerm": "Termo de Planejamento",
     "closingTerm": "Termo de Encerramento",
     "technicalDemand": "Demanda Técnica",
-    "healthMap": "TED Health Map"
+    "healthMap": "TED Health Map",
+    "projectHealth": "Saúde (Semáforo)"
   },
   "healthMapFinancial": {
     "totalProject": "Valor total Projeto",
@@ -303,6 +320,39 @@
     "costTotal": "Total",
     "documentViewError": "Erro ao carregar o documento."
   },
+  "projectSemaphore": {
+    "title": "Saúde do Projeto (Semáforo)",
+    "noData": "Nenhuma informação de semáforo disponível para o projeto selecionado.",
+    "expand": "Expandir",
+    "collapse": "Recolher",
+    "statusLabel": "Status",
+    "totalExecuted": "Total Executado",
+    "percentOfProduct": "% do produto",
+    "period": "Período",
+    "planned": "Previsto",
+    "executed": "Executado",
+    "executedPercent": "% executado",
+    "demands": "Demandas",
+    "demandsSummary": "{{closed}} de {{total}} demandas encerradas",
+    "status": {
+      "green": "Status verde",
+      "yellow": "Status amarelo",
+      "red": "Status vermelho",
+      "gray": "Status cinza"
+    },
+    "legend": {
+      "green": "Verde · dentro do planejado",
+      "yellow": "Amarelo · atenção necessária",
+      "red": "Vermelho · crítico",
+      "gray": "Cinza · sem informação"
+    },
+    "level": {
+      "projeto": "Projeto",
+      "meta": "Meta",
+      "produto": "Produto",
+      "demanda": "Demanda"
+    }
+  },
   "header": {
     "toggleSidebar": "Recolher/Expandir menu",
     "notifications": "Notificações",
@@ -337,6 +387,13 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "description": "Visão geral da plataforma de gestão operacional de projetos",
+    "titleAdmin": "Dashboard Administrador",
+    "descriptionAdmin": "Visão completa: demandas, custos e indicadores do sistema.",
+    "titleOperador": "Dashboard Operador",
+    "descriptionOperador": "Resumo das demandas e projetos sob sua atuação.",
+    "titleVisualizador": "Dashboard Visualizador",
+    "descriptionVisualizador": "Consulta de indicadores e demandas conforme suas permissões.",
     "totalDemands": "Total de Demandas",
     "openDemands": "Demandas em Aberto",
     "closedDemands": "Demandas Encerradas",
@@ -625,7 +682,7 @@
     "viewDocument": "Visualizar Documento",
     "viewDocumentTitle": "Visualizar Documento PDF",
     "documentViewError": "Erro ao carregar documento para visualização",
-    "generatePdf": "Gerar PDF do Documento",
+    "generatePdf": "Enviar para assinatura",
     "viewGeneratedPdfTitle": "PDF Gerado do Template",
     "viewGeneratedPdfDescription": "PDF gerado a partir do template DOCX com os dados do Termo de Abertura",
     "generatingPdf": "Gerando PDF...",
@@ -638,7 +695,18 @@
     "createdSuccess": "Termo de Abertura criado com sucesso",
     "updatedSuccess": "Termo de Abertura atualizado com sucesso",
     "deletedSuccess": "Termo de Abertura excluído com sucesso",
-    "signedSuccess": "Termo de Abertura assinado com sucesso"
+    "signedSuccess": "Termo de Abertura assinado com sucesso",
+    "report": {
+      "documentTitle": "TERMO DE ABERTURA DE DEMANDA TECNOLÓGICA",
+      "demandNumber": "Número Demanda:",
+      "demandDate": "Data Demanda:",
+      "descriptivo": "Descritivo:",
+      "signature": "Assinatura:",
+      "signatureNote": "Data e hora na assinatura eletrônica",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "Gestor TED - IBAMA",
+      "pageOf": "Página {{page}} de {{total}}"
+    }
   },
   "planningTerm": {
     "title": "Termo de Planejamento",
@@ -658,6 +726,7 @@
     "hours": "Horas",
     "hourlyRate": "Valor/Hora",
     "totalCost": "Custo Total",
+    "lineTotal": "Total",
     "addCost": "Adicionar Custo",
     "notSigned": "Não assinado",
     "signed": "Assinado",
@@ -690,11 +759,25 @@
     "viewDocument": "Visualizar Documento",
     "viewDocumentTitle": "Visualizar Documento PDF",
     "documentViewError": "Erro ao carregar documento para visualização",
-    "generatePdf": "Gerar PDF do Documento",
+    "generatePdf": "Enviar para assinatura",
     "viewGeneratedPdfTitle": "PDF Gerado do Template",
     "viewGeneratedPdfDescription": "PDF gerado a partir do template DOCX com dados do Termo de Planejamento",
     "generatingPdf": "Gerando PDF...",
-    "generatePdfError": "Erro ao gerar PDF do template"
+    "generatePdfError": "Erro ao gerar PDF do template",
+    "report": {
+      "documentTitle": "TERMO DE PLANEJAMENTO DE EXECUÇÃO DE DEMANDA TECNOLÓGICA",
+      "demandNumber": "Número Demanda:",
+      "planningDate": "Data Planejamento:",
+      "specification": "Especificação:",
+      "schedule": "Cronograma:",
+      "expectedResult": "Resultado esperado:",
+      "costs": "Custos:",
+      "signature": "Assinatura:",
+      "signatureNote": "Data e hora na assinatura eletrônica",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "Gestor TED - IBAMA",
+      "pageOf": "Página {{page}} de {{total}}"
+    }
   },
   "closingTerm": {
     "title": "Termo de Encerramento",
@@ -712,6 +795,10 @@
     "hours": "Horas",
     "hourlyRate": "Valor/Hora",
     "totalCost": "Custo Total",
+    "datesTab": "Datas",
+    "resultTab": "Resultado Entregue",
+    "costsTab": "Custos Realizados",
+    "lineTotal": "Total",
     "addCost": "Adicionar Custo",
     "plannedVsActual": "Planejado vs Realizado",
     "notSigned": "Não assinado",
@@ -746,11 +833,23 @@
     "viewDocument": "Visualizar Documento",
     "viewDocumentTitle": "Visualizar Documento PDF",
     "documentViewError": "Erro ao carregar documento para visualização",
-    "generatePdf": "Gerar PDF do Documento",
+    "generatePdf": "Enviar para assinatura",
     "viewGeneratedPdfTitle": "PDF Gerado do Template",
     "viewGeneratedPdfDescription": "PDF gerado a partir do template DOCX com dados do Termo de Encerramento",
     "generatingPdf": "Gerando PDF...",
-    "generatePdfError": "Erro ao gerar PDF do template"
+    "generatePdfError": "Erro ao gerar PDF do template",
+    "report": {
+      "documentTitle": "TERMO DE ENCERRAMENTO DE EXECUÇÃO DE DEMANDA TECNOLÓGICA",
+      "demandNumber": "Número Demanda",
+      "closingDate": "Data Encerramento",
+      "resultsDelivered": "Resultados entregues",
+      "costs": "Custos",
+      "signature": "Assinatura:",
+      "signatureNote": "Data e hora na assinatura eletrônica",
+      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerRole": "Gestor TED - IBAMA",
+      "pageOf": "Página {{page}} de {{total}}"
+    }
   },
   "validation": {
     "required": "Campo obrigatório",
@@ -777,6 +876,7 @@
     "personalData": "Dados Pessoais",
     "changePassword": "Alterar Senha",
     "userProfile": "Perfil de Acesso",
+    "id": "ID",
     "namePlaceholder": "Digite seu nome completo",
     "emailPlaceholder": "Digite seu e-mail",
     "currentPassword": "Senha Atual",

@@ -9,7 +9,7 @@ import { Edit, Trash2, FileText, FilePlus, FileCheck, FileX, ChevronRight, Chevr
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
-import { Badge } from '@/components/ui/badge';
+import { getStatusBadge } from '@/components/common/statusBadge';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -41,21 +41,6 @@ const STATUS_KEY_MAP: Record<string, string> = {
   opened: 'demands.statusB', inPlanning: 'demands.statusD', inExecution: 'demands.statusF', closed: 'demands.statusG',
 };
 
-const getStatusBadge = (status: DemandStatus | string | undefined, t: (key: string) => string) => {
-  const raw = (status ?? '').toString().trim();
-  const key = STATUS_KEY_MAP[raw] ?? STATUS_KEY_MAP[raw.toUpperCase()] ?? 'demands.statusA';
-  const label = t(key);
-  const code = raw.toUpperCase();
-  const variant = code === 'G' || raw === 'closed' ? 'default' : code === 'Z' ? 'destructive' : (code === 'C' || code === 'E' || raw === 'opened') ? 'secondary' : 'outline';
-  return (
-    <Badge 
-      variant={variant} 
-      className={code === 'G' || raw === 'closed' ? 'bg-success text-success-foreground' : code === 'Z' ? 'bg-destructive text-destructive-foreground' : (code === 'D' || code === 'F' || raw === 'inPlanning' || raw === 'inExecution') ? 'bg-info text-info-foreground' : ''}
-    >
-      {label}
-    </Badge>
-  );
-};
 
 export default function DemandasPage() {
   const { t } = useTranslation();
@@ -203,9 +188,7 @@ export default function DemandasPage() {
     return demandas.filter((d) => d.metaProduto?.projetoMetaId === metaIdNumber);
   }, [demandas, selectedMetaId]);
 
-  const formatDateTime = (dateStr: string) => format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-
-  // Carrega Termo de Planejamento com custos para uma demanda específica
+   // Carrega Termo de Planejamento com custos para uma demanda específica
   const loadPlanejamento = useCallback(async (demandaId: number) => {
     setLoadingPlanejamento(prev => ({ ...prev, [demandaId]: true }));
     try {
@@ -368,11 +351,10 @@ export default function DemandasPage() {
         });
       } else {
         await demandaService.create({
-          codigo: data.codigo,
           nome: data.nome,
-          projetoId: selectedProject.id, // Usa o projeto selecionado
+          projetoId: selectedProject.id,
           usuarioId: user.id,
-          descricao: data.descricao, // Campo de teste com editor de texto rico
+          descricao: data.descricao,
           metaProdutoId: data.metaProdutoId ? Number(data.metaProdutoId) : null,
         });
       }
@@ -570,7 +552,9 @@ export default function DemandasPage() {
   }
 
   return (
+
     <div className="space-y-6">
+      
       <PageHeader 
         title={t('demands.title')} 
         description={t('common.manageDemands')} 
@@ -684,15 +668,17 @@ export default function DemandasPage() {
           />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FormField 
                   control={form.control} 
                   name="codigo" 
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('demands.code')} *</FormLabel>
-                      <FormControl><Input placeholder={t('common.demandCodePlaceholder')} {...field} /></FormControl>
-                      <FormMessage />
+                      <FormLabel>{t('demands.code')}</FormLabel>
+                      <FormControl>
+                          <Input disabled  placeholder={t('common.demandCodePlaceholder')} {...field} />
+                        </FormControl>
+                        <FormMessage />
                     </FormItem>
                   )} 
                 />

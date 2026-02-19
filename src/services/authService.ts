@@ -25,6 +25,17 @@ export const authService = {
   },
 
   /**
+   * 🔁 RENOVA O TOKEN USANDO O COOKIE HttpOnly
+   */
+  async silentRefresh(): Promise<void> {
+    const response = await api.post<AuthResponse>(
+      AUTH_ENDPOINTS.refresh,
+      {},
+      { credentials: 'include' }
+    );
+    setAuthToken(response.token);
+  },
+  /**
    * Realiza logout do usuário
    * Limpa o token localmente mesmo se o backend falhar
    */
@@ -32,7 +43,7 @@ export const authService = {
     // Sempre limpa o token localmente, mesmo se o backend falhar
     // Isso garante que o logout funcione mesmo com problemas no servidor
     try {
-      await api.post(AUTH_ENDPOINTS.logout);
+      await api.post(AUTH_ENDPOINTS.logout, {}, { credentials: 'include' });
     } catch (error) {
       // Log do erro mas não lança exceção - o logout local deve sempre funcionar
       console.warn('Erro ao fazer logout no backend:', error);

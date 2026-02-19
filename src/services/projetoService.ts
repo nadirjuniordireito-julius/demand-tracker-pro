@@ -4,18 +4,20 @@
 // =====================================================
 
 import api from './api';
-import { projetoSchema, paginatedProjetoSchema } from '@/lib/schemas';
+import { projetoSchema, paginatedProjetoSchema, semaforoNodeSchema } from '@/lib/schemas';
 import type { 
   Projeto, 
   ProjetoCreateDTO, 
   ProjetoUpdateDTO, 
-  PaginatedResponse 
+  PaginatedResponse,
+  SemaforoNodeDTO, 
 } from '@/types';
 
 const ENDPOINTS = {
   base: '/projetos',
   byId: (id: number) => `/projetos/${id}`,
   totais: (id: number) => `/projetos/${id}/totais`,
+  semaforo: (id: number) => `/projetos/${id}/semaforo`,
 };
 
 export interface ProjetoFilters {
@@ -57,6 +59,13 @@ export const projetoService = {
    */
   async getTotais(id: number): Promise<{ valorTotalProjeto: number; valorTotalExecutado: number }> {
     return api.get<{ valorTotalProjeto: number; valorTotalExecutado: number }>(ENDPOINTS.totais(id));
+  },
+
+  /**
+   * Busca a árvore de semáforo do projeto (PROJETO → METAS → PRODUTOS → DEMANDAS)
+   */
+  async getSemaforo(id: number): Promise<SemaforoNodeDTO> {
+    return api.get<SemaforoNodeDTO>(ENDPOINTS.semaforo(id), { schema: semaforoNodeSchema });
   },
 
   /**

@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProject } from '@/contexts/ProjectContext';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -173,33 +174,43 @@ function NavSubGroup({ icon, label, isCollapsed, children, defaultOpen = false }
 export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   return (
     <aside
       className={cn(
-        'relative bg-sidebar border-r border-sidebar-border flex flex-col',
+        'h-full shrink-0 relative bg-sidebar border-r border-sidebar-border flex flex-col',
+        'shadow-[4px_0_14px_rgba(0,0,0,0.08)]',
         'transition-all duration-300 ease-in-out',
         isCollapsed ? 'w-16' : 'w-64'
       )}
     >
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-2 pt-4">
-        {/* Início - oculto para perfil Visualizador (V) */}
-        {user?.perfil !== 'V' && (
-          <NavItem 
-            to="/"
-            icon={<Home className="h-5 w-5" />} 
-            label={t('nav.home')} 
-            isCollapsed={isCollapsed}
-            end
-          />
-        )}
+        {/* Início - visível para todos os perfis */}
+        <NavItem 
+          to="/"
+          icon={<Home className="h-5 w-5" />} 
+          label={t('nav.home')} 
+          isCollapsed={isCollapsed}
+          end
+        />
         <NavItem 
           to="/dashboard" 
           icon={<LayoutDashboard className="h-5 w-5" />} 
           label={t('nav.dashboard')} 
           isCollapsed={isCollapsed}
         />
+
+        {/* Visão de Saúde do Projeto (Semáforo) - requer projeto selecionado */}
+        {selectedProject && (
+          <NavItem
+            to={`/projetos/${selectedProject.id}/semaforo`}
+            icon={<HeartPulse className="h-5 w-5" />}
+            label={t('nav.projectHealth')}
+            isCollapsed={isCollapsed}
+          />
+        )}
 
         {/* Cadastros Group - apenas perfil Admin (A) */}
         {user?.perfil === 'A' && (
@@ -287,9 +298,9 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
           aria-label={t('header.toggleSidebar')}
         >
           {isCollapsed ? (
-            <ChevronRight className="h-3.5 w-3.5 stroke-[1]" />
+            <ChevronRight className="h-3.5 w-3.5 stroke-[2.5]" />
           ) : (
-            <ChevronLeft className="h-3.5 w-3.5 stroke-[1]" />
+            <ChevronLeft className="h-3.5 w-3.5 stroke-[2.5]" />
           )}
         </Button>
       </div>
