@@ -40,14 +40,6 @@ import {
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { DataTable, type Column, type Action } from '@/components/common/DataTable';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { useApi } from '@/hooks/useApi';
 import { projetoMetaSchema, type ProjetoMetaFormData, metaProdutoSchema, type MetaProdutoFormData } from '@/lib/validations';
@@ -460,30 +452,8 @@ export default function ProjetoMetaPage() {
     }
   };
 
-  // Definição das colunas da tabela
+  // Definição das colunas da tabela (DataTable padrão)
   const columns: Column<ProjetoMeta>[] = useMemo(() => [
-    {
-      key: 'expand',
-      label: '',
-      render: (meta) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          aria-label={expandedRows.has(meta.id) ? t('common.collapseDetails') : t('common.expandDetails')}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleRow(meta.id);
-          }}
-        >
-          {expandedRows.has(meta.id) ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronRight className="h-4 w-4" />
-          )}
-        </Button>
-      ),
-    },
     {
       key: 'codigo',
       label: t('projectMeta.code'),
@@ -514,7 +484,7 @@ export default function ProjetoMetaPage() {
         }).format(total);
       },
     },
-  ], [t, expandedRows, toggleRow, produtosByMeta]);
+  ], [t, produtosByMeta]);
 
   // Definição das ações da tabela
   const actions: Action<ProjetoMeta>[] = useMemo(() => [
@@ -587,248 +557,165 @@ export default function ProjetoMetaPage() {
                   }).format(valorTotalMetas)}
                 </span>
               </div>
-              <div className="border rounded-lg overflow-hidden w-full">
-                <Table className="min-w-full">
-                  <TableHeader>
-                    <TableRow>
-                      {actions && actions.length > 0 && (
-                        <TableHead 
-                          className="h-8 py-2 sticky left-0 z-10 bg-background w-[80px] sm:w-[100px] px-2 sm:px-4 border-r"
-                          style={{ minWidth: '80px' }}
-                        >
-                          <span className="text-xs sm:text-sm font-medium">{t('common.actions')}</span>
-                        </TableHead>
-                      )}
-                      {columns.map((column) => (
-                        <TableHead
-                          key={column.key}
-                          className={`
-                            ${column.hideOnMobile ? 'hidden sm:table-cell' : ''}
-                            px-2 sm:px-4
-                            whitespace-nowrap
-                          `}
-                          style={{ 
-                            minWidth: column.minWidth || '120px',
-                          }}
-                        >
-                          <span className="text-xs sm:text-sm font-medium">{column.label}</span>
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedMetas.map((meta) => (
-                      <React.Fragment key={meta.id}>
-                        <TableRow>
-                          {actions && actions.length > 0 && (
-                            <TableCell 
-                              className="py-2 sticky left-0 z-10 bg-background px-2 sm:px-4 border-r"
-                              style={{ minWidth: '80px' }}
-                            >
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    aria-label={t('common.actions')}
-                                  >
-                                    <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="min-w-[120px]">
-                                  {actions.map((action, index) => (
-                                    <div key={`${action.label}-${index}`}>
-                                      {action.separator && index > 0 && <DropdownMenuSeparator />}
-                                      <DropdownMenuItem
-                                        onClick={() => action.onClick(meta)}
-                                        className={action.variant === 'destructive' ? 'text-destructive' : ''}
-                                      >
-                                        {action.icon && (
-                                          <span className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 inline-flex items-center">
-                                            {action.icon}
-                                          </span>
-                                        )}
-                                        <span className="text-xs sm:text-sm">{action.label}</span>
-                                      </DropdownMenuItem>
-                                    </div>
-                                  ))}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          )}
-                          {columns.map((column) => (
-                            <TableCell 
-                              key={column.key}
-                              className={`
-                                py-2
-                                ${column.key === columns[0]?.key ? 'font-medium' : ''}
-                                ${column.hideOnMobile ? 'hidden sm:table-cell' : ''}
-                                px-2 sm:px-4
-                                text-xs sm:text-sm
-                              `}
-                              style={{ 
-                                minWidth: column.minWidth || '120px',
-                              }}
-                            >
-                              {column.render ? column.render(meta) : (meta[column.key] as React.ReactNode)}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                        {/* Expanded row with produtos */}
-                        {expandedRows.has(meta.id) && (
-                          <TableRow>
-                            <TableCell 
-                              colSpan={columns.length + (actions ? 1 : 0)} 
-                              className="p-0 bg-muted/20"
-                            >
-                              <div className="p-4">
-                                <div className="flex justify-between items-center mb-4">
-                                  <h4 className="text-sm font-medium">{t('nav.products')}</h4>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleAddProduto(meta.id)}
-                                    className="h-8"
-                                  >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    {t('common.add')}
-                                  </Button>
-                                </div>
-                                {loadingProdutos[meta.id] ? (
-                                  <div className="text-center py-4 text-sm text-muted-foreground">
-                                    {t('common.loading')}...
-                                  </div>
-                                ) : (produtosByMeta[meta.id] || []).length === 0 ? (
-                                  <div className="text-center py-4 text-sm text-muted-foreground">
-                                    {t('common.noRecordsFound')}
-                                  </div>
-                                ) : (
-                                  <div className="border rounded-md overflow-hidden bg-background">
-                                    <table className="w-full">
-                                      <thead className="bg-muted/50">
-                                        <tr>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground" style={{ minWidth: '80px' }}>
-                                            {t('common.actions')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
-                                            {t('projectMeta.code')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
-                                            {t('projectMeta.productName')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.unit')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.quantity')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.unitValue')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.totalValue')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.start')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.end')}
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                                            {t('common.status')}
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {([...(produtosByMeta[meta.id] || [])]
-                                            .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true }))
-                                            .map((produto) => (
-                                          <tr key={produto.id} className="border-t hover:bg-muted/30">
-                                            <td className="px-4 py-2">
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button 
-                                                    variant="ghost" 
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    aria-label={t('common.actions')}
-                                                  >
-                                                    <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="min-w-[120px]">
-                                                  <DropdownMenuItem
-                                                    onClick={() => handleAddProduto(meta.id)}
-                                                  >
-                                                    <Plus className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                                    <span className="text-xs sm:text-sm">{t('common.add')}</span>
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuSeparator />
-                                                  <DropdownMenuItem
-                                                    onClick={() => handleEditProduto(produto, meta.id)}
-                                                  >
-                                                    <Edit className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                                    <span className="text-xs sm:text-sm">{t('common.edit')}</span>
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuSeparator />
-                                                  <DropdownMenuItem
-                                                    onClick={() => handleDeleteProduto(produto, meta.id)}
-                                                    className="text-destructive"
-                                                  >
-                                                    <Trash2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                                    <span className="text-xs sm:text-sm">{t('common.delete')}</span>
-                                                  </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
-                                            </td>
-                                            <td className="px-4 py-2 text-sm">
-                                              {produto.codigo}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm font-medium">
-                                              {produto.nome}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
-                                              {produto.unidadeMedida}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
-                                              {produto.quantidade}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
-                                              {new Intl.NumberFormat('pt-BR', {
-                                                style: 'currency',
-                                                currency: 'BRL',
-                                              }).format(produto.valorUnitario)}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell font-medium">
-                                              {new Intl.NumberFormat('pt-BR', {
-                                                style: 'currency',
-                                                currency: 'BRL',
-                                              }).format((produto.quantidade ?? 0) * (produto.valorUnitario ?? 0))}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
-                                              {formatInicioFimFromBase(selectedProject?.dataEfetivaInicio, produto.inicio ?? 0)}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
-                                              {formatInicioFimFromBase(selectedProject?.dataEfetivaInicio, produto.fim ?? 0)}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
-                                              {getStatusBadge(produto.status, t)}
-                                            </td>
-                                          </tr>
-                                        )))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <DataTable<ProjetoMeta>
+                data={paginatedMetas}
+                columns={columns}
+                actions={actions}
+                getRowId={(m) => m.id}
+                actionsLabel={t('common.actions')}
+                expandedRowIds={expandedRows}
+                rowDetail={(meta) => (
+                  <div className="p-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-sm font-medium">{t('nav.products')}</h4>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddProduto(meta.id)}
+                        className="h-8"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('common.add')}
+                      </Button>
+                    </div>
+                    {loadingProdutos[meta.id] ? (
+                      <div className="text-center py-4 text-sm text-muted-foreground">
+                        {t('common.loading')}...
+                      </div>
+                    ) : (produtosByMeta[meta.id] || []).length === 0 ? (
+                      <div className="text-center py-4 text-sm text-muted-foreground">
+                        {t('common.noRecordsFound')}
+                      </div>
+                    ) : (
+                      <div className="border rounded-md overflow-hidden bg-background">
+                        <table className="w-full">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground" style={{ minWidth: '80px' }}>
+                                {t('common.actions')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
+                                {t('projectMeta.code')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
+                                {t('projectMeta.productName')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.unit')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.quantity')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.unitValue')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.totalValue')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.start')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.end')}
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                                {t('common.status')}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {([...(produtosByMeta[meta.id] || [])]
+                              .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true }))
+                              .map((produto) => (
+                                <tr key={produto.id} className="border-t hover:bg-muted/30">
+                                  <td className="px-4 py-2">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                          aria-label={t('common.actions')}
+                                        >
+                                          <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="min-w-[120px]">
+                                        <DropdownMenuItem onClick={() => handleAddProduto(meta.id)}>
+                                          <Plus className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                          <span className="text-xs sm:text-sm">{t('common.add')}</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleEditProduto(produto, meta.id)}>
+                                          <Edit className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                          <span className="text-xs sm:text-sm">{t('common.edit')}</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => handleDeleteProduto(produto, meta.id)}
+                                          className="text-destructive"
+                                        >
+                                          <Trash2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                          <span className="text-xs sm:text-sm">{t('common.delete')}</span>
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </td>
+                                  <td className="px-4 py-2 text-sm">{produto.codigo}</td>
+                                  <td className="px-4 py-2 text-sm font-medium">{produto.nome}</td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
+                                    {produto.unidadeMedida}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
+                                    {produto.quantidade}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
+                                    {new Intl.NumberFormat('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    }).format(produto.valorUnitario)}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell font-medium">
+                                    {new Intl.NumberFormat('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    }).format((produto.quantidade ?? 0) * (produto.valorUnitario ?? 0))}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
+                                    {formatInicioFimFromBase(selectedProject?.dataEfetivaInicio, produto.inicio ?? 0)}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
+                                    {formatInicioFimFromBase(selectedProject?.dataEfetivaInicio, produto.fim ?? 0)}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-muted-foreground hidden sm:table-cell">
+                                    {getStatusBadge(produto.status, t)}
+                                  </td>
+                                </tr>
+                              )))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+                rowSuffixInActions={(meta) => (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    aria-label={expandedRows.has(meta.id) ? t('common.collapseDetails') : t('common.expandDetails')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleRow(meta.id);
+                    }}
+                  >
+                    {expandedRows.has(meta.id) ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              />
               <TablePagination 
                 currentPage={currentPage + 1} 
                 totalPages={totalPages} 

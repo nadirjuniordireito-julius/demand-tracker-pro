@@ -7,12 +7,14 @@ import {
   Users,
   FolderKanban,
   UserCircle,
+  Briefcase,
   FileText,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
   Target,
   HeartPulse,
+  CircleDollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -244,6 +246,18 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
               to="/cadastros/perfis" 
               icon={<UserCircle className="h-4 w-4" />} 
               label={t('nav.profiles')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem 
+              to="/cadastros/profissionais" 
+              icon={<Briefcase className="h-4 w-4" />} 
+              label={t('nav.professionals')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem 
+              to="/cadastros/desembolsos" 
+              icon={<CircleDollarSign className="h-4 w-4" />} 
+              label={t('nav.disbursements')} 
               isCollapsed={isCollapsed}
             />
             <NavItem 

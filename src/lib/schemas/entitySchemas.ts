@@ -48,6 +48,18 @@ export const projetoSchema = z.object({
   usuario: usuarioRefSchema.optional(),
 });
 
+// --- Desembolso ---
+export const desembolsoSchema = z.object({
+  id: z.number(),
+  documento: z.string().nullable().optional(),
+  valorPrevisto: z.number(),
+  valor: z.number(),
+  dataDesembolso: z.string(),
+  dataPrevistaDesembolso: z.string(),
+  projetoId: z.number(),
+  projeto: projetoSchema.optional(),
+});
+
 // --- DemandaTecnica (campos principais; relacionamentos como objeto genérico para evitar ciclo) ---
 export const demandaTecnicaSchema = z.object({
   id: z.number(),
@@ -149,6 +161,9 @@ export const semaforoNodeSchema: z.ZodType<unknown> = z.lazy(() =>
     qtdDemandasEncerradas: z.number().nullable().optional(),
     valorTotalPrevisto: z.number().nullable().optional(),
     valorTotalExecutado: z.number().nullable().optional(),
+    statusDemanda: z.string().nullable().optional(),
+    status_demanda: z.string().nullable().optional(),
+    situacao: z.string().nullable().optional(),
     children: z.array(semaforoNodeSchema),
   })
 );
@@ -167,8 +182,24 @@ export function paginatedSchema<T extends z.ZodType>(itemSchema: T) {
 }
 
 export const paginatedPerfilSchema = paginatedSchema(perfilSchema);
+
+// --- Profissional ---
+export const profissionalSchema = z.object({
+  id: z.number(),
+  nome: z.string(),
+  tipoPessoa: z.enum(['F', 'J']),
+  documento: z.string(),
+  funcao: z.string().nullable().optional(),
+  valorHora: z.number(),
+  dataInicioAtividade: z.string(),
+  projetoId: z.number(),
+  projeto: z.unknown().optional(),
+});
+
+export const paginatedProfissionalSchema = paginatedSchema(profissionalSchema);
 export const paginatedProjetoSchema = paginatedSchema(projetoSchema);
 export const paginatedDemandaTecnicaSchema = paginatedSchema(demandaTecnicaSchema);
 export const paginatedTermoAberturaSchema = paginatedSchema(termoAberturaSchema);
 export const paginatedTermoPlanejamentoSchema = paginatedSchema(termoPlanejamentoSchema);
 export const paginatedTermoEncerramentoSchema = paginatedSchema(termoEncerramentoSchema);
+export const paginatedDesembolsoSchema = paginatedSchema(desembolsoSchema);

@@ -435,9 +435,9 @@ export default function UsuariosPage() {
                 name="nome"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('users.name')} *</FormLabel>
+                    <FormLabel>{t('auth.username')} *</FormLabel>
                     <FormControl>
-                      <Input placeholder={t('common.fullNamePlaceholder')} {...field} />
+                      <Input placeholder={t('auth.usernamePlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -485,27 +485,29 @@ export default function UsuariosPage() {
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('users.status')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="A">{t('users.active')}</SelectItem>
-                        <SelectItem value="I">{t('users.inactive')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {selectedUsuario && (
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('users.status')} *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="A">{t('users.active')}</SelectItem>
+                          <SelectItem value="I">{t('users.inactive')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                /> 
+              )}
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>

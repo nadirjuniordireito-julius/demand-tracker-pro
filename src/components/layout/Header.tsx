@@ -30,6 +30,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { usuarioFotoService } from '@/services';
 import logoImage from '@/assets/logo.png';
+import juliusLogo from '@/assets/julius-xpt-976-TW.png';
+import { formatDate } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function Header() {
   const { t, i18n } = useTranslation();
@@ -117,23 +120,16 @@ export function Header() {
             onKeyDown={(e) => e.key === 'Enter' && setAboutOpen(true)}
             aria-label={t('common.appName')}
           >
-            <img 
-              src={logoImage} 
-              alt="Logo" 
-              className="h-8 w-8 object-contain"
+            
+            <img
+              src={juliusLogo}
+              alt="Julius"
+              className="h-8 w-auto object-contain"
             />
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-normal text-header-foreground">
-                {t('common.appName')}
-              </span>
-              <span className="text-[11px] text-muted-foreground italic">
-                {t('common.appNameDesc')}
-              </span>
-            </div>
           </div>
 
           {selectedProject && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md">
               {userProjects.length > 1 && (
                 <Button
                   variant="ghost"
@@ -148,10 +144,10 @@ export function Header() {
               )}
               <div className="flex flex-col">
                 <span className="text-xs font-medium text-header-foreground leading-tight">
-                  {selectedProject.codTed}
+                  {selectedProject.codTed} - {selectedProject.nome}
                 </span>
                 <span className="text-xs text-muted-foreground leading-tight">
-                  {selectedProject.nome}
+                  {formatDate(selectedProject.termoInicial, 'dd/MM/yyyy', { locale: ptBR })} - {formatDate(selectedProject.termoFinal, 'dd/MM/yyyy', { locale: ptBR })}
                 </span>
               </div>
             </div>
@@ -335,13 +331,12 @@ export function Header() {
             <p className="text-sm text-muted-foreground text-center mb-4">
               {t('common.appNameDesc')}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {t('common.aboutCreatedDate')}
-            </p>
           </div>
-          <footer className="border-t bg-muted/40 px-6 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{t('common.aboutDevelopedBy')}</span>
-            <span>{t('common.aboutAllRightsReserved')}</span>
+          <footer className="border-t bg-muted/40 px-6 py-3 flex flex-col gap-1 text-xs text-emerald-900">
+            <span className="font-bold">{t('common.aboutDevelopedBy')}</span>
+            <span>
+              {t('common.aboutCreatedDate')} · {t('common.aboutAllRightsReserved')}
+            </span>
           </footer>
         </DialogContent>
       </Dialog>

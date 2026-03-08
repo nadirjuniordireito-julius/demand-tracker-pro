@@ -22,6 +22,8 @@ const UsuariosPage = lazy(() => import("./pages/cadastros/UsuariosPage"));
 const ProjetosPage = lazy(() => import("./pages/cadastros/ProjetosPage"));
 const ProjetoMetaPage = lazy(() => import("./pages/cadastros/ProjetoMetaPage"));
 const PerfisPage = lazy(() => import("./pages/cadastros/PerfisPage"));
+const ProfissionaisPage = lazy(() => import("./pages/cadastros/ProfissionaisPage"));
+const DesembolsosPage = lazy(() => import("./pages/cadastros/DesembolsosPage"));
 const TemplatesPage = lazy(() => import("./pages/cadastros/TemplatesPage"));
 const DemandasPage = lazy(() => import("./pages/demandas/DemandasPage"));
 const TermoAberturaPage = lazy(() => import("./pages/demandas/TermoAberturaPage"));
@@ -70,6 +72,8 @@ const App = () => {
                           <Route path="/cadastros/projetos" element={<ProjetosPage />} />
                           <Route path="/cadastros/projeto-meta" element={<ProjetoMetaPage />} />
                           <Route path="/cadastros/perfis" element={<PerfisPage />} />
+                          <Route path="/cadastros/profissionais" element={<ProfissionaisPage />} />
+                          <Route path="/cadastros/desembolsos" element={<DesembolsosPage />} />
                           <Route path="/cadastros/templates" element={<TemplatesPage />} />
                           <Route path="/projetos/:id/semaforo" element={<ProjetoSemaforoPage />} />
                           <Route path="/demandas" element={<DemandasPage />} />

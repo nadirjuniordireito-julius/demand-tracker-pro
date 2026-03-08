@@ -10,17 +10,18 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { BubbleNode as BubbleNodeType } from '@/types/tedHealthMap';
-import { getScheduleStatusColor, getHaloIntensity, hasRisingRisk } from '@/types/tedHealthMap';
+import {
+  getBubbleOuterColor,
+  getEffectiveBubbleSemaforoStatus,
+  getHaloIntensity,
+  hasRisingRisk,
+  BUBBLE_SEMAFORO_COLORS,
+} from '@/types/tedHealthMap';
 import { cn } from '@/lib/utils';
 
 const BUBBLE_FILL_LIGHT = '#f2f2f2';
 const BUBBLE_FILL_HOVER = '#d8d8d8';
 const CENTER_TEXT_NAVY = '#001f3f';
-const colorMap = {
-  green: 'hsl(142, 65%, 42%)',
-  yellow: 'hsl(45, 93%, 47%)',
-  red: 'hsl(0, 72%, 50%)',
-};
 
 interface BubbleNodeProps {
   node: BubbleNodeType;
@@ -47,12 +48,13 @@ export function BubbleNode({
   onHoverChange,
   dimmed = false,
 }: BubbleNodeProps) {
-  const color = node.statusColor ?? getScheduleStatusColor(node.desvioPrazoDias);
+  const outerColor = getBubbleOuterColor(node);
+  const effectiveStatus = getEffectiveBubbleSemaforoStatus(node);
+  const statusColorRed = effectiveStatus === 'VERMELHO' || effectiveStatus === 'red';
   const deviation = node.deviation ?? Math.abs(node.desvioEsforcoHoras ?? 0);
   const hasDeviationHalo = deviation !== 0 && Math.abs(deviation) > 20;
   const hasImpacto = (node.impactoNoPai ?? 0) > 0.3;
   const haloIntensity = node.haloIntensity ?? getHaloIntensity(node);
-  const statusColorRed = color === 'red';
   const systemicRiskMeta = hasSystemicRiskMeta && node.level === 'meta';
   const systemicRiskProduto = hasSystemicRiskProduto && node.level === 'produto';
 
@@ -137,6 +139,14 @@ export function BubbleNode({
           </feMerge>
         </filter>
       </defs>
+      {/* Anel de status (mesmo padrão do semáforo: VERDE | AMARELO | VERMELHO | CINZA) — sempre visível */}
+      <circle
+        r={safeR + 2.5}
+        fill="none"
+        stroke={outerColor}
+        strokeWidth={2}
+        strokeOpacity={0.9}
+      />
       {systemicRiskMeta && (
         <motion.circle
           r={safeR + 8}
@@ -155,7 +165,7 @@ export function BubbleNode({
         <motion.circle
           r={safeR + (systemicRiskProduto ? 6 : 4)}
           fill="none"
-          stroke={systemicRiskProduto ? colorMap.yellow : colorMap[color]}
+          stroke={systemicRiskProduto ? BUBBLE_SEMAFORO_COLORS.AMARELO : outerColor}
           strokeWidth={systemicRiskProduto ? 3 : 2}
           strokeOpacity={systemicRiskProduto ? 0.9 : haloIntensity}
           filter={systemicRiskProduto ? `url(#glow-yellow-${String(node.id)})` : undefined}

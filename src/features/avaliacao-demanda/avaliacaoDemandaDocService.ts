@@ -35,7 +35,7 @@ export const avaliacaoDemandaDocService = {
   /** GET: metadados do doc da avaliação da demanda */
   async get(demandaId: number): Promise<DemandaAvaliacaoDocMeta | null> {
     try {
-      return await api.get<DemandaAvaliacaoDocMeta>(base(demandaId), { allow404: true });
+      return await api.get<DemandaAvaliacaoDocMeta>(base(demandaId), { allow404: false, silent: true });
     } catch {
       return null;
     }
@@ -54,7 +54,7 @@ export const avaliacaoDemandaDocService = {
   /** GET /exists: verificar se existe doc para a demanda */
   async exists(demandaId: number): Promise<boolean> {
     try {
-      const data = await api.get<boolean | { exists?: boolean }>(existsEndpoint(demandaId), { allow404: true });
+      const data = await api.get<boolean | { exists?: boolean }>(existsEndpoint(demandaId), { allow404: false, silent: true });
       return data === true || (typeof data === 'object' && data?.exists === true);
     } catch {
       return false;

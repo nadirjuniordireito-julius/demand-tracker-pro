@@ -17,19 +17,16 @@ import type { DemandaTecnica, TermoEncerramentoDocResponseDTO } from '@/types';
 import { getStatusBadge } from '@/components/common/statusBadge';
 import { formatDateTime } from '@/helpers/formatDate';
 import { ptBR } from 'date-fns/locale';
-import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
 import { Signature, Download, Upload } from 'lucide-react';
-import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
-import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
 import { termoAberturaDocService, termoPlanejamentoDocService, termoEncerramentoDocService } from '@/services/termoDocService';
-import { LoadingButton } from '@/components/common/LoadingStates';
 import { TermoEncerramentoDoc, TermoPlanejamentoDoc, TermoAberturaDoc}  from '@/types';
-import { request } from 'http';
 import { useAuth } from '@/contexts/AuthContext';
+import type { AssinarEletronicaTipo } from '@/components/common/PdfSignaturePositionDialog';
 
 export default function HomePageVisualizador() {
   const { toast } = useToast();
@@ -48,6 +45,11 @@ export default function HomePageVisualizador() {
   const [termoEncerramentoDoc, setTermoEncerramentoDoc] = useState<TermoEncerramentoDocResponseDTO>();
   const [termoPlanejamentoDoc, setTermoPlanejamentoDoc] = useState<TermoPlanejamentoDoc>();
   const [termoAberturaDoc, setTermoAberturaDoc] = useState<TermoAberturaDoc>();
+  const [assinarEletronicaConfig, setAssinarEletronicaConfig] = useState<{
+    tipo: AssinarEletronicaTipo;
+    docId: number;
+    userId: number;
+  } | null>(null);
   const { user } = useAuth();
   const columns: Column<DemandaTecnica>[] = useMemo(() => [
     {
@@ -75,50 +77,6 @@ export default function HomePageVisualizador() {
   ],[]);
 
   /**
-   * assinar internamente o documento
-   */
-  async function gerarHash(file: Blob | Promise<Blob>) {
-    const blob = await file; // se já for Blob, passa; se for Promise, resolve
-    const buffer = await blob.arrayBuffer();
-    const hash = await crypto.subtle.digest('SHA-256', buffer);
-  
-    return Array.from(new Uint8Array(hash))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  const assinar = async () =>{
-
-    const st = selectedDemanda?.status;
-    if(st === 'F') {
-      const hashPdf = await gerarHash( termoEncerramentoDocService.downloadById(termoEncerramentoDoc!.id) );
-      const usuarioId = user.id;
-      termoEncerramentoDocService.assinar(termoEncerramentoDoc!.id, hashPdf, usuarioId);
-    } else if(st === 'D') {
-      const hashPdf = await gerarHash( termoPlanejamentoDocService.downloadById(termoPlanejamentoDoc!.id) );
-      const usuarioId = user.id;
-      termoPlanejamentoDocService.assinar(termoPlanejamentoDoc!.id, hashPdf, usuarioId);
-    } else if(st === 'B') {
-      const hashPdf = await gerarHash( termoAberturaDocService.downloadById(termoAberturaDoc!.id) );
-      const usuarioId = user.id;
-      termoAberturaDocService.assinar(termoAberturaDoc!.id, hashPdf, usuarioId);
-    }
-    /**
-     * dados para rastreabilidade e assinatura
-     */
-
-   
-    toast({
-      title: t('common.success'),
-      description: t('common.documentSignedSuccessfully'),
-    });
-    setIsAssinarEletronicaOpen(false);
-
-     await reloadTable();
-
-  }
-
-  /**
    * 
    * @param demanda Abrir o visualizador de PDF com o termo especifico conforme status da demanda e permitir o download.
    */
@@ -142,33 +100,34 @@ export default function HomePageVisualizador() {
    const assinarEletronica = async (demanda: DemandaTecnica) => {
     setSelectedDemanda(demanda);
     setDocumento(null);
-   
-    if(demanda.status === 'F') {
+    setAssinarEletronicaConfig(null);
 
+    if (demanda.status === 'F') {
       try {
         const doc1 = await termoEncerramentoDocService.findByTermoEncerramentoId(demanda.termoEncerramento!.id);
         setTermoEncerramentoDoc(doc1);
+        setAssinarEletronicaConfig({ tipo: 'encerramento', docId: doc1.id, userId: user.id });
       } catch {
-        setTermoEncerramentoDoc(null);
-      } 
+        setTermoEncerramentoDoc(undefined);
+      }
       setDocumento(termoEncerramentoDocService.downloadByTermoEncerramentoId(demanda.termoEncerramento!.id));
-    } else if(demanda.status === 'D') {
-      
+    } else if (demanda.status === 'D') {
       try {
         const doc2 = await termoPlanejamentoDocService.findByTermoPlanejamentoId(demanda.termoPlanejamento!.id);
         setTermoPlanejamentoDoc(doc2);
+        setAssinarEletronicaConfig({ tipo: 'planejamento', docId: doc2.id, userId: user.id });
       } catch {
-        setTermoPlanejamentoDoc(null);
-      } 
+        setTermoPlanejamentoDoc(undefined);
+      }
       setDocumento(termoPlanejamentoDocService.downloadByTermoPlanejamentoId(demanda.termoPlanejamento!.id));
-    } else if(demanda.status === 'B') {
-     
+    } else if (demanda.status === 'B') {
       try {
         const doc3 = await termoAberturaDocService.findByTermoAberturaId(demanda.termoAbertura!.id);
         setTermoAberturaDoc(doc3);
+        setAssinarEletronicaConfig({ tipo: 'abertura', docId: doc3.id, userId: user.id });
       } catch {
-        setTermoAberturaDoc(null);
-      } 
+        setTermoAberturaDoc(undefined);
+      }
       setDocumento(termoAberturaDocService.downloadByTermoAberturaId(demanda.termoAbertura!.id));
     }
     setIsAssinarEletronicaOpen(true);
@@ -251,13 +210,15 @@ export default function HomePageVisualizador() {
         <div>
           <PdfPreviewDialog
             open={isAssinarEletronicaOpen}
-            onOpenChange={setIsAssinarEletronicaOpen}
+            onOpenChange={(next) => {
+              if (!next) setAssinarEletronicaConfig(null);
+              setIsAssinarEletronicaOpen(next);
+            }}
             title={t('openingTerm.viewDocumentTitle')}
             description={documento?.nomeArquivo}
             fetchPdf={() => documento}
             loadingLabel={t('common.loading')}
             errorMessage={t('openingTerm.documentViewError')}
-           
             onError={(err: unknown) =>
               toast({
                 title: t('common.error'),
@@ -265,16 +226,27 @@ export default function HomePageVisualizador() {
                 variant: 'destructive',
               })
             }
-            customFooter={
-              <DialogFooter>
-                <Button variant="default" onClick={() => assinar()}>
-                  {t('assinar')}
-                </Button>
-                <Button variant="ghost" onClick={() => setIsAssinarEletronicaOpen(false)}>
-                  {t('common.close')}
-                </Button>
-              </DialogFooter>
-            }
+            assinarEletronica={assinarEletronicaConfig ?? undefined}
+            onAssinaturaConcluida={() => {
+              // Fecha o preview, limpa configuração de assinatura
+              setIsAssinarEletronicaOpen(false);
+              setAssinarEletronicaConfig(null);
+              // Reseta para primeira página e recarrega como se estivesse entrando pela primeira vez
+              setCurrentPage(0);
+              reloadTable();
+            }}
+            renderSignButton={({ pdfBlob, openSignatureDialog }) => (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="ml-3"
+                disabled={!pdfBlob}
+                onClick={openSignatureDialog}
+              >
+                {t('pdf.signButton')}
+              </Button>
+            )}
           />
         </div>
  

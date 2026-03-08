@@ -1,5 +1,5 @@
-const logoIbama = `${window.location.origin}/ibama.jpg`;
-const logoUfla = `${window.location.origin}/ufla.png`;
+const defaultLogoIbama = `${typeof window !== 'undefined' ? window.location.origin : ''}/ibama.jpg`;
+const defaultLogoUfla = `${typeof window !== 'undefined' ? window.location.origin : ''}/ufla1.png`;
 
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,12 @@ export type TPELabels = {
   pageOf: (page: number, total: number) => string;
 };
 
+export type CustoItem = {
+  perfil: string;
+  horas: number;
+  valorHora: number;
+};
+
 export type TPEProps = {
   PROJETO_COD_TED: string;
   PROJETO_NOME: string;
@@ -27,7 +33,12 @@ export type TPEProps = {
   ESPECIFICACAO: string;
   CRONOGRAMA: string;
   RESULTADO_ESPERADO: string;
-  CUSTOS_DETALHADOS: string;
+  CUSTOS_DETALHADOS: CustoItem[];
+  totalGeral: number;
+  /** URL do logo Ibama (se omitido, usa /ibama.jpg na origin) */
+  logoIbama?: string;
+  /** URL do logo UFLA (se omitido, usa /ufla1.png na origin; use import de asset para PDF) */
+  logoUfla?: string;
   /** Quando fornecidas (ex.: geração via service sem contexto i18n), substituem t() */
   labels?: TPELabels;
 };
@@ -113,6 +124,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "#444",
   },
+  table: { width: "100%", borderWidth: 1, borderColor: "#000" },
+  row: { flexDirection: "row" },
+  cellHeader: {
+    flex: 1,
+    fontWeight: "bold",
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    padding: 4,
+    backgroundColor: "#eee",
+    textAlign: "center",
+  },
+  cell: {
+    flex: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    padding: 4,
+    textAlign: "center",
+  },
 });
 
 /**
@@ -129,8 +158,13 @@ export function TermoPlanejamentoReportInner(props: TPEPropsWithLabels) {
     CRONOGRAMA,
     RESULTADO_ESPERADO,
     CUSTOS_DETALHADOS,
+    totalGeral,
+    logoIbama = defaultLogoIbama,
+    logoUfla = defaultLogoUfla,
     labels: L,
   } = props;
+
+  const moeda = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
   return (
     <Document>
@@ -175,7 +209,32 @@ export function TermoPlanejamentoReportInner(props: TPEPropsWithLabels) {
 
         <Text style={styles.sectionTitle}>{L.costs}</Text>
         <View style={styles.box}>
-          <Text>{CUSTOS_DETALHADOS}</Text>
+          <View style={styles.table}>
+            <View style={styles.row} fixed>
+              <Text style={styles.cellHeader}>Perfil</Text>
+              <Text style={styles.cellHeader}>Horas</Text>
+              <Text style={styles.cellHeader}>Valor/Hora</Text>
+              <Text style={styles.cellHeader}>Total</Text>
+            </View>
+            {CUSTOS_DETALHADOS.map((item, i) => (
+              <View style={styles.row} key={i} wrap>
+                <Text style={styles.cell}>{item.perfil}</Text>
+                <Text style={styles.cell}>{item.horas}</Text>
+                <Text style={styles.cell}>{moeda(item.valorHora)}</Text>
+                <Text style={styles.cell}>
+                  {moeda(item.horas * item.valorHora)}
+                </Text>
+              </View>
+            ))}
+            <View style={styles.row}>
+              <Text style={[styles.cell, { flex: 3, fontWeight: "bold" }]}>
+                TOTAL GERAL
+              </Text>
+              <Text style={[styles.cell, { fontWeight: "bold" }]}>
+                {moeda(totalGeral)}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>{L.signature}</Text>

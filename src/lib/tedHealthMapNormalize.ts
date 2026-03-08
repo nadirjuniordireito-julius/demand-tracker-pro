@@ -2,10 +2,18 @@
  * TED Health Map — Normaliza resposta da API para BubbleNode
  *
  * O backend pode retornar `value` em vez de `valor`, `fillPercent`, etc.
- * Esta função mapeia os campos da API para o formato esperado pelo frontend.
+ * Status de meta/produto/demanda: quando a API envia status VERDE|AMARELO|VERMELHO|CINZA,
+ * preenche semaforoStatus (mesma lógica do semáforo de projeto).
  */
 
-import type { BubbleNode } from '@/types/tedHealthMap';
+import type { BubbleNode, BubbleSemaforoStatus } from '@/types/tedHealthMap';
+
+const SEMAFORO_STATUS_VALUES: BubbleSemaforoStatus[] = ['VERDE', 'AMARELO', 'VERMELHO', 'CINZA'];
+
+function toSemaforoStatus(v: unknown): BubbleSemaforoStatus | undefined {
+  const s = typeof v === 'string' ? v.toUpperCase() : '';
+  return SEMAFORO_STATUS_VALUES.includes(s as BubbleSemaforoStatus) ? (s as BubbleSemaforoStatus) : undefined;
+}
 
 type ApiNode = Record<string, unknown> & {
   id?: string | number;
@@ -15,6 +23,8 @@ type ApiNode = Record<string, unknown> & {
   value?: number;
   valor?: number;
   fillPercent?: number;
+  status?: string;
+  semaforoStatus?: string;
   children?: ApiNode[];
 };
 
@@ -51,6 +61,10 @@ export function normalizeBubbleNode(
     normalizeBubbleNode(child, level)
   );
 
+  const statusStr = apiNode.status != null ? String(apiNode.status) : undefined;
+  const semaforoStatus =
+    toSemaforoStatus(apiNode.semaforoStatus ?? apiNode.status) ?? (statusStr ? toSemaforoStatus(statusStr) : undefined);
+
   return {
     id: String(apiNode.id ?? ''),
     name: String(apiNode.name ?? ''),
@@ -61,7 +75,8 @@ export function normalizeBubbleNode(
     desvioEsforcoHoras: apiNode.desvioEsforcoHoras as number | undefined,
     desvioFinanceiro: apiNode.desvioFinanceiro as number | undefined,
     risco7d: apiNode.risco7d as number | undefined,
-    status: apiNode.status as string | undefined,
+    status: statusStr,
+    semaforoStatus,
     perfisEnvolvidos: apiNode.perfisEnvolvidos as string[] | undefined,
     deviation: apiNode.deviation as number | undefined,
     impactoNoPai: apiNode.impactoNoPai as number | undefined,

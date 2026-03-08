@@ -25,6 +25,22 @@ export interface DemandaTecnicaDTO {
   dataAbertura: string;
 }
 
+/** Usuário resumido na timeline da demanda (GET /api/demandas/{id}/timeline). */
+export interface UsuarioTimelineDTO {
+  id: number;
+  nome: string;
+  /** URL da foto do usuário (pode ser absoluta ou relativa ao backend). */
+  fotoUrl?: string | null;
+}
+
+/** Evento da timeline da demanda (GET /api/demandas/{id}/timeline). */
+export interface DemandaTimelineEventoDTO {
+  sequencia: number;
+  dataHoraEvento: string; // ISO datetime
+  usuario: UsuarioTimelineDTO | null;
+  tipoEvento: string;
+}
+
 // =====================================================
 // Entidade: Usuario
 // =====================================================
@@ -222,6 +238,73 @@ export interface PerfilUpdateDTO {
   termoFinal?: string;
   valor?: number; // BigDecimal no backend (precision 18, scale 2)
   usuarioId?: number;
+  projetoId?: number;
+}
+
+// =====================================================
+// Entidade: Profissional (pessoa física/jurídica vinculada a projeto)
+// =====================================================
+export interface Profissional {
+  id: number;
+  nome: string;
+  tipoPessoa: 'F' | 'J';
+  documento: string;
+  funcao?: string | null;
+  valorHora: number;
+  dataInicioAtividade: string; // YYYY-MM-DD
+  projetoId: number;
+  projeto?: Projeto;
+}
+
+export interface ProfissionalCreateDTO {
+  nome: string;
+  tipoPessoa: 'F' | 'J';
+  documento: string;
+  funcao?: string | null;
+  valorHora: number;
+  dataInicioAtividade: string; // YYYY-MM-DD
+  projetoId: number;
+}
+
+export interface ProfissionalUpdateDTO {
+  nome?: string;
+  tipoPessoa?: 'F' | 'J';
+  documento?: string;
+  funcao?: string | null;
+  valorHora?: number;
+  dataInicioAtividade?: string;
+  projetoId?: number;
+}
+
+// =====================================================
+// Entidade: Desembolso (lançamento financeiro por projeto)
+// =====================================================
+export interface Desembolso {
+  id: number;
+  documento?: string | null;
+  valorPrevisto: number;
+  valor: number;
+  dataDesembolso: string;         // YYYY-MM-DD
+  dataPrevistaDesembolso: string; // YYYY-MM-DD
+  projetoId: number;
+  projeto?: Projeto;
+}
+
+export interface DesembolsoCreateDTO {
+  documento?: string | null;
+  valorPrevisto: number;
+  valor: number;
+  dataDesembolso: string;         // YYYY-MM-DD
+  dataPrevistaDesembolso: string; // YYYY-MM-DD
+  projetoId: number;
+}
+
+export interface DesembolsoUpdateDTO {
+  documento?: string | null;
+  valorPrevisto?: number;
+  valor?: number;
+  dataDesembolso?: string;
+  dataPrevistaDesembolso?: string;
   projetoId?: number;
 }
 
@@ -487,8 +570,36 @@ export interface TermoEncerramentoDocResponseDTO {
 }
 
 // =====================================================
+// Entidade: TermoEncerramentoAnexo (anexos de apoio ao termo de encerramento)
+// =====================================================
+export interface TermoEncerramentoAnexoResponseDTO {
+  id: number;
+  termoEncerramentoId: number;
+  nomeArquivo: string;
+  tipoConteudo: string;
+  tamanhoArquivo: number;
+  usuarioId?: number | null;
+}
+
+// =====================================================
 // Entidade: TermoEncerramentoCusto
 // =====================================================
+/** Item de profissional vinculado a um custo (entrada no create/update do termo). */
+export interface TermoEncerramentoCustoProfissionalItemDTO {
+  profissionalId: number;
+  qtdeHora: number;
+  valorHora: number;
+}
+
+/** Resposta: profissional vinculado a um custo do termo de encerramento. */
+export interface TermoEncerramentoCustoProfissionalDTO {
+  id?: number;
+  profissionalId: number;
+  qtdeHora: number;
+  valorHora: number;
+  profissional?: Profissional;
+}
+
 export interface TermoEncerramentoCusto {
   id: number;
   termoEncerramentoId: number;
@@ -496,12 +607,14 @@ export interface TermoEncerramentoCusto {
   qtdeHora: number;
   valorHora: number;
   perfil?: Perfil;
+  profissionais?: TermoEncerramentoCustoProfissionalDTO[];
 }
 
 export interface TermoEncerramentoCustoCreateDTO {
   perfilId: number;
   qtdeHora: number;
   valorHora: number;
+  profissionais?: TermoEncerramentoCustoProfissionalItemDTO[];
 }
 
 // =====================================================
@@ -580,6 +693,8 @@ export interface SemaforoNodeDTO {
   valorTotalPrevisto?: number | null;
   /** Valor total já executado (Meta ou Produto). Preenchido pelo backend quando disponível. */
   valorTotalExecutado?: number | null;
+  /** Status da demanda técnica (quando nivel === 'DEMANDA'). 'Z' = cancelada. Usado para não listar demandas canceladas no semáforo. */
+  statusDemanda?: string | null;
   children: SemaforoNodeDTO[];
 }
 

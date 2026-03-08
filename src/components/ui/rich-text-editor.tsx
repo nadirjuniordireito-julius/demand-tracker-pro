@@ -32,6 +32,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  height?: string;
 }
 
 const FONT_SIZES = [
@@ -55,6 +56,7 @@ export function RichTextEditor({
   placeholder = 'Digite seu texto aqui...',
   className,
   disabled = false,
+  height = '120px',
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
@@ -352,8 +354,8 @@ export function RichTextEditor({
           updateContent();
         }}
         className={cn(
-          'min-h-[200px] max-h-[400px] overflow-y-auto p-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-          'prose prose-sm max-w-none dark:prose-invert',
+          'h-[120px] overflow-y-auto p-4 block',
+          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           disabled && 'bg-muted cursor-not-allowed opacity-50'
         )}
         style={{

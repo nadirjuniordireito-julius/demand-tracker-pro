@@ -95,17 +95,17 @@ export const termoAberturaDocService = {
     return api.delete(ABERTURA_DOC_ENDPOINTS.byId(id));
   },
 
-    /**
+  /**
    * Assinar o documento internamente
    */
-    async assinar(id: number, hashPdf: string,
-      usuarioId: number): Promise<void> {
-        const endpoint = withQuery(
-          ABERTURA_DOC_ENDPOINTS.assinar(id),
-          { hashPdf, usuarioId }
-        );
-        return api.put(endpoint);
-    },
+  async assinar(id: number, hashPdf: string, usuarioId: number,
+    pageNumber: number, x: number, y: number, width: number, height: number): Promise<void> {
+    const endpoint = withQuery(
+      ABERTURA_DOC_ENDPOINTS.assinar(id),
+      { hashPdf, usuarioId, pageNumber, x, y, width, height }
+    );
+    return api.put(endpoint);
+  },
 };
 
 // =====================================================
@@ -118,7 +118,7 @@ const PLANEJAMENTO_DOC_ENDPOINTS = {
   download: (id: number) => `/termos-planejamento-doc/${id}/download`,
   downloadByTermo: (termoPlanejamentoId: number) => `/termos-planejamento-doc/termo/${termoPlanejamentoId}/download`,
   exists: (termoPlanejamentoId: number) => `/termos-planejamento-doc/termo/${termoPlanejamentoId}/exists`,
-  assinar: (id: number) => `/termos-planejamento-doc/termo/${id}/assinar`,
+  assinar: (id: number) => `/termos-planejamento-doc/${id}/assinar`,
 };
 
 export const termoPlanejamentoDocService = {
@@ -197,10 +197,11 @@ export const termoPlanejamentoDocService = {
    * Assinar o documento internamente
    */
   async assinar(id: number, hashPdf: string,
-    usuarioId: number): Promise<void> {
+    usuarioId: number,
+    pageNumber: number, x: number, y: number, width: number, height: number): Promise<void> {
       const endpoint = withQuery(
         PLANEJAMENTO_DOC_ENDPOINTS.assinar(id),
-        { hashPdf, usuarioId }
+        { hashPdf, usuarioId, pageNumber, x, y, width, height }
       );
       return api.put(endpoint);
   },
@@ -217,7 +218,7 @@ const ENCERRAMENTO_DOC_ENDPOINTS = {
   download: (id: number) => `/termos-encerramento-doc/${id}/download`,
   downloadByTermo: (termoEncerramentoId: number) => `/termos-encerramento-doc/termo/${termoEncerramentoId}/download`,
   exists: (termoEncerramentoId: number) => `/termos-encerramento-doc/termo/${termoEncerramentoId}/exists`,
-  assinar: (id: number) => `/termos-encerramento-doc/termo/${id}/assinar`,
+  assinar: (id: number) => `/termos-encerramento-doc/${id}/assinar`,
 };
 
 export const termoEncerramentoDocService = {
@@ -296,10 +297,11 @@ export const termoEncerramentoDocService = {
    * Assinar o documento internamente
    */
   async assinar(id: number, hashPdf: string,
-    usuarioId: number): Promise<void> {
+    usuarioId: number,
+    pageNumber: number, x: number, y: number, width: number, height: number): Promise<void> {
       const endpoint = withQuery(
         ENCERRAMENTO_DOC_ENDPOINTS.assinar(id),
-        { hashPdf, usuarioId }
+        { hashPdf, usuarioId, pageNumber, x, y, width, height }
       );
       return api.put(endpoint);
   },

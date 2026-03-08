@@ -6,14 +6,17 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
   Plus,
-  X,
   Upload,
   FileText,
   Trash2,
   Eye,
   FileDown,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Paperclip,
+  ChevronDown,
+  MoreHorizontal,
+  UserCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +29,8 @@ import {
 } from '@/components/ui/dialog';
 import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
+import { TermoEncerramentoAnexosModal } from '@/components/termo/TermoEncerramentoAnexosModal';
+import { CustoProfissionaisModal, type CustoProfissionalItem } from '@/components/termo/CustoProfissionaisModal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -51,27 +56,37 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import logoUfla from '@/assets/ufla1.png';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { termoEncerramentoService, termoPlanejamentoService } from '@/services/termoService';
 import { termoEncerramentoDocService, termoPlanejamentoDocService } from '@/services/termoDocService';
 import { demandaService } from '@/services/demandaService';
 import { perfilService } from '@/services/perfilService';
+import { profissionalService } from '@/services/profissionalService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { termoEncerramentoSchema, type TermoEncerramentoFormData } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
-import { canCreateTermoEncerramento, canUploadTermoEncerramento, canDeleteTermoEncerramento, canSaveTermoEncerramento, canDeleteDocTermoEncerramento } from '@/lib/demandaStatus';
-import type { TermoEncerramento, TermoEncerramentoCusto, DemandaTecnica, Perfil, TermoEncerramentoDocResponseDTO } from '@/types';
+import { canCreateTermoEncerramento, canUploadTermoEncerramento, canDeleteTermoEncerramento, canSaveTermoEncerramento, canDeleteDocTermoEncerramento, normalizeDemandaStatus } from '@/lib/demandaStatus';
+import type { TermoEncerramento, TermoEncerramentoCusto, DemandaTecnica, Perfil, Profissional, TermoEncerramentoDocResponseDTO } from '@/types';
 
 interface CustoForm {
   perfilId: string;
   qtdeHora: string;
   valorHora: string;
+  profissionais: CustoProfissionalItem[];
 }
 
 export default function TermoEncerramentoPage() {
@@ -82,9 +97,13 @@ export default function TermoEncerramentoPage() {
   const { selectedProject } = useProject();
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
+  const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoEncerramento | null>(null);
   const [custos, setCustos] = useState<CustoForm[]>([]);
+  const [custoProfissionaisModalIndex, setCustoProfissionaisModalIndex] = useState<number | null>(null);
+  /** Custos do termo de planejamento (perfilId -> qtdeHora) para exibir "Qtde prevista" no modal de profissionais. */
+  const [planejamentoCustosPorPerfil, setPlanejamentoCustosPorPerfil] = useState<Map<number, number>>(new Map());
   const [custoErrors, setCustoErrors] = useState<Record<number, string>>({});
   const [isLoadingDemanda, setIsLoadingDemanda] = useState(true);
   const [isLoadingTermo, setIsLoadingTermo] = useState(true);
@@ -102,6 +121,7 @@ export default function TermoEncerramentoPage() {
   const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
   const [isViewDocOpen, setIsViewDocOpen] = useState(false);
   const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
+  const [isAnexosOpen, setIsAnexosOpen] = useState(false);
   const { toast } = useToast();
 
   // Evita deslocamento de timezone: "2025-01-15" sem hora é interpretado como UTC meia-noite
@@ -124,19 +144,19 @@ export default function TermoEncerramentoPage() {
     },
   });
 
-  // Carrega perfis do projeto selecionado
+  // Carrega perfis e profissionais do projeto selecionado
   const loadPerfis = useCallback(async () => {
     if (!selectedProject) return;
-    
     setIsLoadingPerfis(true);
     try {
-      const response = await perfilService.findAll({ 
-        projetoId: selectedProject.id,
-        size: 1000 
-      });
-      setPerfis(response.content);
+      const [perfisRes, profisRes] = await Promise.all([
+        perfilService.findAll({ projetoId: selectedProject.id, size: 1000 }),
+        profissionalService.findAll({ projetoId: selectedProject.id, size: 1000 }),
+      ]);
+      setPerfis(perfisRes.content);
+      setProfissionais(profisRes.content);
     } catch (err) {
-      console.error('Erro ao carregar perfis:', err);
+      console.error('Erro ao carregar perfis/profissionais:', err);
     } finally {
       setIsLoadingPerfis(false);
     }
@@ -171,19 +191,46 @@ export default function TermoEncerramentoPage() {
       if (termoExistente) {
         // Se existe, carrega os dados
         setSelectedTermo(termoExistente);
+        const resultadoEntregueVal = termoExistente.resultadoEntregue?.trim() || '';
         form.reset({
           demandaTecnicaId: String(termoExistente.demandaTecnicaId),
           dataTermo: termoExistente.dataTermo ? parseDateOnly(termoExistente.dataTermo) : new Date(),
           dataInicioExecucao: termoExistente.dataInicioExecucao ? parseDateOnly(termoExistente.dataInicioExecucao) : undefined,
           dataFimExecucao: termoExistente.dataFimExecucao ? parseDateOnly(termoExistente.dataFimExecucao) : undefined,
-          resultadoEntregue: termoExistente.resultadoEntregue,
+          resultadoEntregue: resultadoEntregueVal,
         });
-        setCustos((termoExistente.custos || []).map(c => ({
-          perfilId: String(c.perfilId),
-          qtdeHora: String(c.qtdeHora),
-          valorHora: String(c.valorHora),
-        })));
-        
+        setCustos((termoExistente.custos || []).map((c) => {
+          const rawC = c as unknown as Record<string, unknown>;
+          const profisList = (c.profissionais || []) as unknown as Record<string, unknown>[];
+          return {
+            perfilId: String(rawC.perfilId ?? rawC.perfil_id ?? ''),
+            qtdeHora: String(rawC.qtdeHora ?? rawC.qtde_hora ?? ''),
+            valorHora: String(rawC.valorHora ?? rawC.valor_hora ?? ''),
+            profissionais: profisList.map((p) => {
+              const prof = p.profissional as { id?: number } | undefined;
+              const id = p.profissionalId ?? p.profissional_id ?? prof?.id;
+              return {
+                profissionalId: String(id ?? ''),
+                qtdeHora: String(p.qtdeHora ?? p.qtde_hora ?? ''),
+                valorHora: String(p.valorHora ?? p.valor_hora ?? ''),
+              };
+            }),
+          };
+        }));
+        // Se Resultado Entregue estiver vazio, sugere o Resultado Esperado do Termo de Planejamento; guarda custos do planejamento para o modal de profissionais
+        try {
+          const termoPlanejamento = await termoPlanejamentoService.findByDemandaId(Number(demandaId));
+          if (termoPlanejamento?.custos?.length) {
+            setPlanejamentoCustosPorPerfil(new Map(termoPlanejamento.custos.map((c) => [c.perfilId, c.qtdeHora])));
+          } else {
+            setPlanejamentoCustosPorPerfil(new Map());
+          }
+          if (!resultadoEntregueVal && termoPlanejamento?.resultadoEsperado?.trim()) {
+            form.setValue('resultadoEntregue', termoPlanejamento.resultadoEsperado.trim());
+          }
+        } catch {
+          setPlanejamentoCustosPorPerfil(new Map());
+        }
         // Busca documento se existir
         setIsLoadingDoc(true);
         try {
@@ -212,17 +259,20 @@ export default function TermoEncerramentoPage() {
           
           if (termoPlanejamento) {
             if (termoPlanejamento.custos && termoPlanejamento.custos.length > 0) {
-              // Copia os custos do Termo de Planejamento
+              setPlanejamentoCustosPorPerfil(new Map(termoPlanejamento.custos.map((c) => [c.perfilId, c.qtdeHora])));
+              // Copia os custos do Termo de Planejamento (profissionais ficam vazios; usuário compõe na aba Custos)
               setCustos(termoPlanejamento.custos.map(c => ({
                 perfilId: String(c.perfilId),
                 qtdeHora: String(c.qtdeHora),
                 valorHora: String(c.valorHora),
+                profissionais: [],
               })));
               toast({
                 title: t('common.success'),
                 description: t('closingTerm.costsCopiedFromPlanning'),
               });
             } else {
+              setPlanejamentoCustosPorPerfil(new Map());
               setCustos([]);
             }
             // Aproveita datas de início e fim de execução do Termo de Planejamento
@@ -232,12 +282,16 @@ export default function TermoEncerramentoPage() {
             if (termoPlanejamento.dataFimExecucao) {
               form.setValue('dataFimExecucao', parseDateOnly(termoPlanejamento.dataFimExecucao));
             }
+            // Sugestão de preenchimento: Resultado Entregue com o Resultado Esperado do planejamento
+            if (termoPlanejamento.resultadoEsperado?.trim()) {
+              form.setValue('resultadoEntregue', termoPlanejamento.resultadoEsperado.trim());
+            }
           } else {
             setCustos([]);
           }
         } catch (err) {
-          // Se não encontrar termo de planejamento ou der erro, deixa vazio
           console.warn('Erro ao buscar termo de planejamento para copiar custos:', err);
+          setPlanejamentoCustosPorPerfil(new Map());
           setCustos([]);
         }
       }
@@ -262,7 +316,7 @@ export default function TermoEncerramentoPage() {
   }, [loadData]);
 
   const handleAddCusto = () => {
-    setCustos([...custos, { perfilId: '', qtdeHora: '', valorHora: '' }]);
+    setCustos([...custos, { perfilId: '', qtdeHora: '', valorHora: '', profissionais: [] }]);
   };
 
   const handleRemoveCusto = (index: number) => {
@@ -270,6 +324,18 @@ export default function TermoEncerramentoPage() {
     const newErrors = { ...custoErrors };
     delete newErrors[index];
     setCustoErrors(newErrors);
+    if (custoProfissionaisModalIndex === index) setCustoProfissionaisModalIndex(null);
+    else if (custoProfissionaisModalIndex != null && custoProfissionaisModalIndex > index) setCustoProfissionaisModalIndex(custoProfissionaisModalIndex - 1);
+  };
+
+  const handleConfirmCustoProfissionais = (index: number, items: CustoProfissionalItem[]) => {
+    const totalHoras = items.reduce((acc, i) => acc + (Number(i.qtdeHora) || 0), 0);
+    setCustos(prev =>
+      prev.map((c, i) =>
+        i === index ? { ...c, profissionais: items, qtdeHora: totalHoras.toFixed(2) } : c
+      )
+    );
+    setCustoProfissionaisModalIndex(null);
   };
 
   const handleCustoChange = (index: number, field: keyof CustoForm, value: string) => {
@@ -307,9 +373,16 @@ export default function TermoEncerramentoPage() {
   const validateCustos = (): boolean => {
     const errors: Record<number, string> = {};
     custos.forEach((custo, index) => {
-      if (!custo.perfilId || !custo.qtdeHora || !custo.valorHora) {
+      if (!custo.perfilId) {
         errors[index] = t('common.fillAllCostFields');
-      } else if (Number(custo.qtdeHora) <= 0 || Number(custo.valorHora) <= 0) {
+        return;
+      }
+      const validProfis = (custo.profissionais || []).filter(
+        (p) => p.profissionalId && Number(p.qtdeHora) > 0 && Number(p.valorHora) > 0
+      );
+      if (validProfis.length === 0) {
+        errors[index] = t('closingTerm.costProfessionals.noProfessionals');
+      } else if (Number(custo.valorHora) <= 0) {
         errors[index] = t('common.valuesMustBePositive');
       }
     });
@@ -343,12 +416,31 @@ export default function TermoEncerramentoPage() {
     setIsSaving(true);
     try {
       const custosFormatted = custos
-        .filter(c => c.perfilId && c.qtdeHora && c.valorHora)
-        .map(c => ({
-          perfilId: Number(c.perfilId),
-          qtdeHora: Number(c.qtdeHora),
-          valorHora: Number(c.valorHora),
-        }));
+        .filter(
+          (c) =>
+            c.perfilId &&
+            c.valorHora &&
+            (c.profissionais?.length ?? 0) > 0 &&
+            (c.profissionais ?? []).some(
+              (p) => p.profissionalId && Number(p.qtdeHora) > 0 && Number(p.valorHora) > 0
+            )
+        )
+        .map((c) => {
+          const profis = (c.profissionais ?? []).filter(
+            (p) => p.profissionalId && Number(p.qtdeHora) > 0 && Number(p.valorHora) > 0
+          );
+          const qtdeHora = profis.reduce((acc, p) => acc + Number(p.qtdeHora), 0);
+          return {
+            perfilId: Number(c.perfilId),
+            qtdeHora,
+            valorHora: Number(c.valorHora),
+            profissionais: profis.map((p) => ({
+              profissionalId: Number(p.profissionalId),
+              qtdeHora: Number(p.qtdeHora),
+              valorHora: Number(p.valorHora),
+            })),
+          };
+        });
 
       const dataTermoStr = data.dataTermo.toISOString().split('T')[0];
       const dataInicioExecucaoStr = data.dataInicioExecucao?.toISOString().split('T')[0];
@@ -614,8 +706,8 @@ export default function TermoEncerramentoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Form Dialog - sempre aberto quando a página carrega */}
-      <Dialog open={isFormOpen} onOpenChange={handleClose}>
+      {/* Form Dialog - fecha pelo X do header ou botões (regra global no DialogContent) */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeaderStandard
             title={selectedTermo ? t('closingTerm.editTerm') : t('closingTerm.newTerm')}
@@ -818,7 +910,10 @@ export default function TermoEncerramentoPage() {
                   {demanda?.metaProduto != null && typeof demanda.metaProduto.quantidade === 'number' && typeof demanda.metaProduto.valorUnitario === 'number' && (() => {
                     const totalPlanned = demanda.metaProduto!.quantidade * demanda.metaProduto!.valorUnitario;
                     const totalExecuted = typeof demanda.totalExecutadoProduto === 'number' ? demanda.totalExecutadoProduto : 0;
-                    const totalFormCosts = custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0);
+                    const totalFormCosts = custos.reduce((acc, c) => {
+                      const horas = (c.profissionais ?? []).reduce((s, p) => s + (Number(p.qtdeHora) || 0), 0);
+                      return acc + horas * (Number(c.valorHora) || 0);
+                    }, 0);
                     if (totalExecuted + totalFormCosts > totalPlanned) {
                       return (
                         <Alert variant="destructive">
@@ -854,8 +949,9 @@ export default function TermoEncerramentoPage() {
                       ) : (
                         <>
                           <div className="flex gap-2 pb-1.5 border-b">
-                            <div className="flex-1 grid grid-cols-4 gap-2">
+                            <div className="flex-1 grid gap-2 items-center" style={{ gridTemplateColumns: '1fr 2.5rem 5rem 7rem 7rem' }}>
                               <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.profile')}</span>
+                              <span className="text-xs font-medium text-muted-foreground w-10 flex justify-center" aria-hidden="true">&nbsp;</span>
                               <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.hours')}</span>
                               <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.hourlyRate')}</span>
                               <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.lineTotal')}</span>
@@ -863,18 +959,19 @@ export default function TermoEncerramentoPage() {
                             <div className="w-8 shrink-0" aria-hidden />
                           </div>
                           {custos.map((custo, index) => {
-                            const horas = Number(custo.qtdeHora) || 0;
-                            const valorHora = Number(custo.valorHora) || 0;
-                            const totalLinha = horas * valorHora;
+                            const profis = custo.profissionais ?? [];
+                            const horas = profis.reduce((acc, p) => acc + (Number(p.qtdeHora) || 0), 0);
+                            const valorHoraPerfil = Number(custo.valorHora) || 0;
+                            const totalLinha = horas * valorHoraPerfil;
                             return (
-                              <div key={'id' in custo && custo.id != null ? String(custo.id) : `custo-${index}`} className="space-y-1">
+                              <div key={'id' in custo && (custo as { id?: number }).id != null ? String((custo as { id: number }).id) : `custo-${index}`} className="space-y-1">
                                 <div className="flex items-center gap-2 py-1.5 px-2 bg-muted/50 rounded-md">
-                                  <div className="flex-1 grid grid-cols-4 gap-2">
+                                  <div className="flex-1 grid gap-2 items-center min-w-0" style={{ gridTemplateColumns: '1fr 2.5rem 5rem 7rem 7rem' }}>
                                     <Select
                                       value={custo.perfilId}
                                       onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
                                     >
-                                      <SelectTrigger className="h-8">
+                                      <SelectTrigger className="h-8 justify-start text-left min-w-0">
                                         <SelectValue placeholder={t('common.selectProfile')} />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -889,13 +986,27 @@ export default function TermoEncerramentoPage() {
                                         )}
                                       </SelectContent>
                                     </Select>
-                                    <Input
-                                      type="number"
-                                      className="h-8"
-                                      value={custo.qtdeHora}
-                                      onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
-                                      placeholder={t('common.hoursPlaceholder')}
-                                    />
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-8 w-8 shrink-0 justify-self-center"
+                                          onClick={() => setCustoProfissionaisModalIndex(index)}
+                                          disabled={!custo.perfilId}
+                                          aria-label={t('closingTerm.costProfessionals.composeProfessionalsTooltip')}
+                                        >
+                                          <UserCircle className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        {t('closingTerm.costProfessionals.composeProfessionalsTooltip')}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm tabular-nums">
+                                      {horas > 0 ? horas.toFixed(2) : '—'}
+                                    </div>
                                     <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
                                       {custo.valorHora ? formatCurrency(Number(custo.valorHora)) : '—'}
                                     </div>
@@ -907,11 +1018,12 @@ export default function TermoEncerramentoPage() {
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0 text-destructive"
+                                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
                                     onClick={() => handleRemoveCusto(index)}
+                                    disabled={normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'E'}
                                     aria-label={t('common.remove')}
                                   >
-                                    <X className="h-4 w-4" />
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                                 {custoErrors[index] && (
@@ -921,12 +1033,15 @@ export default function TermoEncerramentoPage() {
                             );
                           })}
                           <div className="flex gap-2 pt-2 mt-2 border-t font-medium">
-                            <div className="flex-1 grid grid-cols-4 gap-2">
-                              <span className="col-span-2" />
+                            <div className="flex-1 grid gap-2" style={{ gridTemplateColumns: '1fr 2.5rem 5rem 7rem 7rem' }}>
+                              <span className="col-span-3" />
                               <span className="text-xs font-medium text-muted-foreground">{t('closingTerm.totalCost')}</span>
                               <span className="text-sm">
                                 {formatCurrency(
-                                  custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0)
+                                  custos.reduce((acc, c) => {
+                                    const horas = (c.profissionais ?? []).reduce((s, p) => s + (Number(p.qtdeHora) || 0), 0);
+                                    return acc + horas * (Number(c.valorHora) || 0);
+                                  }, 0)
                                 )}
                               </span>
                             </div>
@@ -980,55 +1095,73 @@ export default function TermoEncerramentoPage() {
                 </div>
               )}
 
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                <div className="flex gap-2">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4 border-t">
+                <div className="flex items-center gap-2">
                   {selectedTermo && (
-                    <>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleGeneratePdf}
-                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoEncerramento(demanda?.status)}
-                        className="flex items-center gap-2"
-                        title={t('closingTerm.generatePdf')}
-                      >
-                        <FileDown className="h-4 w-4" />
-                        {t('closingTerm.generatePdf')}
-                      </Button>
-
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleOpenUpload}
-                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoEncerramento(demanda?.status)}
-                        className="flex items-center gap-2"
-                      >
-                        <Upload className="h-4 w-4" />
-                        {documento ? t('closingTerm.replaceDocument') : t('closingTerm.uploadDocument')}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="destructive" 
-                        onClick={handleDelete} 
-                        disabled={isSaving || isDeleting || !canDeleteTermoEncerramento(demanda?.status)}
-                      >
-                        {t('common.delete')}
-                      </Button>
-                    </>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isSaving || isDeleting || isLoadingDoc}
+                          className="gap-2"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                          {t('closingTerm.documentAndAttachments')}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="min-w-[220px]">
+                        <DropdownMenuItem
+                          onClick={handleGeneratePdf}
+                          disabled={!canUploadTermoEncerramento(demanda?.status)}
+                        >
+                          <FileDown className="h-4 w-4 mr-2" />
+                          {t('closingTerm.generatePdf')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleOpenUpload}
+                          disabled={!canUploadTermoEncerramento(demanda?.status)}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {documento ? t('closingTerm.replaceDocument') : t('closingTerm.uploadDocument')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsAnexosOpen(true)}>
+                          <Paperclip className="h-4 w-4 mr-2" />
+                          {t('closingTerm.attachments.title')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  {selectedTermo && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={handleDelete}
+                      disabled={isSaving || isDeleting || !canDeleteTermoEncerramento(demanda?.status)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {t('common.delete')}
+                    </Button>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  <LoadingButton 
-                    type="submit" 
-                    isLoading={isSaving} 
-                    loadingText={t('common.saving')} 
-                    disabled={isDeleting || !canSaveTermoEncerramento(demanda?.status ?? demanda?.situacao)}
-                  >
-                    {t('common.save')}
-                  </LoadingButton>
+                  {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                    <LoadingButton
+                      type="submit"
+                      isLoading={isSaving}
+                      loadingText={t('common.saving')}
+                      disabled={isDeleting || !canSaveTermoEncerramento(demanda?.status ?? demanda?.situacao)}
+                    >
+                      {t('common.save')}
+                    </LoadingButton>
+                  )}
                 </div>
               </DialogFooter>
             </form>
@@ -1036,8 +1169,13 @@ export default function TermoEncerramentoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+      {/* Delete Confirmation Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isDeleteOpen}
+        onOpenChange={(open) => {
+          if (open) setIsDeleteOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('common.confirmDelete')}</DialogTitle>
@@ -1061,8 +1199,13 @@ export default function TermoEncerramentoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Upload Document Dialog */}
-      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+      {/* Upload Document Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isUploadOpen}
+        onOpenChange={(open) => {
+          if (open) setIsUploadOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('closingTerm.uploadDocumentTitle')}</DialogTitle>
@@ -1113,8 +1256,13 @@ export default function TermoEncerramentoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Document Confirmation Dialog */}
-      <Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+      {/* Delete Document Confirmation Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isDeleteDocOpen}
+        onOpenChange={(open) => {
+          if (open) setIsDeleteDocOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('closingTerm.deleteDocumentConfirmTitle')}</DialogTitle>
@@ -1173,7 +1321,8 @@ export default function TermoEncerramentoPage() {
           termoEncerramentoService.gerarTermoAssinatura(
             selectedTermo!.id,
             selectedProject!.id,
-            'E'
+            'E',
+            { logoUfla }
           )
         }
         loadingLabel={t('planningTerm.generatingPdf')}
@@ -1190,8 +1339,38 @@ export default function TermoEncerramentoPage() {
         }
       />
 
-      
+      <TermoEncerramentoAnexosModal
+        open={isAnexosOpen}
+        onOpenChange={setIsAnexosOpen}
+        termoEncerramentoId={selectedTermo?.id ?? null}
+        demandaStatus={demanda?.status ?? demanda?.situacao}
+        usuarioId={user?.id}
+      />
 
+      {custoProfissionaisModalIndex != null && custos[custoProfissionaisModalIndex] && (
+        <CustoProfissionaisModal
+          key={custoProfissionaisModalIndex}
+          open={true}
+          onOpenChange={(open) => !open && setCustoProfissionaisModalIndex(null)}
+          perfilNome={
+            custos[custoProfissionaisModalIndex]?.perfilId
+              ? perfis.find((p) => p.id === Number(custos[custoProfissionaisModalIndex].perfilId))?.nome ?? '—'
+              : '—'
+          }
+          qtdePrevistaHoras={
+            custos[custoProfissionaisModalIndex]?.perfilId
+              ? planejamentoCustosPorPerfil.get(Number(custos[custoProfissionaisModalIndex].perfilId)) ?? undefined
+              : undefined
+          }
+          profissionais={profissionais}
+          initialItems={custos[custoProfissionaisModalIndex].profissionais ?? []}
+          onConfirm={(items) => handleConfirmCustoProfissionais(custoProfissionaisModalIndex, items)}
+          disabled={
+            normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'E' &&
+            normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'F'
+          }
+        />
+      )}
     </div>
   );
 }

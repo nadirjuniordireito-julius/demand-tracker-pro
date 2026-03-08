@@ -16,6 +16,7 @@ import { DEMANDA_STATUS } from '@/lib/demandaStatus';
 import { projetoService } from '@/services/projetoService';
 import { TedHealthMapFilters } from '@/components/tedHealthMap/TedHealthMapFilters';
 import { TedHealthMapFinancialSummary } from '@/components/tedHealthMap/TedHealthMapFinancialSummary';
+import { TedHealthMapLegend } from '@/components/tedHealthMap/TedHealthMapLegend';
 import { TedHealthMapFlyingBubble } from '@/components/tedHealthMap/TedHealthMapFlyingBubble';
 
 const BubbleChart = lazy(() =>
@@ -204,7 +205,7 @@ export default function TedHealthMapPage() {
         };
         const endPx = {
           left: asideRect.left + 24 - r,
-          top: asideRect.top + asideRect.height / 2 - r,
+          top: asideRect.top + 80 - r,
         };
         setThrowingState({
           node,
@@ -233,7 +234,7 @@ export default function TedHealthMapPage() {
           };
           const endPx = {
             left: asideRect.left + 24 - r,
-            top: asideRect.top + asideRect.height / 2 - r,
+            top: asideRect.top + 80 - r,
           };
           setThrowingState({
             node,
@@ -260,7 +261,7 @@ export default function TedHealthMapPage() {
         };
         const endPx = {
           left: asideRect.left + 24 - r,
-          top: asideRect.top + asideRect.height / 2 - r,
+          top: asideRect.top + 80 - r,
         };
         setThrowingState({
           node,
@@ -537,7 +538,7 @@ export default function TedHealthMapPage() {
                   )}
                   <p className="text-sm text-muted-foreground truncate min-w-0" title={breadcrumb}>{breadcrumb}</p>
                 </div>
-                <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center relative z-0 p-6 pb-10">
+                <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center relative z-0 p-6 pb-2">
                   <div
                     ref={(el) => {
                       containerRef(el);
@@ -559,17 +560,21 @@ export default function TedHealthMapPage() {
                     />
                   </div>
                 </div>
+                <div className="shrink-0 pt-2 pb-3 px-2 border-t border-border/60">
+                  <TedHealthMapLegend compact />
+                </div>
               </LabeledCard>
 
               <aside ref={asideRef} className="w-[30rem] shrink-0 rounded-lg">
+                
                 <TedHealthMapDetailPanel
-                  cardClassName="bg-[hsl(220,9%,97%)] dark:bg-[hsl(220,13%,18%)]"
+                  cardClassName="bg-white dark:bg-gray-800"
                   node={selectedNode ?? selectedProduto ?? selectedMeta}
                   zoomLevel={zoomLevel}
                   productValorPrevisto={
                     selectedNode?.level === 'demanda' && selectedProduto
                       ? (() => {
-                          const raw = selectedProduto.raw as Record<string, unknown> | undefined;
+                          const raw = selectedProduto.raw as unknown as Record<string, unknown> | undefined;
                           const v = raw?.valorTotalPrevisto != null ? Number(raw.valorTotalPrevisto) : Number(selectedProduto.valor);
                           return Number.isFinite(v) ? v : undefined;
                         })()
@@ -577,7 +582,7 @@ export default function TedHealthMapPage() {
                   }
                   parentMetaCode={
                     selectedProduto && selectedMeta
-                      ? (selectedMeta.codigo ?? (selectedMeta.raw as Record<string, unknown> | undefined)?.codigo as string | undefined)
+                      ? (selectedMeta.codigo ?? (selectedProduto.raw as unknown as Record<string, unknown> | undefined)?.codigo as string | undefined)
                       : undefined
                   }
                 />

@@ -28,11 +28,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { BalloonTooltip } from '@/components/tedHealthMap/BalloonTooltip';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Info, FilePlus, FileCheck, FileX, ClipboardList } from 'lucide-react';
+import { Info, FilePlus, FileCheck, FileX, ClipboardList, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { avaliacaoDemandaService } from '@/features/avaliacao-demanda/avaliacaoDemandaService';
 import { avaliacaoDemandaDocService } from '@/features/avaliacao-demanda/avaliacaoDemandaDocService';
 import type { DemandaAvaliacaoResponse } from '@/features/avaliacao-demanda/types';
+import type { ReactGoogleChartEvent } from 'react-google-charts';
+import { DemandaTimelineModal } from '@/components/demandas/DemandaTimelineModal';
 
 const formatCurrency = (value: number | undefined | null) => {
   const n = Number(value);
@@ -102,10 +104,11 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
   const [viewDocState, setViewDocState] = useState<{ type: TermDocType; termoId: number } | null>(null);
   const [avaliacaoDemanda, setAvaliacaoDemanda] = useState<DemandaAvaliacaoResponse | null>(null);
   const [viewAvaliacaoPdfOpen, setViewAvaliacaoPdfOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   const demandNormalizedStatus = node?.level === 'demanda'
     ? normalizeDemandaStatus(
-        node?.status ?? (node?.raw as Record<string, unknown> | undefined)?.status as string ?? (node?.raw as Record<string, unknown> | undefined)?.situacao as string
+        node?.status ?? (node?.raw as unknown as Record<string, unknown> | undefined)?.status as string ?? (node?.raw as unknown as Record<string, unknown> | undefined)?.situacao as string
       )
     : undefined;
   const isDemandaStatusG = demandNormalizedStatus === 'G';
@@ -200,8 +203,8 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
   const status = getStatusLabelFallback(node);
   const codigo = node.codigo ?? (node.raw as { codigo?: string } | undefined)?.codigo;
 
-  const rawMeta = node.level === 'meta' ? (node.raw as Record<string, unknown> | undefined) : undefined;
-  const rawProduto = node.level === 'produto' ? (node.raw as Record<string, unknown> | undefined) : undefined;
+  const rawMeta = node.level === 'meta' ? (node.raw as unknown as Record<string, unknown> | undefined) : undefined;
+  const rawProduto = node.level === 'produto' ? (node.raw as unknown as Record<string, unknown> | undefined) : undefined;
   const rawDetail = rawMeta ?? rawProduto;
   const valorPrevisto = rawDetail?.valorTotalPrevisto != null ? Number(rawDetail.valorTotalPrevisto) : (node.valor ?? undefined);
   const valorExecutado = rawDetail?.valorTotalExecutado != null ? Number(rawDetail.valorTotalExecutado) : undefined;
@@ -214,8 +217,8 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
         : undefined;
   const descricaoDetail = rawDetail?.descricao != null ? String(rawDetail.descricao) : rawDetail?.nome != null ? String(rawDetail.nome) : undefined;
 
-  const rawDemanda = node.level === 'demanda' ? (node.raw as Record<string, unknown> | undefined) : undefined;
-  const metaProduto = rawDemanda?.metaProduto as Record<string, unknown> | undefined;
+  const rawDemanda = node.level === 'demanda' ? (node.raw as unknown as Record<string, unknown> | undefined) : undefined;
+  const metaProduto = rawDemanda?.metaProduto as unknown as Record<string, unknown> | undefined;
   const codigoMeta = rawDemanda?.codigoMeta != null ? String(rawDemanda.codigoMeta) : (metaProduto?.projetoMeta as Record<string, unknown> | undefined)?.codigo != null ? String((metaProduto.projetoMeta as Record<string, unknown>).codigo) : undefined;
   const codigoProduto = rawDemanda?.codigoProduto != null ? String(rawDemanda.codigoProduto) : metaProduto?.codigo != null ? String(metaProduto.codigo) : undefined;
   const codigoDemanda = codigo ?? (rawDemanda?.codigo != null ? String(rawDemanda.codigo) : undefined);
@@ -248,30 +251,30 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
             <TableBody>
               {node.level === 'produto' && parentMetaCode != null && parentMetaCode !== '' && (
                 <TableRow>
-                  <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.metaCode')}</TableCell>
+                  <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.metaCode')}</TableCell>
                   <TableCell className="py-1.5">{parentMetaCode}</TableCell>
                 </TableRow>
               )}
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">
+                <TableCell className="text-muted-foreground py-1.5 font-bold">
                   {node.level === 'meta' ? t('healthMapDetail.metaCode') : t('healthMapDetail.productCode')}
                 </TableCell>
                 <TableCell className="py-1.5">{codigo ?? '—'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.description')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.description')}</TableCell>
                 <TableCell className="py-1.5">{descricaoDetail ?? node.name ?? '—'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.totalValuePlanned')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.totalValuePlanned')}</TableCell>
                 <TableCell className="py-1.5">{formatCurrency(valorPrevisto)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.totalValueExecuted')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.totalValueExecuted')}</TableCell>
                 <TableCell className="py-1.5">{formatCurrency(valorExecutado)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.executionPercent')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.executionPercent')}</TableCell>
                 <TableCell className="py-1.5">{formatPercent(percentualExecucao)}</TableCell>
               </TableRow>
             </TableBody>
@@ -345,38 +348,48 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
                     <ClipboardList className="h-4 w-4" strokeWidth={1.25} />
                   </button>
                 </BalloonTooltip>
+                <BalloonTooltip content={t('healthMapDetail.docTimeline')} side="bottom">
+                  <button
+                    type="button"
+                    onClick={() => setTimelineOpen(true)}
+                    className="p-1.5 rounded transition-colors text-[#6B2D3C] hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring dark:hover:bg-neutral-800"
+                    aria-label={t('healthMapDetail.docTimeline')}
+                  >
+                    <History className="h-4 w-4" strokeWidth={1.25} />
+                  </button>
+                </BalloonTooltip>
               </TooltipProvider>
             </div>
             <Table>
             <TableBody>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.metaCode')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.metaCode')}</TableCell>
                 <TableCell className="py-1.5">{codigoMeta ?? '—'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.productCode')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.productCode')}</TableCell>
                 <TableCell className="py-1.5">{codigoProduto ?? '—'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.demandCode')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.demandCode')}</TableCell>
                 <TableCell className="py-1.5 font-bold">{codigoDemanda ?? '—'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.description')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.description')}</TableCell>
                 <TableCell className="py-1.5">{descricaoDemanda ?? '—'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.productTotalPlanned')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.productTotalPlanned')}</TableCell>
                 <TableCell className="py-1.5">{formatCurrency(productValorPrevisto)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.totalValuePlanned')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.totalValuePlanned')}</TableCell>
                 <TableCell className="py-1.5">{formatCurrency(totalPrevistoDemanda)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.totalValueExecuted')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.totalValueExecuted')}</TableCell>
                 <TableCell className="py-1.5 font-bold">
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 font-bold">
                     {formatCurrency(totalExecutadoDemanda)}
                     {node.level === 'demanda' &&
                       productValorPrevisto != null &&
@@ -410,7 +423,7 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-muted-foreground py-1.5">{t('healthMapDetail.statusLabel')}</TableCell>
+                <TableCell className="text-muted-foreground py-1.5 font-bold">{t('healthMapDetail.statusLabel')}</TableCell>
                 <TableCell className="py-1.5 text-[#1e3a5f] font-medium">{statusDemandaLabelKey ? t(statusDemandaLabelKey) : (statusDemanda ?? '—')}</TableCell>
               </TableRow>
             </TableBody>
@@ -491,33 +504,49 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
             [t('healthMapDetail.chartExecuted'), exec],
             [t('healthMapDetail.chartPlannedRemaining'), restante],
           ];
-          const chartEvents = [
+
+          const chartEvents: ReactGoogleChartEvent[] = [
             {
               eventName: 'ready',
-              callback: (args: unknown) => {
+              callback: (args) => {
                 if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
-                const chartWrapper = (args && typeof args === 'object' && 'chartWrapper' in args
-                  ? (args as { chartWrapper: { getContainer?: () => HTMLElement } }).chartWrapper
-                  : args) as { getContainer?: () => HTMLElement } | undefined;
-                const container = chartWrapper?.getContainer?.();
-                const wrapper = (container?.closest?.('.health-map-pie-chart-wrapper') ?? document.querySelector('.health-map-pie-chart-wrapper')) as HTMLElement | null;
+          
+                const chartWrapper =
+                  args && typeof args === 'object' && 'chartWrapper' in args
+                    ? (args as { chartWrapper: { getContainer?: () => HTMLElement } }).chartWrapper
+                    : args;
+          
+                const container = (chartWrapper as { getContainer?: () => HTMLElement })?.getContainer?.();
+                const wrapper = (container?.closest?.('.health-map-pie-chart-wrapper') ??
+                  document.querySelector('.health-map-pie-chart-wrapper')) as HTMLElement | null;
+          
                 if (!wrapper) return;
+          
                 const repositionTooltip = () => {
                   const tooltip = document.querySelector('.google-visualization-tooltip') as HTMLElement | null;
                   if (!tooltip) return;
+          
                   const rect = wrapper.getBoundingClientRect();
-                  tooltip.setAttribute('data-health-map-pie-tooltip', 'true');
+          
                   tooltip.style.setProperty('position', 'fixed', 'important');
                   tooltip.style.setProperty('left', `${rect.right + 12}px`, 'important');
-                  tooltip.style.setProperty('top', `${rect.top + rect.height / 2 - tooltip.offsetHeight / 2}px`, 'important');
+                  tooltip.style.setProperty(
+                    'top',
+                    `${rect.top + rect.height / 2 - tooltip.offsetHeight / 2}px`,
+                    'important'
+                  );
                 };
+          
                 const observer = new MutationObserver(() => {
                   requestAnimationFrame(repositionTooltip);
                 });
+          
                 observer.observe(document.body, { childList: true, subtree: true });
               },
             },
           ];
+
+          
           return (
             <div className="w-full min-w-0 max-w-full overflow-visible -mt-2" style={{ contain: 'layout' }}>
               <div className="flex items-center gap-3">
@@ -657,6 +686,12 @@ export function TedHealthMapDetailPanel({ node, zoomLevel = 'ted', onClose, prod
         }
       />
     )}
+
+    <DemandaTimelineModal
+      demandaId={node?.level === 'demanda' && node?.id != null ? Number(node.id) : null}
+      open={timelineOpen}
+      onOpenChange={setTimelineOpen}
+    />
   </>
   );
 }

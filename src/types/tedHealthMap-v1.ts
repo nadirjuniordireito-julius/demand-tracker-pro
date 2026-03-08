@@ -1,10 +1,9 @@
 /**
  * TED Health Map — Tipos e modelo de dados
  *
- * Semântica de gestão (alinhada ao semáforo de projeto):
+ * Semântica de gestão:
  * - valor: peso financeiro (raio da bolha)
- * - semaforoStatus (meta/produto/demanda): cor dos círculos externos — VERDE | AMARELO | VERMELHO | CINZA
- * - desvioPrazoDias: fallback para cor quando semaforoStatus não vem do backend (verde=adiantado, amarelo=no prazo, vermelho=atrasado)
+ * - desvioPrazoDias: cor do fill (verde=adiantado, amarelo=no prazo, vermelho=atrasado)
  * - desvioEsforcoHoras + desvioFinanceiro: stroke/halo
  * - risco7d: tendência de risco (opacidade/pulsação)
  */
@@ -14,10 +13,7 @@ import type { Projeto, ProjetoMeta, MetaProduto, DemandaTecnica } from './index'
 /** Níveis da hierarquia TED > Meta > Produto > Demanda */
 export type BubbleLevel = 'ted' | 'meta' | 'produto' | 'demanda';
 
-/** Status do semáforo (mesmo do ProjetoSemaforoPage): cor dos círculos externos das bolhas */
-export type BubbleSemaforoStatus = 'VERDE' | 'AMARELO' | 'VERMELHO' | 'CINZA';
-
-/** Cor derivada: desvioPrazoDias < 0 verde, = 0 amarelo, > 0 vermelho (fallback quando semaforoStatus ausente) */
+/** Cor derivada: desvioPrazoDias < 0 verde, = 0 amarelo, > 0 vermelho */
 export type ScheduleStatusColor = 'green' | 'yellow' | 'red';
 
 /** Nó genérico para qualquer nível da hierarquia */
@@ -37,10 +33,8 @@ export interface BubbleNode {
   desvioFinanceiro?: number;
   /** Tendência de risco nos últimos 7 dias (positivo = risco em alta) */
   risco7d?: number;
-  /** Status da demanda (ex: código A, B, C, … Z ou texto) */
+  /** Status da demanda (ex: Em elaboração, Aberta, Planejado, Encerrado) */
   status?: string;
-  /** Status semáforo (meta/produto/demanda): VERDE | AMARELO | VERMELHO | CINZA — mesma lógica do semáforo de projeto */
-  semaforoStatus?: BubbleSemaforoStatus;
   /** Perfis envolvidos na demanda */
   perfisEnvolvidos?: string[];
   /** Desvio combinado (horas normalizadas) para halo - |valor| > 20 = alerta */
@@ -49,7 +43,7 @@ export interface BubbleNode {
   impactoNoPai?: number;
   /** Status agregado vindo do backend: OK | RISCO | CRITICO */
   statusLabel?: 'OK' | 'RISCO' | 'CRITICO';
-  /** Cor de prazo vinda do backend: green | yellow | red (fallback quando semaforoStatus ausente) */
+  /** Cor de prazo vinda do backend: green | yellow | red */
   statusColor?: ScheduleStatusColor;
   /** Intensidade do halo vinda do backend (0-1) */
   haloIntensity?: number;
@@ -60,41 +54,12 @@ export interface BubbleNode {
   raw?: Projeto | ProjetoMeta | MetaProduto | DemandaTecnica;
 }
 
-/** Cores dos círculos externos (mesmas do semáforo de projeto: emerald, amber, red, gray) */
-export const BUBBLE_SEMAFORO_COLORS: Record<BubbleSemaforoStatus, string> = {
-  VERDE: '#10b981',   // emerald-500
-  AMARELO: '#fbbf24', // amber-400
-  VERMELHO: '#ef4444', // red-500
-  CINZA: '#9ca3af',   // gray-400
-};
-
-/** Mapeia ScheduleStatusColor (green/yellow/red) para a mesma cor hex do semáforo */
-export const SCHEDULE_TO_HEX: Record<ScheduleStatusColor, string> = {
-  green: BUBBLE_SEMAFORO_COLORS.VERDE,
-  yellow: BUBBLE_SEMAFORO_COLORS.AMARELO,
-  red: BUBBLE_SEMAFORO_COLORS.VERMELHO,
-};
-
 /** Regra de cor: desvioPrazoDias → verde (adiantado), amarelo (no prazo), vermelho (atrasado) */
 export function getScheduleStatusColor(desvioPrazoDias?: number): ScheduleStatusColor {
   if (desvioPrazoDias == null) return 'yellow';
   if (desvioPrazoDias < 0) return 'green';
   if (desvioPrazoDias > 0) return 'red';
   return 'yellow';
-}
-
-/** Retorna a cor hex do círculo externo: prioridade semaforoStatus > statusColor > desvioPrazoDias (mesmo padrão do semáforo) */
-export function getBubbleOuterColor(node: BubbleNode): string {
-  const semaforo = node.semaforoStatus;
-  if (semaforo && semaforo in BUBBLE_SEMAFORO_COLORS) return BUBBLE_SEMAFORO_COLORS[semaforo as BubbleSemaforoStatus];
-  const schedule = node.statusColor ?? getScheduleStatusColor(node.desvioPrazoDias);
-  return SCHEDULE_TO_HEX[schedule];
-}
-
-/** Retorna o status semáforo efetivo para exibição: semaforoStatus se definido, senão derivado de statusColor/desvioPrazo */
-export function getEffectiveBubbleSemaforoStatus(node: BubbleNode): BubbleSemaforoStatus | ScheduleStatusColor {
-  if (node.semaforoStatus) return node.semaforoStatus;
-  return node.statusColor ?? getScheduleStatusColor(node.desvioPrazoDias);
 }
 
 /** Intensidade do halo baseada em desvioEsforcoHoras e desvioFinanceiro */

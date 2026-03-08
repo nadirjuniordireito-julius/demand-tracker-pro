@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,17 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
+
+import { Worker, Viewer } from '@react-pdf-viewer/core';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { toolbarPlugin } from '@react-pdf-viewer/toolbar';
+
+import '@react-pdf-viewer/core/lib/styles/index.css';
+import '@react-pdf-viewer/toolbar/lib/styles/index.css';
+import {
+  PdfSignaturePositionDialog,
+  type AssinarEletronicaTipo,
+} from './PdfSignaturePositionDialog';
 
 export interface PdfPreviewDialogProps {
   open: boolean;
@@ -33,6 +45,17 @@ export interface PdfPreviewDialogProps {
   /** Footer customizado */
   customFooter?: React.ReactNode;
 
+  /** Abre o fluxo de posicionamento/assinatura visual (modal separada). */
+  onRequestSignature?: (args: { pdfBlob: Blob }) => void;
+  /** Se informado, o modal de assinatura usa assinatura eletrônica (hash + backend). */
+  assinarEletronica?: { tipo: AssinarEletronicaTipo; docId: number; userId: number };
+  /** Chamado após assinatura eletrônica concluída. */
+  onAssinaturaConcluida?: () => void;
+  /** Renderiza o botão de assinar na toolbar (por padrão, nenhum botão é exibido). */
+  renderSignButton?: (args: {
+    pdfBlob: Blob | null;
+    openSignatureDialog: () => void;
+  }) => React.ReactNode;
 }
 
 export function PdfPreviewDialog({
@@ -44,23 +67,35 @@ export function PdfPreviewDialog({
   loadingLabel,
   errorMessage,
   downloadFileName,
-  closeLabel = 'Fechar',
-  downloadLabel = 'Download',
+  closeLabel,
+  downloadLabel,
   onError,
   customFooter,
+  onRequestSignature,
+  assinarEletronica,
+  onAssinaturaConcluida,
+  renderSignButton,
 }: PdfPreviewDialogProps) {
+
+  const [isSigningMode, setIsSigningMode] = useState(false);
+  const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+
   const fetchPdfRef = useRef(fetchPdf);
   fetchPdfRef.current = fetchPdf;
 
+  const toolbarPluginInstance = toolbarPlugin();
+  const { Toolbar } = toolbarPluginInstance;
+  const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
+
   useEffect(() => {
     if (!open) {
-      if (url) {
-        URL.revokeObjectURL(url);
-        setUrl(null);
-      }
+      if (url) URL.revokeObjectURL(url);
+      setUrl(null);
+      setPdfBlob(null);
       setFetchError(false);
       return;
     }
@@ -68,12 +103,11 @@ export function PdfPreviewDialog({
     let cancelled = false;
     setLoading(true);
     setFetchError(false);
-    setUrl(null);
 
-    fetchPdfRef
-      .current()
+    fetchPdfRef.current()
       .then((blob) => {
         if (cancelled) return;
+        setPdfBlob(blob);
         const objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
       })
@@ -92,10 +126,9 @@ export function PdfPreviewDialog({
   }, [open]);
 
   const handleClose = () => {
-    if (url) {
-      URL.revokeObjectURL(url);
-      setUrl(null);
-    }
+    if (url) URL.revokeObjectURL(url);
+    setUrl(null);
+    setPdfBlob(null);
     setFetchError(false);
     onOpenChange(false);
   };
@@ -110,31 +143,69 @@ export function PdfPreviewDialog({
     document.body.removeChild(a);
   };
 
+  // TODO: Fluxo de assinatura visual agora acontece em um modal separado.
+  // Este componente fica responsável apenas por pré-visualizar o PDF
+  // e expor o botão \"Assinar\" na toolbar."
+
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : handleClose())}>
       <DialogContent className="sm:max-w-[90vw] max-w-[90vw] h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{title}</DialogTitle>
-          {description != null && <DialogDescription>{description}</DialogDescription>}
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <div className="flex-1 overflow-hidden relative">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <p className="text-muted-foreground">{loadingLabel ?? 'Carregando…'}</p>
+
+        <div className="flex-1 overflow-auto flex flex-col">
+          {/* Toolbar básica (zoom) + botão Assinar (abre modal de posicionamento) */}
+          {url && (
+            <div className="border-b px-4 py-2">
+              <Toolbar>
+                {(props) => {
+                  const { ZoomIn, ZoomOut, Download } = props;
+
+                  const openSignatureDialog = () => {
+                    if (!pdfBlob) return;
+                    if (onRequestSignature) {
+                      onRequestSignature({ pdfBlob });
+                    }
+                    setSignatureDialogOpen(true);
+                  };
+
+                  return (
+                    <div className="flex items-center gap-2">
+                      <ZoomOut />
+                      <ZoomIn />
+                      <Download />
+
+                      {renderSignButton &&
+                        renderSignButton({ pdfBlob, openSignatureDialog })}
+                    </div>
+                  );
+                }}
+              </Toolbar>
+            </div>
+          )}
+
+          {/* 🔥 Viewer */}
+          <div className="flex-1 overflow-auto">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">
+                  {loadingLabel ?? t('common.loading')}
+                </p>
               </div>
-            </div>
-          ) : fetchError ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">{errorMessage ?? 'Erro ao carregar o documento.'}</p>
-            </div>
-          ) : url ? (
-            <iframe
-              src={url}
-              className="w-full h-full border-0"
-              title={title}
-            />
-          ) : null}
+            ) : fetchError ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">
+                  {errorMessage ?? t('common.error')}
+                </p>
+              </div>
+            ) : url ? (
+              <Worker workerUrl={workerSrc}>
+                <Viewer fileUrl={url} plugins={[toolbarPluginInstance]} />
+              </Worker>
+            ) : null}
+          </div>
         </div>
 
         {customFooter ? (
@@ -144,18 +215,34 @@ export function PdfPreviewDialog({
         ) : (
           <DialogFooter className="px-6 py-4 border-t">
             <Button variant="outline" onClick={handleClose}>
-              {closeLabel}
+              {closeLabel ?? t('common.close')}
             </Button>
-            {downloadFileName != null && url != null && (
-              <Button variant="default" onClick={handleDownload}>
+
+            {downloadFileName && url && (
+              <Button onClick={handleDownload}>
                 <FileDown className="h-4 w-4 mr-2" />
-                {downloadLabel}
+                {downloadLabel ?? t('common.download')}
               </Button>
             )}
           </DialogFooter>
         )}
-      
       </DialogContent>
+
+      {/* Modal separada para posicionar visualmente a assinatura */}
+      <PdfSignaturePositionDialog
+        open={signatureDialogOpen}
+        onOpenChange={setSignatureDialogOpen}
+        pdfBlob={pdfBlob}
+        signPdf={undefined}
+        onSigned={(signed) => {
+          if (url) URL.revokeObjectURL(url);
+          const objectUrl = URL.createObjectURL(signed);
+          setUrl(objectUrl);
+          setPdfBlob(signed);
+        }}
+        assinarEletronica={assinarEletronica}
+        onAssinaturaConcluida={onAssinaturaConcluida}
+      />
     </Dialog>
   );
 }

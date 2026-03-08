@@ -15,17 +15,19 @@ export function DialogHeaderStandard({ title, description }: DialogHeaderStandar
   const { t } = useTranslation();
   const { selectedProject } = useProject();
 
+  const navy = '#001f3f';
+
   return (
-    <DialogHeader>
+    <DialogHeader style={{ color: navy }}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle style={{ color: navy }}>{title}</DialogTitle>
+          <DialogDescription style={{ color: navy }}>{description}</DialogDescription>
         </div>
         {selectedProject && (
-          <div className="text-right min-w-[200px]">
-            <p className="text-sm font-normal text-foreground">{t('common.selectedProject')}</p>
-            <p className="text-sm text-muted-foreground">
+          <div className="text-right min-w-[200px]" style={{ color: navy }}>
+            <p className="text-sm font-normal">{t('common.selectedProject')}</p>
+            <p className="text-sm" >
               {selectedProject.nome}
               {selectedProject.codTed && ` - ${selectedProject.codTed}`}
             </p>

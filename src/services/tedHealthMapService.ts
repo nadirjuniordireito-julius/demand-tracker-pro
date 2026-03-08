@@ -7,5 +7,5 @@ import { api } from './api';
 import type { BubbleNode } from '@/types/tedHealthMap';
 
 export async function fetchTedHealth(tedId: string | number): Promise<BubbleNode> {
-  return api.get<BubbleNode>(`/ted/${tedId}/health`);
+  return api.get<BubbleNode>(`/ted/${tedId}/health`, { allow404: false, silent: true });
 }

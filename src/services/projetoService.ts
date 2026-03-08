@@ -20,6 +20,23 @@ const ENDPOINTS = {
   semaforo: (id: number) => `/projetos/${id}/semaforo`,
 };
 
+/** Preenche statusDemanda em cada nó a partir de status_demanda ou situacao (resposta do backend em snake_case). */
+function normalizeSemaforoStatusDemanda(
+  node: SemaforoNodeDTO & { status_demanda?: string; situacao?: string }
+): SemaforoNodeDTO {
+  const raw = node as unknown as Record<string, unknown>;
+  const statusDemanda =
+    (node.statusDemanda ?? raw.status_demanda ?? raw.situacao) as string | undefined;
+  const children = (node.children ?? []).map((child) =>
+    normalizeSemaforoStatusDemanda(child as SemaforoNodeDTO & { status_demanda?: string; situacao?: string })
+  );
+  return {
+    ...node,
+    statusDemanda: statusDemanda ?? null,
+    children,
+  };
+}
+
 export interface ProjetoFilters {
   nome?: string;
   codTed?: string;
@@ -62,10 +79,12 @@ export const projetoService = {
   },
 
   /**
-   * Busca a árvore de semáforo do projeto (PROJETO → METAS → PRODUTOS → DEMANDAS)
+   * Busca a árvore de semáforo do projeto (PROJETO → METAS → PRODUTOS → DEMANDAS).
+   * Normaliza statusDemanda a partir de status_demanda ou situacao (backend pode enviar snake_case).
    */
   async getSemaforo(id: number): Promise<SemaforoNodeDTO> {
-    return api.get<SemaforoNodeDTO>(ENDPOINTS.semaforo(id), { schema: semaforoNodeSchema });
+    const raw = await api.get<SemaforoNodeDTO>(ENDPOINTS.semaforo(id), { schema: semaforoNodeSchema });
+    return normalizeSemaforoStatusDemanda(raw);
   },
 
   /**

@@ -30,11 +30,7 @@ export function ProjectSelectionModal() {
 
   return (
     <Dialog open={showSelectionModal} modal={true}>
-      <DialogContent 
-        className="max-w-3xl max-h-[80vh] overflow-y-auto [&>button]:hidden"
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
         <DialogHeader>
           <DialogTitle className="text-lg font-normal flex items-center gap-2">
             <FolderKanban className="h-6 w-6" />

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '@/services/authService';
-import { silentRefresh } from '@/services/api';
+import { getAuthToken, getStoredAuthToken, setAuthToken } from '@/services/api';
 import type { Usuario, LoginRequest } from '@/types';
 
 interface AuthContextType {
@@ -20,14 +20,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const init = async () => {
       try {
-        // 1) tenta silent refresh primeiro
-        await silentRefresh();
+        // Restaura token do sessionStorage no init (F5): garante sincronia com a memória do módulo api.
+        const stored = getStoredAuthToken();
+        if (stored) setAuthToken(stored);
 
-        // 2) agora token existe → pode chamar /me
+        if (!getAuthToken()) {
+          setUser(null);
+          return;
+        }
         const userData = await authService.getCurrentUser();
         setUser(userData);
       } catch (e) {
-        await authService.logout();
+        // await authService.logout();
+        console.error("Erro ao carregar usuário", e);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -51,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: !!getAuthToken(), //isAuthenticated: !!user,
         isLoading,
         login,
         logout,

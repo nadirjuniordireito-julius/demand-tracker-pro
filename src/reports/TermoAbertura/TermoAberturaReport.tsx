@@ -1,5 +1,5 @@
-const logoIbama = `${window.location.origin}/ibama.jpg`;
-const logoUfla = `${window.location.origin}/ufla.png`;
+const defaultLogoIbama = `${typeof window !== 'undefined' ? window.location.origin : ''}/ibama.jpg`;
+const defaultLogoUfla = `${typeof window !== 'undefined' ? window.location.origin : ''}/ufla1.png`;
 
 import {
     Document,
@@ -30,6 +30,10 @@ import {
     DEMANDA_CODIGO: string;
     DATA_ABERTURA: string;
     TERMO_DESCRICAO: string;
+    /** URL do logo Ibama (se omitido, usa /ibama.jpg na origin) */
+    logoIbama?: string;
+    /** URL do logo UFLA (se omitido, usa /ufla1.png na origin; use import de asset para PDF) */
+    logoUfla?: string;
     /** Quando fornecidas (ex.: geração via service sem contexto i18n), substituem t() */
     labels?: TAD5Labels;
   };
@@ -94,8 +98,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginTop: 10,
-    marginBottom: 4,
     fontWeight: "bold",
+  },
+  sectionSubTitle: {
+    fontSize: 4,
+    fontWeight: "normal",
   },
   box: {
     minHeight: 160,
@@ -110,7 +117,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   assinatura: {
-    marginTop: 30,
+    marginTop: 40,
     textAlign: "center",
   },
   footer: {
@@ -154,12 +161,16 @@ const styles = StyleSheet.create({
       DEMANDA_CODIGO,
       DATA_ABERTURA,
       TERMO_DESCRICAO,
+      logoIbama = defaultLogoIbama,
+      logoUfla = defaultLogoUfla,
       labels: L,
     } = props;
 
     return (
       <Document>
+        
         <Page size="A4" style={styles.page} wrap>
+          
           <View style={styles.header} fixed>
             <Image src={logoIbama} style={styles.logo} />
             <View style={styles.headerCenter}>
@@ -172,7 +183,7 @@ const styles = StyleSheet.create({
           <View style={styles.headerLine} fixed />
 
           <Text style={styles.title}>{L.documentTitle}</Text>
-
+         
           <View style={styles.labelRow}>
             <Text style={styles.label}>{L.demandNumber}</Text>
             <Text style={styles.value}>{DEMANDA_CODIGO}</Text>
@@ -189,7 +200,14 @@ const styles = StyleSheet.create({
           </View>
 
           <Text style={styles.sectionTitle}>{L.signature}</Text>
-          <Text>{L.signatureNote}</Text>
+          <Text
+            style={{
+              fontFamily: "Times-Italic",
+              fontSize: 8,
+            }}
+          >
+            {L.signatureNote}
+          </Text>
 
           <View style={styles.assinatura}>
             <Text>________________________________________</Text>

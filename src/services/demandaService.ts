@@ -9,6 +9,7 @@ import type {
   DemandaTecnica, 
   DemandaTecnicaCreateDTO, 
   DemandaTecnicaUpdateDTO, 
+  DemandaTimelineEventoDTO,
   PaginatedResponse,
   DemandStatus
 } from '@/types';
@@ -17,6 +18,7 @@ const ENDPOINTS = {
   base: '/demandas',
   byId: (id: number) => `/demandas/${id}`,
   cancel: (id: number) => `/demandas/${id}/cancelar`,
+  timeline: (id: number) => `/demandas/${id}/timeline`,
 };
 
 export interface DemandaFilters {
@@ -77,10 +79,19 @@ export const demandaService = {
   },
 
   /**
-   * Cancela uma demanda (status -> Z). Só permitido se status !== G
+   * Cancela uma demanda (status -> Z). Só permitido se status !== G.
+   * Backend: PUT /api/demandas/{id}/cancelar; retorna 200 com DemandaTecnicaDTO atualizado (status: "Z").
+   * Envia {} para evitar 500 quando o servidor recebe Content-Type: application/json sem body.
    */
   async cancel(id: number): Promise<DemandaTecnica> {
-    return api.put<DemandaTecnica>(ENDPOINTS.cancel(id));
+    return api.put<DemandaTecnica>(ENDPOINTS.cancel(id), {});
+  },
+
+  /**
+   * Timeline de eventos da demanda (GET /api/demandas/{id}/timeline).
+   */
+  async getTimeline(id: number): Promise<DemandaTimelineEventoDTO[]> {
+    return api.get<DemandaTimelineEventoDTO[]>(ENDPOINTS.timeline(id));
   },
 };
 

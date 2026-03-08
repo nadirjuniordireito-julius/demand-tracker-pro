@@ -74,6 +74,22 @@ function nodeKey(node: SemaforoNodeDTO): string {
 const sortByCodigo = (a: SemaforoNodeDTO, b: SemaforoNodeDTO) =>
   (a.codigo ?? '').localeCompare(b.codigo ?? '', undefined, { numeric: true });
 
+/** Indica se o nó é uma demanda cancelada (status Z). Aceita camelCase e snake_case. */
+function isDemandaCancelada(node: SemaforoNodeDTO): boolean {
+  if (node.nivel !== 'DEMANDA') return false;
+  const raw = node as unknown as Record<string, unknown>;
+  const status = raw.statusDemanda ?? raw.status_demanda ?? raw.situacao ?? '';
+  return String(status) === 'Z';
+}
+
+/** Retorna cópia da árvore excluindo demandas canceladas. */
+function filterTreeExcludingCancelledDemandas(root: SemaforoNodeDTO): SemaforoNodeDTO {
+  const children = (root.children ?? [])
+    .filter((child) => !isDemandaCancelada(child))
+    .map((child) => filterTreeExcludingCancelledDemandas(child));
+  return { ...root, children };
+}
+
 function SemaforoTree({ root }: SemaforoTreeProps) {
   const { t } = useTranslation();
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -230,8 +246,17 @@ function SemaforoTree({ root }: SemaforoTreeProps) {
     );
   };
 
+  const getDemandaStatusLabel = (node: SemaforoNodeDTO): string => {
+    const raw = node as unknown as Record<string, unknown>;
+    const code = String(raw.statusDemanda ?? raw.status_demanda ?? raw.situacao ?? '').toUpperCase();
+    if (!code) return '—';
+    const label = t(`demands.status${code}`);
+    return label ?? code;
+  };
+
   const renderDemandaRow = (node: SemaforoNodeDTO, level: number) => {
     const key = nodeKey(node);
+    const statusLabel = getDemandaStatusLabel(node);
     return (
       <div
         key={key}
@@ -248,8 +273,9 @@ function SemaforoTree({ root }: SemaforoTreeProps) {
                 {t('projectSemaphore.level.demanda')}
               </span>
               <span className="text-xs text-muted-foreground shrink-0">·</span>
-              <span className="truncate min-w-0">{node.codigo}</span>
-              <span className="text-muted-foreground truncate min-w-0">— {node.nome}</span>
+              <span className="truncate min-w-0">
+                {node.codigo} — [ <span className="font-medium text-emerald-600">{statusLabel}</span> ] — {node.nome}
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
               {typeof node.valorTotalExecutado === 'number' && (
@@ -420,7 +446,7 @@ export default function ProjetoSemaforoPage() {
                 {t('projectSemaphore.legend.gray')}
               </Badge>
             </div>
-            <SemaforoTree root={data} />
+            <SemaforoTree root={filterTreeExcludingCancelledDemandas(data)} />
           </div>
         )}
       </Card>

@@ -92,8 +92,7 @@ export default function DemandasPage() {
     const requestedPage = currentPage;
     await execute(
       () => demandaService.findAll({ 
-        nome: search || undefined,
-        codigo: search || undefined,
+        codigo: search.trim() || undefined,
         projetoId: selectedProject.id,
         status: statusFilter !== 'all' ? statusFilter as DemandStatus : undefined,
         page: requestedPage + 1, // Backend espera 1-based
@@ -267,9 +266,15 @@ export default function DemandasPage() {
       hideOnMobile: true,
     },
     {
+      key: 'produto',
+      label: t('demands.product'),
+      render: (demanda) => demanda.metaProduto?.codigo ?? '-',
+      hideOnMobile: true,
+    },    {
       key: 'codigo',
       label: t('demands.code'),
     },
+
     {
       key: 'nome',
       label: t('demands.name'),
@@ -565,7 +570,7 @@ export default function DemandasPage() {
       <SearchFilterBar 
         searchValue={search} 
         onSearchChange={(v) => { setSearch(v); setCurrentPage(0); }} 
-        searchPlaceholder={t('common.searchByCodeOrName')} 
+        searchPlaceholder={t('demands.searchByCode')} 
         onRefresh={loadData}
       >
         <FilterSelect 
@@ -659,7 +664,7 @@ export default function DemandasPage() {
         </>
       )}
 
-      {/* Form Dialog */}
+      {/* Form Dialog - fecha pelo X do header ou botões (regra global no DialogContent) */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeaderStandard

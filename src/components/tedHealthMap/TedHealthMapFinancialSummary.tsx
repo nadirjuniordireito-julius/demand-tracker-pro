@@ -34,7 +34,7 @@ export function TedHealthMapFinancialSummary({
     : null;
 
   return (
-    <div className="rounded-lg border bg-card p-4 flex flex-wrap items-center justify-between gap-4 min-w-0 max-w-full overflow-hidden">
+<div className="rounded-lg border border-slate-300 dark:border-slate-600 bg-card p-4 flex flex-wrap items-center justify-between gap-4 min-w-0 max-w-full overflow-hidden shadow-[0_2px_6px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]">        
       <div className="flex gap-6 min-w-0 shrink">
         <div className="flex flex-col gap-1 text-sm text-muted-foreground shrink-0">
           <span className="whitespace-nowrap">{t('healthMapFinancial.totalProject')}</span>

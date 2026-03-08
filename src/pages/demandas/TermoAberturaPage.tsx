@@ -41,7 +41,7 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
-import { Upload, FileText, Trash2, Eye, FileDown, Calendar } from 'lucide-react';
+import { Upload, FileText, Trash2, Eye, FileDown, Calendar, ChevronDown, MoreHorizontal } from 'lucide-react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import {
   Popover,
@@ -49,6 +49,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import logoUfla from '@/assets/ufla1.png';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { canCreateTermoAbertura, canUploadTermoAbertura, canDeleteTermoAbertura, canSaveTermoAbertura, canDeleteDocTermoAbertura } from '@/lib/demandaStatus';
 import type { TermoAbertura, DemandaTecnica, TermoAberturaDocResponseDTO } from '@/types';
 
@@ -115,7 +122,7 @@ export default function TermoAberturaPage() {
       
       // Pré-preenche o campo de demanda no formulário
       form.setValue('demandaTecnicaId', String(demandaId));
-
+      
       // Busca termo existente
       const termoExistente = await termoAberturaService.findByDemandaId(Number(demandaId));
       
@@ -145,7 +152,7 @@ export default function TermoAberturaPage() {
         form.reset({
           demandaTecnicaId: String(demandaId),
           dataAbertura: new Date(),
-          descricao: '',
+          descricao: demandaData.descricao || '',
         });
       }
 
@@ -449,8 +456,8 @@ export default function TermoAberturaPage() {
 
   return (
     <div className="space-y-6">
-      {/* Form Dialog - sempre aberto quando a página carrega */}
-      <Dialog open={isFormOpen} onOpenChange={handleClose}>
+      {/* Form Dialog - fecha pelo X do header ou botões (regra global no DialogContent) */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeaderStandard
             title={selectedTermo ? t('openingTerm.editTerm') : t('openingTerm.newTerm')}
@@ -585,54 +592,69 @@ export default function TermoAberturaPage() {
                 </div>
               )}
 
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                <div className="flex gap-2">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4 border-t">
+                <div className="flex items-center gap-2">
                   {selectedTermo && (
-                    <>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleGeneratePdf}
-                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoAbertura(demanda?.status)}
-                        className="flex items-center gap-2"
-                        title={t('openingTerm.generatePdf')}
-                      >
-                        <FileDown className="h-4 w-4" />
-                        {t('openingTerm.generatePdf')}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleOpenUpload}
-                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoAbertura(demanda?.status)}
-                        className="flex items-center gap-2"
-                      >
-                        <Upload className="h-4 w-4" />
-                        {documento ? t('openingTerm.replaceDocument') : t('openingTerm.uploadDocument')}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="destructive" 
-                        onClick={handleDelete} 
-                        disabled={isSaving || isDeleting || !canDeleteTermoAbertura(demanda?.status)}
-                      >
-                        {t('common.delete')}
-                      </Button>
-                    </>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isSaving || isDeleting || isLoadingDoc}
+                          className="gap-2"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                          {t('openingTerm.documentAndAttachments')}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="min-w-[220px]">
+                        <DropdownMenuItem
+                          onClick={handleGeneratePdf}
+                          disabled={!canUploadTermoAbertura(demanda?.status)}
+                        >
+                          <FileDown className="h-4 w-4 mr-2" />
+                          {t('openingTerm.generatePdf')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleOpenUpload}
+                          disabled={!canUploadTermoAbertura(demanda?.status)}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {documento ? t('openingTerm.replaceDocument') : t('openingTerm.uploadDocument')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  {selectedTermo && canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={handleDelete}
+                      disabled={isSaving || isDeleting || !canDeleteTermoAbertura(demanda?.status)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {t('common.delete')}
+                    </Button>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  <LoadingButton 
-                    type="submit" 
-                    isLoading={isSaving} 
-                    loadingText={t('common.saving')} 
-                    disabled={isDeleting || !(canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) || (!!demanda && !selectedTermo && demanda?.status == null && demanda?.situacao == null))}
-                  >
-                    {t('common.save')}
-                  </LoadingButton>
+                  {canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) || (!!demanda && !selectedTermo && demanda?.status == null && demanda?.situacao == null) ? (
+                    <LoadingButton
+                      type="submit"
+                      isLoading={isSaving}
+                      loadingText={t('common.saving')}
+                      disabled={isDeleting || !(canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) || (!!demanda && !selectedTermo && demanda?.status == null && demanda?.situacao == null))}
+                    >
+                      {t('common.save')}
+                    </LoadingButton>
+                  ) : null}
                 </div>
               </DialogFooter>
             </form>
@@ -641,8 +663,13 @@ export default function TermoAberturaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+      {/* Delete Confirmation Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isDeleteOpen}
+        onOpenChange={(open) => {
+          if (open) setIsDeleteOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('common.confirmDelete')}</DialogTitle>
@@ -666,8 +693,13 @@ export default function TermoAberturaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Upload Document Dialog */}
-      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+      {/* Upload Document Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isUploadOpen}
+        onOpenChange={(open) => {
+          if (open) setIsUploadOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('openingTerm.uploadDocumentTitle')}</DialogTitle>
@@ -718,8 +750,13 @@ export default function TermoAberturaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Document Confirmation Dialog */}
-      <Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+      {/* Delete Document Confirmation Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isDeleteDocOpen}
+        onOpenChange={(open) => {
+          if (open) setIsDeleteDocOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('openingTerm.deleteDocumentConfirmTitle')}</DialogTitle>
@@ -769,10 +806,12 @@ export default function TermoAberturaPage() {
             termoAberturaDocService.findByTermoAberturaId(selectedTermo.id).then(setDocumento).catch(() => setDocumento(null));
           }
         }}
-        title={t('openingTerm.viewGeneratedPdfTitle')}
-        description={t('openingTerm.viewGeneratedPdfDescription')}
+        title={t('openingTerm.viewDocumentTitle')}
+        
         fetchPdf={() =>
-          termoAberturaService.gerarTermoAssinatura(selectedTermo!.id, selectedProject!.id, 'A')
+          termoAberturaService.gerarTermoAssinatura(selectedTermo!.id, selectedProject!.id, 'A', {
+            logoUfla,
+          })
         }
         loadingLabel={t('openingTerm.generatingPdf')}
         errorMessage={t('openingTerm.generatePdfError')}

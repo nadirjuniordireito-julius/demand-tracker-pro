@@ -8,22 +8,56 @@ import type { z } from 'zod';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
+const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
+
 /**
- * Token de autenticação mantido apenas em memória (não persiste em localStorage).
- * Reduz risco de XSS roubar o token. Ao recarregar a página o usuário precisa fazer login novamente.
+ * Token de autenticação: em memória + sessionStorage para sobreviver ao F5.
+ * sessionStorage é limpo ao fechar a aba (para trocar para localStorage, use getItem/setItem de localStorage).
  */
-let authToken: string | null = null;
+let authToken: string | null = (() => {
+  try {
+    return sessionStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+})();
 
 export const setAuthToken = (token: string | null): void => {
   authToken = token;
+  try {
+    if (token) {
+      sessionStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    } else {
+      sessionStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    }
+  } catch (_) {
+    // storage indisponível (ex.: modo privado)
+  }
 };
 
 export const getAuthToken = (): string | null => {
   return authToken;
 };
 
+/** Lê o token direto do sessionStorage (para restaurar no init após F5, sem depender da ordem de carga dos módulos). */
+export const getStoredAuthToken = (): string | null => {
+  try {
+
+    const stored = sessionStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+
+    if (stored) {
+      setAuthToken(stored); // coloca no axios header
+    }
+
+   //  return sessionStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
 // Headers padrão para requisições
 const getHeaders = (): HeadersInit => {
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -180,23 +214,31 @@ export const silentRefresh = async (): Promise<boolean> => {
       credentials: 'include',
     });
 
-   
     if (!res.ok) return false;
-    if (res.headers.get('content-length') === '0' || res.status === 204) {
-      return true; // consideramos sucesso
-    }
 
-    const data = await res.json().catch(() => null); // evita travar se body estiver vazio
-    if (data?.accessToken) {
-      setAuthToken(data.accessToken); // se existir, atualiza token
+
+    if (res.status === 204) {
+      return false;
     }
-    
+    /*
+    if (res.status === 204 || res.headers.get('content-length') === '0') {
+      // 204 ou body vazio: mantém o token atual (ex.: restaurado do sessionStorage no F5)
+      return true;
+    }
+      */
+
+    const data = await res.json().catch(() => null);
+    const newToken = data?.accessToken ?? data?.token ?? data?.access_token;
+    if (newToken) {
+      setAuthToken(newToken);
+    }
+    // Se não veio token no body, não limpa: evita perder sessão no F5; o loop 401 é evitado pelo _no401Retry no request()
     return true;
   } catch (err) {
     console.error('Silent refresh failed', err);
     return false;
   }
-}
+};
 // Função para mostrar toast de erro (importada dinamicamente para evitar dependência circular)
 let showErrorToastFn: ((error: ApiError) => void) | null = null;
 
@@ -214,13 +256,19 @@ export const setErrorHandledByHook = (handled: boolean) => {
 /** Opções extras para request (silent, allow404, schema Zod para validar resposta) */
 export type RequestOptions = RequestInit & {
   credentials?: RequestCredentials;
+  silent?: boolean;
+  allow404?: boolean;
+  allow500?: boolean;
+  schema?: z.ZodTypeAny;
+  /** Uso interno: evita loop infinito 401 → refresh → 401 */
+  _no401Retry?: boolean;
 };
 // Função genérica para fazer requisições
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { credentials, ...fetchOptions } = options;
+  const { credentials, _no401Retry, ...fetchOptions } = options;
   const url = `${API_BASE_URL}${endpoint}`;
 
   const config: RequestInit = {
@@ -235,14 +283,17 @@ async function request<T>(
   try {
     const response = await fetch(url, config);
 
-    // Tratamento de erro de autenticação
-    if (response.status === 401 && authToken) {
+    // Tratamento de erro de autenticação: só tenta refresh uma vez para não entrar em loop
+    if (response.status === 401 && authToken && !_no401Retry) {
       const refreshed = await silentRefresh();
-    
       if (refreshed) {
-        return request<T>(endpoint, options); // tenta de novo
+        return request<T>(endpoint, { ...options, _no401Retry: true });
       }
-    
+      setAuthToken(null);
+      window.location.href = '/login';
+      throw new ApiError('Sessão expirada. Faça login novamente.', 401);
+    }
+    if (response.status === 401) {
       setAuthToken(null);
       window.location.href = '/login';
       throw new ApiError('Sessão expirada. Faça login novamente.', 401);
@@ -251,7 +302,11 @@ async function request<T>(
     // Tratamento de erros HTTP
     if (!response.ok) {
       const apiError = await extractErrorFromResponse(response);
-      if (credentials && response.status === 404) apiError.allow404 = true;
+      // if (credentials && response.status === 404) apiError.allow404 = true;
+
+      if (response.status === 404 && !options.allow404 && options.silent) {
+        return null as T;
+      }
 
       if (!credentials && import.meta.env.DEV) {
         console.error(
@@ -262,9 +317,9 @@ async function request<T>(
       }
       
       // Mostra toast automaticamente apenas se não estiver sendo tratado por hook
-      // e não estiver em modo silencioso
-      // Isso evita toasts duplicados quando useApi já trata o erro
-      if (!credentials && !isHandledByHook && showErrorToastFn) {
+      // e não estiver em modo silencioso.
+      // Não exibe toast para 401 quando não há token (usuário já está na tela de login).
+      if (!credentials && !isHandledByHook && showErrorToastFn && !(response.status === 401 && !authToken)) {
         showErrorToastFn(apiError);
       }
       
@@ -281,7 +336,8 @@ async function request<T>(
   } catch (error) {
     // Se já for um ApiError, apenas relança
     if (error instanceof ApiError) {
-      if (!isHandledByHook && showErrorToastFn && !error.message.includes('Sessão expirada') && !error.allow404) {
+      const isUnauthorizedOnLoginPage = error.status === 401 && !authToken;
+      if (!isHandledByHook && showErrorToastFn && !error.message.includes('Sessão expirada') && !error.allow404 && !isUnauthorizedOnLoginPage) {
         showErrorToastFn(error);
       }
       throw error;

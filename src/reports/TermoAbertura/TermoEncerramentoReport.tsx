@@ -1,5 +1,5 @@
-const logoIbama = `${window.location.origin}/ibama.jpg`;
-const logoUfla = `${window.location.origin}/ufla.png`;
+const defaultLogoIbama = `${typeof window !== 'undefined' ? window.location.origin : ''}/ibama.jpg`;
+const defaultLogoUfla = `${typeof window !== 'undefined' ? window.location.origin : ''}/ufla1.png`;
 
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { useTranslation } from "react-i18next";
@@ -31,6 +31,10 @@ export type TEProps = {
   RESULTADO_ENTREGUE: string;
   CUSTOS_DETALHADOS: CustoItem[]; 
   totalGeral: number;
+  /** URL do logo Ibama (se omitido, usa /ibama.jpg na origin) */
+  logoIbama?: string;
+  /** URL do logo UFLA (se omitido, usa /ufla1.png na origin; use import de asset para PDF) */
+  logoUfla?: string;
   /** Quando fornecidas (ex.: geração via service sem contexto i18n), substituem t() */
   labels?: TELabels;
 };
@@ -149,6 +153,8 @@ export function TermoEncerramentoReportInner(props: TEPropsWithLabels) {
     RESULTADO_ENTREGUE,
     CUSTOS_DETALHADOS,
     totalGeral,
+    logoIbama = defaultLogoIbama,
+    logoUfla = defaultLogoUfla,
     labels: L,
   } = props;
 

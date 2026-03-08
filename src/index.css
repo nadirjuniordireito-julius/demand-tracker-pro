@@ -57,6 +57,11 @@
     --input: 220 13% 87%;
     --ring: 220 13% 26%;
 
+    /* Sombras (padrão) */
+    --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+    --shadow-elevated: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+
     --radius: 0.375rem;
 
     /* Sidebar */
@@ -84,6 +89,51 @@
     --table-header: 220 9% 96%;
     --table-row-hover: 220 9% 98%;
     --table-border: 220 13% 91%;
+  }
+
+  /* Tema Claro - fundo branco, tons neutros, sombras mais evidentes (cara moderna, sem tom de IA) */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    --primary: 220 13% 26%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 15%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 0 0% 94%;
+    --accent-foreground: 220 13% 26%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 220 13% 26%;
+
+    --header-background: 0 0% 100%;
+    --header-foreground: 0 0% 9%;
+    --header-border: 0 0% 90%;
+
+    --footer-background: 0 0% 98%;
+    --footer-foreground: 0 0% 40%;
+    --footer-border: 0 0% 90%;
+
+    --table-header: 0 0% 96%;
+    --table-row-hover: 0 0% 98%;
+    --table-border: 0 0% 91%;
+
+    /* Sombras mais evidentes e um pouco mais escuras */
+    --shadow-subtle: 0 2px 4px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+    --shadow-card: 0 4px 10px -2px rgb(0 0 0 / 0.12), 0 2px 6px -2px rgb(0 0 0 / 0.08);
+    --shadow-elevated: 0 8px 16px -2px rgb(0 0 0 / 0.14), 0 4px 8px -4px rgb(0 0 0 / 0.1);
   }
 
   /* Tema Light Blue - Inspirado em identidade corporativa limpa com azul vibrante.
@@ -229,6 +279,17 @@
   /* Form elements */
   input, textarea, select {
     @apply transition-colors duration-200;
+  }
+
+  /* Remove fundo azul/amarelo do autofill do navegador (login e demais inputs) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+    box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground));
+    transition: background-color 5000s ease-in-out 0s;
   }
 
   /* Focus states */

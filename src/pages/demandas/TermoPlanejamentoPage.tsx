@@ -13,7 +13,9 @@ import {
   Eye,
   FileDown,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,10 +53,17 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import logoUfla from '@/assets/ufla1.png';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { termoPlanejamentoService } from '@/services/termoService';
 import { termoPlanejamentoDocService } from '@/services/termoDocService';
@@ -65,7 +74,7 @@ import { useProject } from '@/contexts/ProjectContext';
 import { termoPlanejamentoSchema, type TermoPlanejamentoFormData } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
-import { canCreateTermoPlanejamento, canUploadTermoPlanejamento, canDeleteTermoPlanejamento, canSaveTermoPlanejamento, canDeleteDocTermoPlanejamento } from '@/lib/demandaStatus';
+import { canCreateTermoPlanejamento, canUploadTermoPlanejamento, canDeleteTermoPlanejamento, canSaveTermoPlanejamento, canDeleteDocTermoPlanejamento, normalizeDemandaStatus } from '@/lib/demandaStatus';
 import type { TermoPlanejamento, TermoPlanejamentoCusto, DemandaTecnica, Perfil, TermoPlanejamentoDocResponseDTO } from '@/types';
 
 interface CustoForm {
@@ -590,8 +599,8 @@ export default function TermoPlanejamentoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Form Dialog - sempre aberto quando a página carrega */}
-      <Dialog open={isFormOpen} onOpenChange={handleClose}>
+      {/* Form Dialog - fecha pelo X do header ou botões (regra global no DialogContent) */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeaderStandard
             title={selectedTermo ? t('planningTerm.editTerm') : t('planningTerm.newTerm')}
@@ -615,7 +624,7 @@ export default function TermoPlanejamentoPage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>{t('common.demandCodeLabel')}</TableHead>
-                            <TableHead>{t('common.demandDescriptionLabel')}</TableHead>
+                            
                             <TableHead>{t('common.metaCodeLabel')}</TableHead>
                             <TableHead>{t('common.productCodeLabel')}</TableHead>
                             <TableHead>{t('common.productTotalPlannedLabel')}</TableHead>
@@ -625,7 +634,7 @@ export default function TermoPlanejamentoPage() {
                         <TableBody>
                           <TableRow>
                             <TableCell>{demanda.codigo}</TableCell>
-                            <TableCell>{demanda.nome}</TableCell>
+                           
                             <TableCell>{demanda.metaProduto?.projetoMeta?.codigo ?? '—'}</TableCell>
                             <TableCell>{demanda.metaProduto?.codigo ?? '—'}</TableCell>
                             <TableCell>
@@ -801,6 +810,7 @@ export default function TermoPlanejamentoPage() {
                             value={field.value || ''}
                             onChange={field.onChange}
                             placeholder={t('common.schedulePlaceholder')}
+                            height="20px"
                           />
                         </FormControl>
                         <FormMessage />
@@ -857,7 +867,7 @@ export default function TermoPlanejamentoPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">{t('planningTerm.costs')}</CardTitle>
-                        <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
+                        <Button type="button" variant="ghost" size="sm" onClick={handleAddCusto}>
                           <Plus className="h-4 w-4 mr-1" />
                           {t('planningTerm.addCost')}
                         </Button>
@@ -924,11 +934,11 @@ export default function TermoPlanejamentoPage() {
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0 text-destructive"
+                                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
                                     onClick={() => handleRemoveCusto(index)}
                                     aria-label={t('common.remove')}
                                   >
-                                    <X className="h-4 w-4" />
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                                 {custoErrors[index] && (
@@ -997,54 +1007,69 @@ export default function TermoPlanejamentoPage() {
                 </div>
               )}
 
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                <div className="flex gap-2">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4 border-t">
+                <div className="flex items-center gap-2">
                   {selectedTermo && (
-                    <>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleGeneratePdf}
-                        disabled={isSaving || isDeleting || !selectedProject || !canUploadTermoPlanejamento(demanda?.status)}
-                        className="flex items-center gap-2"
-                        title={t('planningTerm.generatePdf')}
-                      >
-                        <FileDown className="h-4 w-4" />
-                        {t('planningTerm.generatePdf')}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleOpenUpload}
-                        disabled={isSaving || isDeleting || isLoadingDoc || !canUploadTermoPlanejamento(demanda?.status)}
-                        className="flex items-center gap-2"
-                      >
-                        <Upload className="h-4 w-4" />
-                        {documento ? t('planningTerm.replaceDocument') : t('planningTerm.uploadDocument')}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="destructive" 
-                        onClick={handleDelete} 
-                        disabled={isSaving || isDeleting || !canDeleteTermoPlanejamento(demanda?.status)}
-                      >
-                        {t('common.delete')}
-                      </Button>
-                    </>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isSaving || isDeleting || isLoadingDoc}
+                          className="gap-2"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                          {t('planningTerm.documentAndAttachments')}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="min-w-[220px]">
+                        <DropdownMenuItem
+                          onClick={handleGeneratePdf}
+                          disabled={!selectedProject || !canUploadTermoPlanejamento(demanda?.status)}
+                        >
+                          <FileDown className="h-4 w-4 mr-2" />
+                          {t('planningTerm.generatePdf')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleOpenUpload}
+                          disabled={!canUploadTermoPlanejamento(demanda?.status)}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {documento ? t('planningTerm.replaceDocument') : t('planningTerm.uploadDocument')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  {selectedTermo && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={handleDelete}
+                      disabled={isSaving || isDeleting || !canDeleteTermoPlanejamento(demanda?.status)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {t('common.delete')}
+                    </Button>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  <LoadingButton 
-                    type="submit" 
-                    isLoading={isSaving} 
-                    loadingText={t('common.saving')} 
-                    disabled={isDeleting || !canSaveTermoPlanejamento(demanda?.status ?? demanda?.situacao)}
-                  >
-                    {t('common.save')}
-                  </LoadingButton>
+                  {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                    <LoadingButton
+                      type="submit"
+                      isLoading={isSaving}
+                      loadingText={t('common.saving')}
+                      disabled={isDeleting || !canSaveTermoPlanejamento(demanda?.status ?? demanda?.situacao)}
+                    >
+                      {t('common.save')}
+                    </LoadingButton>
+                  )}
                 </div>
               </DialogFooter>
             </form>
@@ -1052,8 +1077,13 @@ export default function TermoPlanejamentoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+      {/* Delete Confirmation Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isDeleteOpen}
+        onOpenChange={(open) => {
+          if (open) setIsDeleteOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('common.confirmDelete')}</DialogTitle>
@@ -1077,8 +1107,13 @@ export default function TermoPlanejamentoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Upload Document Dialog */}
-      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+      {/* Upload Document Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isUploadOpen}
+        onOpenChange={(open) => {
+          if (open) setIsUploadOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('planningTerm.uploadDocumentTitle')}</DialogTitle>
@@ -1129,8 +1164,13 @@ export default function TermoPlanejamentoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Document Confirmation Dialog */}
-      <Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+      {/* Delete Document Confirmation Dialog - fecha apenas pelos botões */}
+      <Dialog
+        open={isDeleteDocOpen}
+        onOpenChange={(open) => {
+          if (open) setIsDeleteDocOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('planningTerm.deleteDocumentConfirmTitle')}</DialogTitle>
@@ -1189,7 +1229,8 @@ export default function TermoPlanejamentoPage() {
           termoPlanejamentoService.gerarTermoAssinatura(
             selectedTermo!.id,
             selectedProject!.id,
-            'P'
+            'P',
+            { logoUfla }
           )
         }
         loadingLabel={t('planningTerm.generatingPdf')}

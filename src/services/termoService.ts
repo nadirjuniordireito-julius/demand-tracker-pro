@@ -61,7 +61,7 @@ export const termoAberturaService = {
 
   async findByDemandaId(demandaId: number): Promise<TermoAbertura | null> {
     try {
-      return await api.get<TermoAbertura>(ABERTURA_ENDPOINTS.byDemanda(demandaId));
+      return await api.get<TermoAbertura>(ABERTURA_ENDPOINTS.byDemanda(demandaId), { allow404: false, silent: true });
     } catch {
       return null;
     }
@@ -92,10 +92,15 @@ export const termoAberturaService = {
 
   /**
    * Gera o PDF do termo de abertura usando TermoAberturaReport, grava em TermoAberturaDoc e retorna o blob para preview.
+   * @param options.logoUfla - URL do logo UFLA (use import de asset, ex.: import ufla from '@/assets/ufla1.png', para aparecer no PDF)
+   * @param options.logoIbama - URL do logo Ibama (opcional)
    */
-  async gerarTermoAssinatura(id: number, projetoId: number, _tipo: 'A' | 'P' | 'E'): Promise<Blob> {
-    
- 
+  async gerarTermoAssinatura(
+    id: number,
+    projetoId: number,
+    _tipo: 'A' | 'P' | 'E',
+    options?: { logoIbama?: string; logoUfla?: string }
+  ): Promise<Blob> {
     const termo = await this.findById(id);
     const demanda = await demandaService.findById(termo.demandaTecnicaId);
     const projeto = await projetoService.findById(projetoId);
@@ -117,6 +122,7 @@ export const termoAberturaService = {
       DEMANDA_CODIGO: demanda.codigo ?? '',
       DATA_ABERTURA: dataAberturaFormatada ?? '',
       TERMO_DESCRICAO: descricaoTexto || '',
+      ...options,
       labels: {
         documentTitle: i18n.t('openingTerm.report.documentTitle'),
         demandNumber: i18n.t('openingTerm.report.demandNumber'),
@@ -177,7 +183,7 @@ export const termoPlanejamentoService = {
   async findByDemandaId(demandaId: number): Promise<TermoPlanejamento | null> {
     try {
       return await api.get<TermoPlanejamento>(PLANEJAMENTO_ENDPOINTS.byDemanda(demandaId), {
-        allow404: true,
+        allow404: false,
         silent: true, // 404/500 = termo ainda não existe (usuário vai preencher); evita log e toast
       });
     } catch {
@@ -210,8 +216,15 @@ export const termoPlanejamentoService = {
 
   /**
    * Gera o PDF do termo de planejamento usando TermoPlanejamentoReport, grava em TermoPlanejamentoDoc e retorna o blob para preview.
+   * @param options.logoUfla - URL do logo UFLA (use import de asset para aparecer no PDF)
+   * @param options.logoIbama - URL do logo Ibama (opcional)
    */
-  async gerarTermoAssinatura(id: number, projetoId: number, _tipo: 'A' | 'P' | 'E'): Promise<Blob> {
+  async gerarTermoAssinatura(
+    id: number,
+    projetoId: number,
+    _tipo: 'A' | 'P' | 'E',
+    options?: { logoIbama?: string; logoUfla?: string }
+  ): Promise<Blob> {
     const termo = await this.findById(id);
     const demanda = await demandaService.findById(termo.demandaTecnicaId);
     const projeto = await projetoService.findById(projetoId);
@@ -225,14 +238,15 @@ export const termoPlanejamentoService = {
         ? format(parseISO(termo.dataAbertura), 'dd/MM/yyyy', { locale: ptBR })
         : format(new Date(termo.dataAbertura + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }));
 
-    const custosLinhas = (termo.custos ?? []).map((c) => {
-      const total = (c.qtdeHora ?? 0) * (c.valorHora ?? 0);
-      const perfilNome = c.perfil?.nome ?? '-';
-      return `${perfilNome}\t${c.qtdeHora ?? 0}\t${c.valorHora ?? 0}\t${total.toFixed(2)}`;
-    });
-    const CUSTOS_DETALHADOS = custosLinhas.length
-      ? custosLinhas.join('\n')
-      : '';
+    const CUSTOS_DETALHADOS = (termo.custos ?? []).map((c) => ({
+      perfil: c.perfil?.nome ?? '-',
+      horas: Number(c.qtdeHora) ?? 0,
+      valorHora: Number(c.valorHora) ?? 0,
+    }));
+    const totalGeral = CUSTOS_DETALHADOS.reduce(
+      (acc, item) => acc + item.horas * item.valorHora,
+      0
+    );
 
     const reportProps = {
       PROJETO_COD_TED: projeto.codTed ?? '',
@@ -243,6 +257,8 @@ export const termoPlanejamentoService = {
       CRONOGRAMA: stripHtml(termo.cronograma),
       RESULTADO_ESPERADO: stripHtml(termo.resultadoEsperado),
       CUSTOS_DETALHADOS,
+      totalGeral,
+      ...options,
       labels: {
         documentTitle: i18n.t('planningTerm.report.documentTitle'),
         demandNumber: i18n.t('planningTerm.report.demandNumber'),
@@ -300,7 +316,7 @@ export const termoEncerramentoService = {
 
   async findByDemandaId(demandaId: number): Promise<TermoEncerramento | null> {
     try {
-      return await api.get<TermoEncerramento>(ENCERRAMENTO_ENDPOINTS.byDemanda(demandaId), { allow404: true });
+      return await api.get<TermoEncerramento>(ENCERRAMENTO_ENDPOINTS.byDemanda(demandaId), { allow404: false, silent: true });
     } catch {
       return null;
     }
@@ -329,7 +345,17 @@ export const termoEncerramentoService = {
     return downloadBlob(`/termos-encerramento/${id}/gerar-pdf?projetoId=${projetoId}&tipo=${tipo}`);
   },
 
-  async gerarTermoAssinatura(id: number, projetoId: number, _tipo: 'A' | 'P' | 'E'): Promise<Blob> {
+  /**
+   * Gera o PDF do termo de encerramento usando TermoEncerramentoReport, grava em TermoEncerramentoDoc e retorna o blob para preview.
+   * @param options.logoUfla - URL do logo UFLA (use import de asset para aparecer no PDF)
+   * @param options.logoIbama - URL do logo Ibama (opcional)
+   */
+  async gerarTermoAssinatura(
+    id: number,
+    projetoId: number,
+    _tipo: 'A' | 'P' | 'E',
+    options?: { logoIbama?: string; logoUfla?: string }
+  ): Promise<Blob> {
     const termo = await this.findById(id);
     const demanda = await demandaService.findById(termo.demandaTecnicaId);
     const projeto = await projetoService.findById(projetoId);
@@ -357,6 +383,7 @@ export const termoEncerramentoService = {
       RESULTADO_ENTREGUE: stripHtml(termo.resultadoEntregue),
       CUSTOS_DETALHADOS : CUSTOS,
       totalGeral: termo.custos?.reduce((acc, c) => acc + (c.qtdeHora ?? 0) * (c.valorHora ?? 0), 0) ?? 0,
+      ...options,
       labels: {
         documentTitle: i18n.t('closingTerm.report.documentTitle'),
         demandNumber: i18n.t('closingTerm.report.demandNumber'),

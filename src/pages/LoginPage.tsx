@@ -46,6 +46,8 @@ const LoginPage = () => {
       toast({
         title: t('auth.loginSuccess'),
         description: t('auth.welcomeBack'),
+        duration: 1000,
+        position: 'top-right',
       });
       navigate(from, { replace: true });
     } catch (error) {

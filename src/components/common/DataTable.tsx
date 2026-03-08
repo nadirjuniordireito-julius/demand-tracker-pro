@@ -97,13 +97,13 @@ export function DataTable<T extends Record<string, any>>({
   const defaultActionsLabel = actionsLabel || t('common.actions');
 
   return (
-    <div className="border rounded-lg overflow-hidden w-full">
+    <div className="border rounded-lg overflow-hidden w-full bg-card shadow-card">
       <Table className="min-w-full">
         <TableHeader>
           <TableRow>
             {actions && actions.length > 0 && (
               <TableHead 
-                className="h-8 py-2 sticky left-0 z-10 bg-background w-[80px] sm:w-[100px] px-2 sm:px-4 border-r"
+                className="h-8 py-2 sticky left-0 z-10 bg-card w-[80px] sm:w-[100px] px-2 sm:px-4 border-r"
                 style={{ minWidth: '80px' }}
               >
                 <span className="text-xs sm:text-sm">{defaultActionsLabel}</span>
@@ -162,7 +162,7 @@ export function DataTable<T extends Record<string, any>>({
                   <TableRow>
                     {actions && actions.length > 0 && (
                       <TableCell 
-                        className="py-2 sticky left-0 z-10 bg-background px-2 sm:px-4 border-r"
+                        className="py-2 sticky left-0 z-10 bg-card px-2 sm:px-4 border-r"
                         style={{ minWidth: '80px' }}
                       >
                     <div className="flex items-center gap-1">

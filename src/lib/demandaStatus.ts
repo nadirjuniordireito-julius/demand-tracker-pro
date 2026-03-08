@@ -144,13 +144,17 @@ export const canUploadTermoPlanejamento = (status: string | undefined): boolean 
 export const canDeleteTermoPlanejamento = (status: string | undefined): boolean =>
   normalizeDemandaStatus(status) === 'D';
 
-/** Termo de Encerramento: pode criar se E; upload se F; excluir termo se F */
+/** Termo de Encerramento: pode criar se E; upload e excluir termo se E ou F (em E pode tudo nesta tela) */
 export const canCreateTermoEncerramento = (status: string | undefined): boolean =>
   normalizeDemandaStatus(status) === 'E';
-export const canUploadTermoEncerramento = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'F';
-export const canDeleteTermoEncerramento = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'F';
+export const canUploadTermoEncerramento = (status: string | undefined): boolean => {
+  const code = normalizeDemandaStatus(status);
+  return code === 'E' || code === 'F';
+};
+export const canDeleteTermoEncerramento = (status: string | undefined): boolean => {
+  const code = normalizeDemandaStatus(status);
+  return code === 'E' || code === 'F';
+};
 
 /** Demanda está encerrada (status G ou "ENCERRADA") */
 export const isDemandaEncerrada = (status: string | undefined): boolean =>

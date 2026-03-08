@@ -21,7 +21,7 @@ export const avaliacaoDemandaService = {
   /** Obtém avaliação (GET) */
   async get(demandaId: number): Promise<DemandaAvaliacaoResponse | null> {
     try {
-      return await api.get<DemandaAvaliacaoResponse>(byDemanda(demandaId));
+      return await api.get<DemandaAvaliacaoResponse>(byDemanda(demandaId), { allow404: false, silent: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) return null;
       throw err;

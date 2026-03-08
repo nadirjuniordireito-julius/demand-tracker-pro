@@ -174,6 +174,72 @@ export const perfilSchema = z.object({
 
 export type PerfilFormData = z.infer<typeof perfilSchema>;
 
+// ==================== Profissional ====================
+export const profissionalSchema = z.object({
+  nome: z
+    .string()
+    .trim()
+    .min(1, { message: 'validation.nameRequired' })
+    .max(500, { message: 'validation.nameMax500' }),
+  tipoPessoa: z.enum(['F', 'J'], { required_error: 'validation.tipoPessoaRequired' }),
+  documento: z
+    .string()
+    .trim()
+    .min(1, { message: 'validation.documentRequired' })
+    .max(100, { message: 'validation.documentMax100' }),
+  funcao: z
+    .string()
+    .trim()
+    .max(255, { message: 'validation.funcaoMax255' })
+    .optional()
+    .or(z.literal('')),
+  valorHora: z
+    .number({
+      required_error: 'validation.valueRequired',
+      invalid_type_error: 'validation.valueNumber',
+    })
+    .positive({ message: 'validation.valuePositive' }),
+  dataInicioAtividade: z.date({
+    required_error: 'validation.dateRequired',
+    invalid_type_error: 'validation.dateInvalid',
+  }),
+  projetoId: z.number({ required_error: 'validation.projectRequired' }).positive(),
+});
+
+export type ProfissionalFormData = z.infer<typeof profissionalSchema>;
+
+// ==================== Desembolso ====================
+export const desembolsoSchema = z.object({
+  documento: z
+    .string()
+    .trim()
+    .max(500, { message: 'validation.documentMax500' })
+    .optional()
+    .or(z.literal('')),
+  valorPrevisto: z
+    .number({
+      required_error: 'validation.valueRequired',
+      invalid_type_error: 'validation.valueNumber',
+    })
+    .max(9999999999999999.99, { message: 'validation.valueTooLarge' }),
+  valor: z
+    .number({
+      required_error: 'validation.valueRequired',
+      invalid_type_error: 'validation.valueNumber',
+    })
+    .max(9999999999999999.99, { message: 'validation.valueTooLarge' }),
+  dataDesembolso: z.date({
+    required_error: 'validation.dateRequired',
+    invalid_type_error: 'validation.dateInvalid',
+  }),
+  dataPrevistaDesembolso: z.date({
+    required_error: 'validation.dateRequired',
+    invalid_type_error: 'validation.dateInvalid',
+  }),
+});
+
+export type DesembolsoFormData = z.infer<typeof desembolsoSchema>;
+
 // ==================== Demanda ====================
 // codigo é opcional na inclusão: o backend calcula automaticamente (sem min(1))
 export const demandaSchema = z.object({
