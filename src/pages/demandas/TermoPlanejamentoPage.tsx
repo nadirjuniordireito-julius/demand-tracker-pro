@@ -881,11 +881,19 @@ export default function TermoPlanejamentoPage() {
                       ) : (
                         <>
                           <div className="flex gap-2 pb-1.5 border-b">
-                            <div className="flex-1 grid grid-cols-4 gap-2">
-                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.profile')}</span>
-                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.hours')}</span>
-                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.hourlyRate')}</span>
-                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.lineTotal')}</span>
+                            <div className="flex-1 grid grid-cols-6 gap-2">
+                              <span className="col-span-3 text-xs font-medium text-muted-foreground">
+                                {t('planningTerm.profile')}
+                              </span>
+                              <span className="col-span-1 text-xs font-medium text-muted-foreground">
+                                {t('planningTerm.hours')}
+                              </span>
+                              <span className="col-span-1 text-xs font-medium text-muted-foreground">
+                                {t('planningTerm.hourlyRate')}
+                              </span>
+                              <span className="col-span-1 text-xs font-medium text-muted-foreground">
+                                {t('planningTerm.lineTotal')}
+                              </span>
                             </div>
                             <div className="w-8 shrink-0" aria-hidden />
                           </div>
@@ -896,12 +904,13 @@ export default function TermoPlanejamentoPage() {
                             return (
                               <div key={'id' in custo && custo.id != null ? String(custo.id) : `custo-${index}`} className="space-y-1">
                                 <div className="flex items-center gap-2 py-1.5 px-2 bg-muted/50 rounded-md">
-                                  <div className="flex-1 grid grid-cols-4 gap-2">
-                                    <Select
-                                      value={custo.perfilId}
-                                      onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
-                                    >
-                                      <SelectTrigger className="h-8">
+                                  <div className="flex-1 grid grid-cols-6 gap-2">
+                                    <div className="col-span-3">
+                                      <Select
+                                        value={custo.perfilId}
+                                        onValueChange={(value) => handleCustoChange(index, 'perfilId', value)}
+                                      >
+                                        <SelectTrigger className="h-8">
                                         <SelectValue placeholder={t('common.selectProfile')} />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -915,18 +924,19 @@ export default function TermoPlanejamentoPage() {
                                           ))
                                         )}
                                       </SelectContent>
-                                    </Select>
+                                        </Select>
+                                    </div>
                                     <Input
+                                      className="col-span-1 h-8"
                                       type="number"
-                                      className="h-8"
                                       value={custo.qtdeHora}
                                       onChange={(e) => handleCustoChange(index, 'qtdeHora', e.target.value)}
                                       placeholder={t('common.hoursPlaceholder')}
                                     />
-                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
+                                    <div className="col-span-1 flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground justify-end text-right">
                                       {custo.valorHora ? formatCurrency(Number(custo.valorHora)) : '—'}
                                     </div>
-                                    <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm font-medium">
+                                    <div className="col-span-1 flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm font-medium justify-end text-right">
                                       {totalLinha > 0 ? formatCurrency(totalLinha) : '—'}
                                     </div>
                                   </div>
@@ -948,12 +958,17 @@ export default function TermoPlanejamentoPage() {
                             );
                           })}
                           <div className="flex gap-2 pt-2 mt-2 border-t font-medium">
-                            <div className="flex-1 grid grid-cols-4 gap-2">
-                              <span className="col-span-2" />
-                              <span className="text-xs font-medium text-muted-foreground">{t('planningTerm.totalCost')}</span>
-                              <span className="text-sm">
+                            <div className="flex-1 grid grid-cols-6 gap-2 items-center">
+                              <span className="col-span-3" />
+                              <span className="col-span-2 text-xs font-medium text-muted-foreground text-right">
+                                {t('planningTerm.totalCost')}
+                              </span>
+                              <span className="col-span-1 text-sm text-right">
                                 {formatCurrency(
-                                  custos.reduce((acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0), 0)
+                                  custos.reduce(
+                                    (acc, c) => acc + (Number(c.qtdeHora) || 0) * (Number(c.valorHora) || 0),
+                                    0
+                                  )
                                 )}
                               </span>
                             </div>

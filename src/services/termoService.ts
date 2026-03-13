@@ -248,14 +248,15 @@ export const termoPlanejamentoService = {
       0
     );
 
+  
     const reportProps = {
       PROJETO_COD_TED: projeto.codTed ?? '',
       PROJETO_NOME: projeto.nome ?? '',
       DEMANDA_CODIGO: demanda.codigo ?? '',
       DATA_ABERTURA: dataFormatada ?? '',
-      ESPECIFICACAO: stripHtml(termo.especificacao),
-      CRONOGRAMA: stripHtml(termo.cronograma),
-      RESULTADO_ESPERADO: stripHtml(termo.resultadoEsperado),
+      ESPECIFICACAO: termo.especificacao,
+      CRONOGRAMA: termo.cronograma,
+      RESULTADO_ESPERADO: termo.resultadoEsperado,
       CUSTOS_DETALHADOS,
       totalGeral,
       ...options,
@@ -276,7 +277,9 @@ export const termoPlanejamentoService = {
     };
 
     const doc = React.createElement(TermoPlanejamentoReportInner, reportProps);
+  
     validatePdfTree(doc);
+  
     const blob = await pdf(doc as React.ReactElement).toBlob();
     const file = new File([blob], `termo-planejamento-${id}.pdf`, { type: 'application/pdf' });
 

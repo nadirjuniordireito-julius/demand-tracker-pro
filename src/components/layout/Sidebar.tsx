@@ -15,6 +15,7 @@ import {
   Target,
   HeartPulse,
   CircleDollarSign,
+  Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,15 +36,18 @@ interface NavItemProps {
 }
 
 interface NavGroupProps {
+  id: string;
   icon: React.ReactNode;
   label: string;
   isCollapsed: boolean;
   children: React.ReactNode;
-  defaultOpen?: boolean;
   /** Prefixo da rota (ex: /cadastros, /demandas) para destacar só quando a rota atual pertence a este grupo */
   pathPrefix: string;
   /** Chamado ao clicar no grupo com menu recolhido, para expandir o sidebar */
   onExpandSidebar?: () => void;
+  /** Controlado pelo pai: só um grupo aberto por vez */
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 function NavItem({ to, icon, label, isCollapsed, end = false }: NavItemProps) {
@@ -67,8 +71,7 @@ function NavItem({ to, icon, label, isCollapsed, end = false }: NavItemProps) {
   );
 }
 
-function NavGroup({ icon, label, isCollapsed, children, defaultOpen = false, pathPrefix, onExpandSidebar }: NavGroupProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+function NavGroup({ id, icon, label, isCollapsed, children, pathPrefix, onExpandSidebar, isOpen, onToggle }: NavGroupProps) {
   const location = useLocation();
 
   const isChildActive = location.pathname === pathPrefix || location.pathname.startsWith(pathPrefix + '/');
@@ -76,10 +79,8 @@ function NavGroup({ icon, label, isCollapsed, children, defaultOpen = false, pat
   const handleClick = () => {
     if (isCollapsed) {
       onExpandSidebar?.();
-      setIsOpen(true);
-    } else {
-      setIsOpen(!isOpen);
     }
+    onToggle();
   };
 
   return (
@@ -173,10 +174,30 @@ function NavSubGroup({ icon, label, isCollapsed, children, defaultOpen = false }
   );
 }
 
+const CADASTROS_GROUP_ID = 'cadastros';
+const DEMANDAS_GROUP_ID = 'demandas';
+
 export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { selectedProject } = useProject();
+  const location = useLocation();
+
+  // Apenas um grupo de menu aberto por vez (accordion)
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+
+  // Ao navegar, abre o grupo que contém a rota atual
+  useEffect(() => {
+    if (location.pathname.startsWith('/cadastros')) {
+      setOpenGroupId(CADASTROS_GROUP_ID);
+    } else if (location.pathname.startsWith('/demandas') || location.pathname.startsWith('/execucao-demandas')) {
+      setOpenGroupId(DEMANDAS_GROUP_ID);
+    }
+  }, [location.pathname]);
+
+  const handleGroupToggle = (id: string) => {
+    setOpenGroupId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <aside
@@ -217,12 +238,14 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
         {/* Cadastros Group - apenas perfil Admin (A) */}
         {user?.perfil === 'A' && (
           <NavGroup
+            id={CADASTROS_GROUP_ID}
             icon={<FolderKanban className="h-5 w-5" />}
             label={t('nav.registrations')}
             isCollapsed={isCollapsed}
-            defaultOpen
             pathPrefix="/cadastros"
             onExpandSidebar={() => isCollapsed && onToggleSidebar()}
+            isOpen={openGroupId === CADASTROS_GROUP_ID}
+            onToggle={() => handleGroupToggle(CADASTROS_GROUP_ID)}
           >
             <NavItem 
               to="/cadastros/usuarios" 
@@ -271,18 +294,29 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
 
         {/* Demandas Group - Visualizador (V) não vê submenu Demanda Técnica */}
         <NavGroup
+          id={DEMANDAS_GROUP_ID}
           icon={<FileText className="h-5 w-5" />}
           label={t('nav.demands')}
           isCollapsed={isCollapsed}
-          defaultOpen
           pathPrefix="/demandas"
           onExpandSidebar={() => isCollapsed && onToggleSidebar()}
+          isOpen={openGroupId === DEMANDAS_GROUP_ID}
+          onToggle={() => handleGroupToggle(DEMANDAS_GROUP_ID)}
         >
           {user?.perfil !== 'V' && (
             <NavItem 
               to="/demandas" 
               icon={<FileText className="h-4 w-4" />} 
               label={t('nav.technicalDemand')} 
+              isCollapsed={isCollapsed}
+              end
+            />
+          )}
+          {user?.perfil !== 'V' && (
+            <NavItem 
+              to="/execucao-demandas" 
+              icon={<Settings2 className="h-4 w-4" />} 
+              label={t('nav.execucaoDemandas', 'Execução de Demandas')} 
               isCollapsed={isCollapsed}
               end
             />

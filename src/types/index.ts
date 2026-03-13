@@ -254,6 +254,7 @@ export interface Profissional {
   dataInicioAtividade: string; // YYYY-MM-DD
   projetoId: number;
   projeto?: Projeto;
+  perfilId: number;
 }
 
 export interface ProfissionalCreateDTO {
@@ -264,6 +265,7 @@ export interface ProfissionalCreateDTO {
   valorHora: number;
   dataInicioAtividade: string; // YYYY-MM-DD
   projetoId: number;
+  perfilId: number;
 }
 
 export interface ProfissionalUpdateDTO {
@@ -274,6 +276,7 @@ export interface ProfissionalUpdateDTO {
   valorHora?: number;
   dataInicioAtividade?: string;
   projetoId?: number;
+  perfilId?: number;
 }
 
 // =====================================================

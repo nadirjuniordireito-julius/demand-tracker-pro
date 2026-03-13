@@ -55,7 +55,7 @@ export default function DemandasPage() {
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaTecnica | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -88,25 +88,34 @@ export default function DemandasPage() {
   // Carrega dados iniciais - filtra apenas demandas do projeto selecionado
   const loadData = useCallback(async () => {
     if (!selectedProject) return;
-    
-    const requestedPage = currentPage;
+
+    const isFilteringByMeta = selectedMetaId !== 'all' && !!selectedMetaId;
+    const requestedPage = isFilteringByMeta ? 0 : currentPage;
+    const requestedSize = isFilteringByMeta ? 1000 : pageSize;
     await execute(
       () => demandaService.findAll({ 
         codigo: search.trim() || undefined,
         projetoId: selectedProject.id,
         status: statusFilter !== 'all' ? statusFilter as DemandStatus : undefined,
         page: requestedPage + 1, // Backend espera 1-based
-        size: pageSize 
+        size: requestedSize,
       }),
       {
         onSuccess: (data) => {
-          setDemandas(data.content);
-          setTotalPages(data.totalPages);
-          setTotalElements(data.totalElements);
+          // Quando filtrando por meta, carregamos tudo em uma única "página" grande
+          if (isFilteringByMeta) {
+            setDemandas(data.content);
+            setTotalPages(1);
+            setTotalElements(data.content.length);
+          } else {
+            setDemandas(data.content);
+            setTotalPages(data.totalPages);
+            setTotalElements(data.totalElements);
+          }
         },
       }
     );
-  }, [execute, search, statusFilter, currentPage, pageSize, selectedProject]);
+  }, [execute, search, statusFilter, currentPage, pageSize, selectedProject, selectedMetaId]);
 
   // Carrega metas e produtos vinculados ao projeto selecionado
   const loadMetasProdutos = useCallback(async () => {

@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -311,6 +312,12 @@ export function TermoEncerramentoAnexosModal({
               </Table>
             )}
           </div>
+
+          <DialogFooter className="mt-4 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              {t('common.close')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

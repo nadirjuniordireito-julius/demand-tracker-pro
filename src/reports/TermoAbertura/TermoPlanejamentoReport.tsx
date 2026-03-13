@@ -141,6 +141,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     padding: 4,
     textAlign: "center",
+    fontSize: 9,
+  },
+  paragraph: {
+    marginBottom: 8,
+    textAlign: "justify",
   },
 });
 
@@ -165,6 +170,24 @@ export function TermoPlanejamentoReportInner(props: TPEPropsWithLabels) {
   } = props;
 
   const moeda = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+
+  const normalizeRichText = (input: string): string => {
+    if (!input) return "";
+
+    let text = input;
+
+    // Normaliza quebras de linha de Windows
+    text = text.replace(/\r\n/g, "\n");
+    // Converte quebras HTML básicas em \n
+    text = text.replace(/<br\s*\/?>/gi, "\n");
+    text = text.replace(/<\/p>/gi, "\n\n");
+    text = text.replace(/<\/li>/gi, "\n");
+    text = text.replace(/<\/h[1-6]>/gi, "\n\n");
+    // Remove demais tags HTML
+    text = text.replace(/<\/?[^>]+>/g, "");
+    
+    return text;
+  };
 
   return (
     <Document>
@@ -193,22 +216,16 @@ export function TermoPlanejamentoReportInner(props: TPEPropsWithLabels) {
         </View>
 
         <Text style={styles.sectionTitle}>{L.specification}</Text>
-        <View style={styles.box}>
-          <Text>{ESPECIFICACAO}</Text>
-        </View>
+        <Text style={styles.paragraph}>{normalizeRichText(ESPECIFICACAO)}</Text>
 
         <Text style={styles.sectionTitle}>{L.schedule}</Text>
-        <View style={styles.box}>
-          <Text>{CRONOGRAMA}</Text>
-        </View>
+        <Text style={styles.paragraph}>{normalizeRichText(CRONOGRAMA)}</Text>
 
         <Text style={styles.sectionTitle}>{L.expectedResult}</Text>
-        <View style={styles.box}>
-          <Text>{RESULTADO_ESPERADO}</Text>
-        </View>
+        <Text style={styles.paragraph}>{normalizeRichText(RESULTADO_ESPERADO)}</Text>
 
         <Text style={styles.sectionTitle}>{L.costs}</Text>
-        <View style={styles.box}>
+        <View wrap={false} style={styles.labelRow}>
           <View style={styles.table}>
             <View style={styles.row} fixed>
               <Text style={styles.cellHeader}>Perfil</Text>
@@ -237,11 +254,13 @@ export function TermoPlanejamentoReportInner(props: TPEPropsWithLabels) {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>{L.signature}</Text>
-        <Text>{L.signatureNote}</Text>
 
-        <View style={styles.assinatura}>
-          <Text>________________________________________</Text>
+        <View style={styles.assinatura} wrap={false}>
+
+          <Text style={styles.sectionTitle}>{L.signature}</Text>
+          <Text>{L.signatureNote}</Text>
+          
+          <Text style={{ marginTop: 36 }}>________________________________________</Text>
           <Text>{L.signerName}</Text>
           <Text>{L.signerRole}</Text>
         </View>

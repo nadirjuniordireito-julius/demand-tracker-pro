@@ -26,9 +26,10 @@ import { cn } from '@/lib/utils';
 import { profissionalSchema, type ProfissionalFormData } from '@/lib/validations';
 import { useApi } from '@/hooks/useApi';
 import { profissionalService } from '@/services/profissionalService';
+import { perfilService } from '@/services/perfilService';
 import { useProject } from '@/contexts/ProjectContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Profissional, PaginatedResponse } from '@/types';
+import type { Profissional, PaginatedResponse, Perfil } from '@/types';
 
 const parseDateOnly = (dateStr: string) => {
   const part = String(dateStr).split('T')[0];
@@ -42,6 +43,7 @@ export default function ProfissionaisPage() {
   const { selectedProject } = useProject();
   const { toast } = useToast();
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -54,6 +56,7 @@ export default function ProfissionaisPage() {
   const { isLoading, error, execute } = useApi<PaginatedResponse<Profissional>>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false);
 
   const form = useForm<ProfissionalFormData>({
     resolver: zodResolver(profissionalSchema),
@@ -65,8 +68,25 @@ export default function ProfissionaisPage() {
       valorHora: 0,
       dataInicioAtividade: new Date(),
       projetoId: 0,
+      perfilId: 0,
     },
   });
+
+  const loadPerfis = useCallback(async () => {
+    if (!selectedProject) return;
+    setIsLoadingPerfis(true);
+    try {
+      const response = await perfilService.findAll({
+        projetoId: selectedProject.id,
+        size: 1000,
+      });
+      setPerfis(response.content);
+    } catch (err) {
+      console.error('Erro ao carregar perfis:', err);
+    } finally {
+      setIsLoadingPerfis(false);
+    }
+  }, [selectedProject]);
 
   const loadData = useCallback(async () => {
     if (!selectedProject) return;
@@ -93,6 +113,10 @@ export default function ProfissionaisPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    loadPerfis();
+  }, [loadPerfis]);
+
   const formatDate = (dateStr: string) =>
     format(parseDateOnly(dateStr) ?? new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
 
@@ -110,6 +134,7 @@ export default function ProfissionaisPage() {
       valorHora: 0,
       dataInicioAtividade: new Date(),
       projetoId: selectedProject.id,
+      perfilId: 0,
     });
     setIsFormOpen(true);
   };
@@ -125,6 +150,7 @@ export default function ProfissionaisPage() {
       valorHora: profissional.valorHora,
       dataInicioAtividade: parseDateOnly(profissional.dataInicioAtividade) ?? new Date(),
       projetoId: selectedProject.id,
+      perfilId: profissional.perfilId,
     });
     setIsFormOpen(true);
   };
@@ -192,6 +218,7 @@ export default function ProfissionaisPage() {
         valorHora: data.valorHora,
         dataInicioAtividade: data.dataInicioAtividade.toISOString().split('T')[0],
         projetoId: selectedProject.id,
+        perfilId: data.perfilId,
       };
       // Update: sempre envia funcao ("" para limpar). Create: só envia se preenchido.
       if (selectedProfissional) {
@@ -368,6 +395,34 @@ export default function ProfissionaisPage() {
                     <FormControl>
                       <Input placeholder={t('professionals.funcaoPlaceholder')} {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="perfilId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('professionals.perfil')} *</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(Number(value))}
+                      value={field.value ? String(field.value) : ''}
+                      disabled={isLoadingPerfis || !selectedProject}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('professionals.selectPerfil')} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {perfis.map((perfil) => (
+                          <SelectItem key={perfil.id} value={String(perfil.id)}>
+                            {perfil.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

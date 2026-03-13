@@ -204,6 +204,12 @@ export const profissionalSchema = z.object({
     invalid_type_error: 'validation.dateInvalid',
   }),
   projetoId: z.number({ required_error: 'validation.projectRequired' }).positive(),
+  perfilId: z
+    .number({
+      required_error: 'validation.profileRequired',
+      invalid_type_error: 'validation.valueNumber',
+    })
+    .positive({ message: 'validation.profileRequired' }),
 });
 
 export type ProfissionalFormData = z.infer<typeof profissionalSchema>;

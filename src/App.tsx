@@ -31,6 +31,9 @@ const TermoPlanejamentoPage = lazy(() => import("./pages/demandas/TermoPlanejame
 const TermoEncerramentoPage = lazy(() => import("./pages/demandas/TermoEncerramentoPage"));
 const AvaliacaoDemandaPage = lazy(() => import("./features/avaliacao-demanda").then((m) => ({ default: m.AvaliacaoDemandaPage })));
 const TedHealthMapPage = lazy(() => import("./pages/TedHealthMapPage"));
+const ExecucaoDemandasListPage = lazy(() => import("./modules/execucaoDemanda/pages/ExecucaoDemandasListPage"));
+const ExecucaoDemandaDetailPage = lazy(() => import("./modules/execucaoDemanda/pages/ExecucaoDemandaDetailPage"));
+const ExecucaoGanttPage = lazy(() => import("./modules/execucaoDemanda/pages/ExecucaoGanttPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -82,6 +85,9 @@ const App = () => {
                           <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />
                           <Route path="/demandas/avaliacao" element={<AvaliacaoDemandaPage />} />
                           <Route path="/demandas/health-map" element={<TedHealthMapPage />} />
+                          <Route path="/execucao-demandas" element={<ExecucaoDemandasListPage />} />
+                          <Route path="/execucao-demandas/:demandaTecnicaId" element={<ExecucaoDemandaDetailPage />} />
+                          <Route path="/execucao-demandas/:demandaTecnicaId/gantt" element={<ExecucaoGanttPage />} />
                           <Route path="/perfil" element={<ProfilePage />} />
                           <Route path="/configuracoes" element={<SettingsPage />} />
                         </Route>
