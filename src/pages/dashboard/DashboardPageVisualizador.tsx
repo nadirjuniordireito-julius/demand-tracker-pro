@@ -8,7 +8,7 @@ import {
   Eye,
 } from 'lucide-react';
 
-const DashboardCharts = lazy(() => import('../DashboardCharts'));
+// const DashboardCharts = lazy(() => import('../DashboardCharts'));
 
 export default function DashboardPageVisualizador() {
   const { t } = useTranslation();

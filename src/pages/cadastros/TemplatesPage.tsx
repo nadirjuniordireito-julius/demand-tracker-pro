@@ -364,9 +364,8 @@ export default function TemplatesPage() {
         />
       )}
 
-      {/* Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      {isFormOpen && (
+        <div className="border rounded-lg p-4 sm:p-6 bg-background">
           <DialogHeaderStandard
             title={selectedTemplate ? t('templates.editTemplate') : t('templates.newTemplate')}
             description={selectedTemplate ? t('common.editTemplate') : t('common.fillTemplate')}
@@ -449,8 +448,8 @@ export default function TemplatesPage() {
               </DialogFooter>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

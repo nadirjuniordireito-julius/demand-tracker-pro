@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -67,7 +68,7 @@ export function ProjectDocumentsModal({ open, onOpenChange, projeto }: ProjectDo
 
   useEffect(() => {
     if (open && projeto?.id) loadDocs();
-  }, [open, projeto?.id, loadDocs]);
+  }, [projeto?.id, loadDocs]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return t('common.fileSizeZero');
@@ -252,6 +253,13 @@ export function ProjectDocumentsModal({ open, onOpenChange, projeto }: ProjectDo
               </Table>
             )}
           </div>
+
+          <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  {t('common.cancel')}
+                </Button>
+          </DialogFooter>
+
         </DialogContent>
       </Dialog>
 

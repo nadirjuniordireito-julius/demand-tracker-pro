@@ -1,0 +1,24 @@
+---
+description: Prevent locale JSON encoding corruption
+alwaysApply: true
+---
+
+# i18n UTF-8 Safety Rule
+
+- Never update `src/i18n/locales/*.json` using shell bulk replace commands.
+- Prefer structured edits (`ApplyPatch`/editor-level changes) for locale files.
+- Keep locale files in UTF-8 and preserve accents exactly.
+- When adding or updating keys, touch all required languages in the same change.
+
+## Required validation after locale edits
+
+1. Run JSON lint/validation on edited locale files.
+2. Run a mojibake scan for common corruption patterns (`cÃ`, `Ã§`, `Ã¡`, `Â`, `�`).
+3. If any corruption appears, stop and fix encoding before continuing.
+
+## Good vs bad
+
+```text
+❌ BAD: "CÃ³digo", "NÃ£o", "�0 necessário"
+✅ GOOD: "Código", "Não", "É necessário"
+```

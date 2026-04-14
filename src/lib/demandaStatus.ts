@@ -39,8 +39,8 @@ const LABEL_TO_CODE: Record<string, string> = {
   'planejamento': 'D',
   'inplanning': 'D',
   // E - Planejado e assinado
-  'planejado': 'E',
-  'planejado e assinado': 'E',
+  'em execução': 'E',
+  'execução': 'E',
   // F - Em encerramento
   'em encerramento': 'F',
   'encerramento': 'F',

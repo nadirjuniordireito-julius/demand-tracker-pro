@@ -1,7 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import type { UserProfile } from '@/types';
-import DashboardPageAdmin from '@/pages/dashboard/DashboardPageAdmin';
-import DashboardPageOperador from '@/pages/dashboard/DashboardPageOperador';
+import DashboardMap from '@/pages/dashboard/DashboardMap';
 import DashboardPageVisualizador from '@/pages/dashboard/DashboardPageVisualizador';
 
 export default function DashboardPage() {
@@ -10,11 +9,11 @@ export default function DashboardPage() {
 
   switch (perfil) {
     case 'A':
-      return <DashboardPageAdmin />;
+      return <DashboardMap />;
     case 'O':
-      return <DashboardPageOperador />;
+      return <DashboardMap />;
     case 'V':
-      return <DashboardPageVisualizador />;
+      return <DashboardMap />;
     default:
       return <DashboardPageVisualizador />;
   }

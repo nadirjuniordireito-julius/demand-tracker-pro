@@ -5,7 +5,17 @@ import { cn } from "@/lib/utils";
 
 const TooltipProvider = TooltipPrimitive.Provider;
 
-const Tooltip = TooltipPrimitive.Root;
+type TooltipProps = React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root> & {
+  visible?: boolean;
+};
+
+const Tooltip = ({ visible = true, ...props }: TooltipProps) => {
+  if (!visible) {
+    return null;
+  }
+
+  return <TooltipPrimitive.Root {...props} />;
+};
 
 const TooltipTrigger = TooltipPrimitive.Trigger;
 

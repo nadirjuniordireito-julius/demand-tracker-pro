@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
+import { PageHeader } from '@/components/common/PageComponents';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { TermoEncerramentoAnexosModal } from '@/components/termo/TermoEncerramentoAnexosModal';
 import { CustoProfissionaisModal, type CustoProfissionalItem } from '@/components/termo/CustoProfissionaisModal';
@@ -98,7 +98,6 @@ export default function TermoEncerramentoPage() {
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoEncerramento | null>(null);
   const [custos, setCustos] = useState<CustoForm[]>([]);
   const [custoProfissionaisModalIndex, setCustoProfissionaisModalIndex] = useState<number | null>(null);
@@ -123,6 +122,12 @@ export default function TermoEncerramentoPage() {
   const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
   const [isAnexosOpen, setIsAnexosOpen] = useState(false);
   const { toast } = useToast();
+  const isSafeInternalPath = (value: string | null): value is string =>
+    !!value && value.startsWith('/') && !value.startsWith('//');
+  const returnTo = (() => {
+    const queryReturnTo = searchParams.get('returnTo');
+    return isSafeInternalPath(queryReturnTo) ? queryReturnTo : null;
+  })();
 
   // Evita deslocamento de timezone: "2025-01-15" sem hora é interpretado como UTC meia-noite
   const parseDateOnly = (dateStr: string) => {
@@ -296,8 +301,6 @@ export default function TermoEncerramentoPage() {
         }
       }
 
-      // Abre o modal automaticamente
-      setIsFormOpen(true);
     } catch (err: unknown) {
       if (import.meta.env.DEV) console.error('Erro ao carregar dados:', err);
       setError(getErrorMessage(err, 'Erro ao carregar dados da demanda'));
@@ -505,7 +508,10 @@ export default function TermoEncerramentoPage() {
   };
 
   const handleClose = () => {
-    setIsFormOpen(false);
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
     navigate('/demandas');
   };
 
@@ -526,9 +532,7 @@ export default function TermoEncerramentoPage() {
         await demandaService.update(demanda.id, { status: 'E' });
       }
       setIsDeleteOpen(false);
-      setIsFormOpen(false);
-      // Redireciona de volta para a página de demandas
-      navigate('/demandas');
+      handleClose();
     } catch (error) {
       // Erro já é tratado automaticamente pela API (toast será exibido)
     } finally {
@@ -686,9 +690,6 @@ export default function TermoEncerramentoPage() {
           onRetry={loadData}
           retryText={t('common.retry')}
         />
-        <Button onClick={() => navigate('/demandas')} variant="outline">
-          {t('common.back')}
-        </Button>
       </div>
     );
   }
@@ -706,18 +707,12 @@ export default function TermoEncerramentoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Form Dialog - fecha pelo X do header ou botões (regra global no DialogContent) */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-          <DialogHeaderStandard
-            title={selectedTermo ? t('closingTerm.editTerm') : t('closingTerm.newTerm')}
-            description={selectedTermo 
-              ? t('common.editTerm')
-              : t('common.fillTerm')}
-          />
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <PageHeader
+        title={selectedTermo ? t('closingTerm.editTerm') : t('closingTerm.newTerm')}
+        description={selectedTermo ? t('common.editTerm') : t('common.fillTerm')}
+      />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="demandaTecnicaId"
@@ -1164,10 +1159,8 @@ export default function TermoEncerramentoPage() {
                   )}
                 </div>
               </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+        </form>
+      </Form>
 
       {/* Delete Confirmation Dialog - fecha apenas pelos botões */}
       <Dialog

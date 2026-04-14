@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Edit, Trash2, FileText, FilePlus, FileCheck, FileX, ChevronRight, ChevronDown, XCircle, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,7 +31,7 @@ import { projetoMetaService, metaProdutoService, termoEncerramentoService, termo
 import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { demandaSchema, type DemandaFormData } from '@/lib/validations';
-import { canCancelDemanda, canEditDemanda, canDeleteDemanda, canAvaliarDemanda, isDemandaEncerrada } from '@/lib/demandaStatus';
+import { canCancelDemanda, canDeleteDemanda, canAvaliarDemanda, isDemandaEncerrada, normalizeDemandaStatus } from '@/lib/demandaStatus';
 import type { DemandaTecnica, DemandStatus, PaginatedResponse, ProjetoMeta, MetaProduto, TermoEncerramento, TermoPlanejamento } from '@/types';
 
 // Mapeamento: códigos novos (A-Z) + formato antigo do backend (opened, inPlanning, inExecution, closed)
@@ -41,21 +41,41 @@ const STATUS_KEY_MAP: Record<string, string> = {
   opened: 'demands.statusB', inPlanning: 'demands.statusD', inExecution: 'demands.statusF', closed: 'demands.statusG',
 };
 
+type DemandasListMemory = {
+  search: string;
+  statusFilter: string;
+  selectedMetaId: string;
+  currentPage: number;
+  pageSize: number;
+};
+
+// Memória em runtime para restaurar posição da lista ao voltar de páginas filhas.
+let demandasListMemory: DemandasListMemory | null = null;
 
 export default function DemandasPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { selectedProject } = useProject();
+  const selectedProjectId = selectedProject?.id;
+  const initialListState = demandasListMemory ?? {
+    search: '',
+    statusFilter: 'all',
+    selectedMetaId: 'all',
+    currentPage: 0,
+    pageSize: 20,
+  };
+  const isListRoute = /^\/demandas\/?$/.test(location.pathname);
   const [demandas, setDemandas] = useState<DemandaTecnica[]>([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [search, setSearch] = useState(initialListState.search);
+  const [statusFilter, setStatusFilter] = useState<string>(initialListState.statusFilter);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaTecnica | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(initialListState.currentPage);
+  const [pageSize, setPageSize] = useState(initialListState.pageSize);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -78,7 +98,14 @@ export default function DemandasPage() {
 
   // Lista de metas para filtro principal
   const [metasFiltro, setMetasFiltro] = useState<ProjetoMeta[]>([]);
-  const [selectedMetaId, setSelectedMetaId] = useState<string>('all');
+  const [selectedMetaId, setSelectedMetaId] = useState<string>(initialListState.selectedMetaId);
+  const listContextRef = useRef({
+    search: '',
+    statusFilter: 'all',
+    selectedMetaId: 'all',
+    currentPage: 0,
+    pageSize: 20,
+  });
 
   const form = useForm<DemandaFormData>({
     resolver: zodResolver(demandaSchema),
@@ -86,17 +113,31 @@ export default function DemandasPage() {
   });
 
   // Carrega dados iniciais - filtra apenas demandas do projeto selecionado
-  const loadData = useCallback(async () => {
-    if (!selectedProject) return;
+  const loadData = useCallback(async (context?: {
+    search: string;
+    statusFilter: string;
+    selectedMetaId: string;
+    currentPage: number;
+    pageSize: number;
+  }) => {
+    if (!selectedProjectId || !isListRoute) return;
 
-    const isFilteringByMeta = selectedMetaId !== 'all' && !!selectedMetaId;
-    const requestedPage = isFilteringByMeta ? 0 : currentPage;
-    const requestedSize = isFilteringByMeta ? 1000 : pageSize;
+    const effective = context ?? {
+      search,
+      statusFilter,
+      selectedMetaId,
+      currentPage,
+      pageSize,
+    };
+
+    const isFilteringByMeta = effective.selectedMetaId !== 'all' && !!effective.selectedMetaId;
+    const requestedPage = isFilteringByMeta ? 0 : effective.currentPage;
+    const requestedSize = isFilteringByMeta ? 1000 : effective.pageSize;
     await execute(
       () => demandaService.findAll({ 
-        codigo: search.trim() || undefined,
-        projetoId: selectedProject.id,
-        status: statusFilter !== 'all' ? statusFilter as DemandStatus : undefined,
+        codigo: effective.search.trim() || undefined,
+        projetoId: selectedProjectId,
+        status: effective.statusFilter !== 'all' ? effective.statusFilter as DemandStatus : undefined,
         page: requestedPage + 1, // Backend espera 1-based
         size: requestedSize,
       }),
@@ -115,11 +156,29 @@ export default function DemandasPage() {
         },
       }
     );
-  }, [execute, search, statusFilter, currentPage, pageSize, selectedProject, selectedMetaId]);
+  }, [execute, search, statusFilter, currentPage, pageSize, selectedProjectId, selectedMetaId, isListRoute]);
+
+  useEffect(() => {
+    listContextRef.current = {
+      search,
+      statusFilter,
+      selectedMetaId,
+      currentPage,
+      pageSize,
+    };
+
+    demandasListMemory = {
+      search,
+      statusFilter,
+      selectedMetaId,
+      currentPage,
+      pageSize,
+    };
+  }, [search, statusFilter, selectedMetaId, currentPage, pageSize]);
 
   // Carrega metas e produtos vinculados ao projeto selecionado
   const loadMetasProdutos = useCallback(async () => {
-    if (!selectedProject) {
+    if (!selectedProjectId) {
       setMetasProdutos([]);
       return;
     }
@@ -127,7 +186,7 @@ export default function DemandasPage() {
     setIsLoadingProdutos(true);
     try {
       // Busca metas do projeto
-      const metas = await projetoMetaService.findByProjeto(selectedProject.id);
+      const metas = await projetoMetaService.findByProjeto(selectedProjectId);
       // Ordena metas pelo código para facilitar a visualização
       const metasOrdenadas = [...metas].sort((a, b) => a.codigo.localeCompare(b.codigo));
 
@@ -148,7 +207,7 @@ export default function DemandasPage() {
     } finally {
       setIsLoadingProdutos(false);
     }
-  }, [selectedProject]);
+  }, [selectedProjectId]);
 
   useEffect(() => {
     loadData();
@@ -169,13 +228,13 @@ export default function DemandasPage() {
   // Carrega metas para filtro principal sempre que o projeto mudar
   useEffect(() => {
     const loadMetasFiltro = async () => {
-      if (!selectedProject) {
+      if (!selectedProjectId) {
         setMetasFiltro([]);
         setSelectedMetaId('all');
         return;
       }
       try {
-        const metas = await projetoMetaService.findByProjeto(selectedProject.id);
+        const metas = await projetoMetaService.findByProjeto(selectedProjectId);
         const ordenadas = [...metas].sort((a, b) => a.codigo.localeCompare(b.codigo));
         setMetasFiltro(ordenadas);
       } catch (err) {
@@ -185,7 +244,7 @@ export default function DemandasPage() {
     };
 
     loadMetasFiltro();
-  }, [selectedProject]);
+  }, [selectedProjectId]);
 
   // Aplica filtro por meta (cliente) nas demandas já carregadas
   const paginatedDemandas = useMemo(() => {
@@ -235,15 +294,8 @@ export default function DemandasPage() {
   };
 
   const handleEdit = (demanda: DemandaTecnica) => {
-    setSelectedDemanda(demanda);
-    form.reset({
-      codigo: demanda.codigo,
-      nome: demanda.nome,
-      projetoId: String(demanda.projetoId),
-      descricao: demanda.descricao || '',
-      metaProdutoId: demanda.metaProdutoId ? String(demanda.metaProdutoId) : '',
-    });
-    setIsFormOpen(true);
+    const returnTo = `${location.pathname}${location.search}`;
+    navigate(`/demandas/${demanda.id}/editar?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   const handleDelete = (demanda: DemandaTecnica) => {
@@ -314,24 +366,39 @@ export default function DemandasPage() {
     {
       label: t('nav.openingTerm'),
       icon: <FilePlus className="h-4 w-4" />,
-      onClick: (demanda) => navigate(`/demandas/termo-abertura?demandaId=${demanda.id}`),
+      onClick: (demanda) => {
+        const returnTo = `${location.pathname}${location.search}`;
+        navigate(`/demandas/termo-abertura?demandaId=${demanda.id}&returnTo=${encodeURIComponent(returnTo)}`);
+      },
       separator: true,
     },
     {
       label: t('nav.planningTerm'),
       icon: <FileCheck className="h-4 w-4" />,
-      onClick: (demanda) => navigate(`/demandas/termo-planejamento?demandaId=${demanda.id}`),
+      onClick: (demanda) => {
+        const returnTo = `${location.pathname}${location.search}`;
+        navigate(`/demandas/termo-planejamento?demandaId=${demanda.id}&returnTo=${encodeURIComponent(returnTo)}`);
+      },
     },
     {
       label: t('nav.closingTerm'),
       icon: <FileX className="h-4 w-4" />,
-      onClick: (demanda) => navigate(`/demandas/termo-encerramento?demandaId=${demanda.id}`),
+      onClick: (demanda) => {
+        const returnTo = `${location.pathname}${location.search}`;
+        navigate(`/demandas/termo-encerramento?demandaId=${demanda.id}&returnTo=${encodeURIComponent(returnTo)}`);
+      },
     },
     {
       label: t('avaliacaoDemanda.actionLabel'),
       icon: <ClipboardList className="h-4 w-4" />,
       onClick: (demanda) => navigate(`/demandas/avaliacao?demandaId=${demanda.id}`),
       visible: (demanda) => canAvaliarDemanda(demanda),
+    },
+    {
+      label: t('execucao.manageExecution', 'Execução'),
+      icon: <ClipboardList className="h-4 w-4" />,
+      onClick: (demanda) => navigate(`/execucao-demandas/${demanda.id}`),
+      visible: (demanda) => normalizeDemandaStatus(demanda.status ?? demanda.situacao) === 'E',
     },
     {
       label: t('demands.cancelDemand'),
@@ -355,26 +422,16 @@ export default function DemandasPage() {
     
     setIsSaving(true);
     try {
-      if (selectedDemanda) {
-        await demandaService.update(selectedDemanda.id, {
-          codigo: data.codigo,
-          nome: data.nome,
-          projetoId: selectedProject.id, // Usa o projeto selecionado
-          descricao: data.descricao, // Campo de teste com editor de texto rico
-          metaProdutoId: data.metaProdutoId ? Number(data.metaProdutoId) : null,
-        });
-      } else {
-        await demandaService.create({
-          nome: data.nome,
-          projetoId: selectedProject.id,
-          usuarioId: user.id,
-          descricao: data.descricao,
-          metaProdutoId: data.metaProdutoId ? Number(data.metaProdutoId) : null,
-        });
-      }
+      await demandaService.create({
+        nome: data.nome,
+        projetoId: selectedProject.id,
+        usuarioId: user.id,
+        descricao: data.descricao,
+        metaProdutoId: data.metaProdutoId ? Number(data.metaProdutoId) : null,
+      });
       setIsFormOpen(false);
       form.reset();
-      loadData();
+      await loadData(listContextRef.current);
     } catch (error) {
       // Erro já é tratado automaticamente pela API (toast será exibido)
       // Aqui apenas evitamos que o erro quebre o fluxo da aplicação
@@ -677,8 +734,8 @@ export default function DemandasPage() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeaderStandard
-            title={selectedDemanda ? t('demands.editDemand') : t('demands.newDemand')}
-            description={selectedDemanda ? t('common.editDemand') : t('common.fillDemand')}
+            title={t('demands.newDemand')}
+            description={t('common.fillDemand')}
           />
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -769,7 +826,6 @@ export default function DemandasPage() {
                   type="submit" 
                   isLoading={isSaving} 
                   loadingText={t('common.saving')}
-                  disabled={selectedDemanda ? !canEditDemanda(selectedDemanda.status ?? selectedDemanda.situacao) : false}
                 >
                   {t('common.save')}
                 </LoadingButton>

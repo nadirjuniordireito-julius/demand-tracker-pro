@@ -343,7 +343,7 @@ export default function ProjetoSemaforoPage() {
   }, [projectId, execute]);
 
   useEffect(() => {
-    if (data) console.log('ProjetoSemaforoPage · semáforo (backend)', data);
+    // if (data) console.log('ProjetoSemaforoPage · semáforo (backend)', data);
   }, [data]);
 
   useEffect(() => {

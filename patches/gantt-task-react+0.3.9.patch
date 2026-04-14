@@ -1,0 +1,364 @@
+diff --git a/node_modules/gantt-task-react/dist/index.js b/node_modules/gantt-task-react/dist/index.js
+index 626bb39..0cc3385 100644
+--- a/node_modules/gantt-task-react/dist/index.js
++++ b/node_modules/gantt-task-react/dist/index.js
+@@ -100,7 +100,7 @@ var startOfDate = function startOfDate(date, scale) {
+   var newDate = new Date(date.getFullYear(), shouldReset("year") ? 0 : date.getMonth(), shouldReset("month") ? 1 : date.getDate(), shouldReset("day") ? 0 : date.getHours(), shouldReset("hour") ? 0 : date.getMinutes(), shouldReset("minute") ? 0 : date.getSeconds(), shouldReset("second") ? 0 : date.getMilliseconds());
+   return newDate;
+ };
+-var ganttDateRange = function ganttDateRange(tasks, viewMode, preStepsCount) {
++var ganttDateRange = function ganttDateRange(tasks, viewMode, preStepsCount, chartRangeBounds) {
+   var newStartDate = tasks[0].start;
+   var newEndDate = tasks[0].start;
+ 
+@@ -116,6 +116,16 @@ var ganttDateRange = function ganttDateRange(tasks, viewMode, preStepsCount) {
+     }
+   }
+ 
++  if (chartRangeBounds != null && chartRangeBounds.min != null && chartRangeBounds.max != null) {
++    if (chartRangeBounds.min < newStartDate) {
++      newStartDate = chartRangeBounds.min;
++    }
++
++    if (chartRangeBounds.max > newEndDate) {
++      newEndDate = chartRangeBounds.max;
++    }
++  }
++
+   switch (viewMode) {
+     case exports.ViewMode.Year:
+       newStartDate = addToDate(newStartDate, -1, "year");
+@@ -209,6 +219,12 @@ var seedDates = function seedDates(startDate, endDate, viewMode) {
+ 
+   return dates;
+ };
++var filterWeekdaysOnly = function filterWeekdaysOnly(dates) {
++  return dates.filter(function (d) {
++    var day = d.getDay();
++    return day !== 0 && day !== 6;
++  });
++};
+ var getLocaleMonth = function getLocaleMonth(date, locale) {
+   var bottomValue = getCachedDateTimeFormat(locale, {
+     month: "long"
+@@ -1209,13 +1225,65 @@ var convertToMilestone = function convertToMilestone(task, index, dates, columnW
+ };
+ 
+ var taskXCoordinate = function taskXCoordinate(xDate, dates, columnWidth) {
+-  var index = dates.findIndex(function (d) {
+-    return d.getTime() >= xDate.getTime();
+-  }) - 1;
+-  var remainderMillis = xDate.getTime() - dates[index].getTime();
+-  var percentOfInterval = remainderMillis / (dates[index + 1].getTime() - dates[index].getTime());
+-  var x = index * columnWidth + percentOfInterval * columnWidth;
+-  return x;
++  if (!dates || dates.length === 0) {
++    return 0;
++  }
++
++  var t = xDate.getTime();
++  var dayMs = 86400000;
++
++  if (dates.length === 1) {
++    var d0 = dates[0].getTime();
++    var synth = d0 + dayMs;
++    var p0 = (t - d0) / (synth - d0);
++
++    if (p0 < 0) {
++      p0 = 0;
++    }
++
++    if (p0 > 1) {
++      p0 = 1;
++    }
++
++    return p0 * columnWidth;
++  }
++
++  var i = 0;
++
++  for (i = 0; i < dates.length - 1; i++) {
++    var dA = dates[i].getTime();
++    var dB = dates[i + 1].getTime();
++
++    if (t >= dA && t < dB) {
++      var denom = dB - dA;
++      var pct = denom > 0 ? (t - dA) / denom : 0;
++      return i * columnWidth + pct * columnWidth;
++    }
++  }
++
++  if (t < dates[0].getTime()) {
++    var denom2 = dates[1].getTime() - dates[0].getTime();
++    var pct2 = denom2 > 0 ? (t - dates[0].getTime()) / denom2 : 0;
++    var xb = pct2 * columnWidth;
++    return xb < 0 ? 0 : xb;
++  }
++
++  var lastIdx = dates.length - 1;
++  var dLast = dates[lastIdx].getTime();
++
++  if (t >= dLast) {
++    var dayAfterLast = dLast + dayMs;
++    var denom3 = dayAfterLast - dLast;
++    var pct3 = denom3 > 0 ? (t - dLast) / denom3 : 1;
++
++    if (pct3 > 1) {
++      pct3 = 1;
++    }
++
++    return lastIdx * columnWidth + pct3 * columnWidth;
++  }
++
++  return (dates.length - 1) * columnWidth;
+ };
+ 
+ var taskXCoordinateRTL = function taskXCoordinateRTL(xDate, dates, columnWidth) {
+@@ -2257,6 +2325,9 @@ var Gantt = function Gantt(_ref) {
+       _ref$todayColor = _ref.todayColor,
+       todayColor = _ref$todayColor === void 0 ? "rgba(252, 248, 227, 0.5)" : _ref$todayColor,
+       viewDate = _ref.viewDate,
++      _ref$excludeWeekends = _ref.excludeWeekends,
++      excludeWeekends = _ref$excludeWeekends === void 0 ? false : _ref$excludeWeekends,
++      chartRangeBounds = _ref.chartRangeBounds,
+       _ref$TooltipContent = _ref.TooltipContent,
+       TooltipContent = _ref$TooltipContent === void 0 ? StandardTooltipContent : _ref$TooltipContent,
+       _ref$TaskListHeader = _ref.TaskListHeader,
+@@ -2274,13 +2345,17 @@ var Gantt = function Gantt(_ref) {
+   var taskListRef = React.useRef(null);
+ 
+   var _useState = React.useState(function () {
+-    var _ganttDateRange = ganttDateRange(tasks, viewMode, preStepsCount),
++    var _ganttDateRange = ganttDateRange(tasks, viewMode, preStepsCount, chartRangeBounds),
+         startDate = _ganttDateRange[0],
+         endDate = _ganttDateRange[1];
+ 
++    var dates = seedDates(startDate, endDate, viewMode);
++    if (excludeWeekends && viewMode === exports.ViewMode.Day) {
++      dates = filterWeekdaysOnly(dates);
++    }
+     return {
+       viewMode: viewMode,
+-      dates: seedDates(startDate, endDate, viewMode)
++      dates: dates
+     };
+   }),
+       dateSetup = _useState[0],
+@@ -2350,11 +2425,14 @@ var Gantt = function Gantt(_ref) {
+ 
+     filteredTasks = filteredTasks.sort(sortTasks);
+ 
+-    var _ganttDateRange2 = ganttDateRange(filteredTasks, viewMode, preStepsCount),
++    var _ganttDateRange2 = ganttDateRange(filteredTasks, viewMode, preStepsCount, chartRangeBounds),
+         startDate = _ganttDateRange2[0],
+         endDate = _ganttDateRange2[1];
+ 
+     var newDates = seedDates(startDate, endDate, viewMode);
++    if (excludeWeekends && viewMode === exports.ViewMode.Day) {
++      newDates = filterWeekdaysOnly(newDates);
++    }
+ 
+     if (rtl) {
+       newDates = newDates.reverse();
+@@ -2369,7 +2447,7 @@ var Gantt = function Gantt(_ref) {
+       viewMode: viewMode
+     });
+     setBarTasks(convertToBarTasks(filteredTasks, newDates, columnWidth, rowHeight, taskHeight, barCornerRadius, handleWidth, rtl, barProgressColor, barProgressSelectedColor, barBackgroundColor, barBackgroundSelectedColor, projectProgressColor, projectProgressSelectedColor, projectBackgroundColor, projectBackgroundSelectedColor, milestoneBackgroundColor, milestoneBackgroundSelectedColor));
+-  }, [tasks, viewMode, preStepsCount, rowHeight, barCornerRadius, columnWidth, taskHeight, handleWidth, barProgressColor, barProgressSelectedColor, barBackgroundColor, barBackgroundSelectedColor, projectProgressColor, projectProgressSelectedColor, projectBackgroundColor, projectBackgroundSelectedColor, milestoneBackgroundColor, milestoneBackgroundSelectedColor, rtl, scrollX, onExpanderClick]);
++  }, [tasks, viewMode, preStepsCount, excludeWeekends, chartRangeBounds, rowHeight, barCornerRadius, columnWidth, taskHeight, handleWidth, barProgressColor, barProgressSelectedColor, barBackgroundColor, barBackgroundSelectedColor, projectProgressColor, projectProgressSelectedColor, projectBackgroundColor, projectBackgroundSelectedColor, milestoneBackgroundColor, milestoneBackgroundSelectedColor, rtl, scrollX, onExpanderClick]);
+   React.useEffect(function () {
+     if (viewMode === dateSetup.viewMode && (viewDate && !currentViewDate || viewDate && (currentViewDate === null || currentViewDate === void 0 ? void 0 : currentViewDate.valueOf()) !== viewDate.valueOf())) {
+       var dates = dateSetup.dates;
+diff --git a/node_modules/gantt-task-react/dist/index.modern.js b/node_modules/gantt-task-react/dist/index.modern.js
+index b372269..a0b7d88 100644
+--- a/node_modules/gantt-task-react/dist/index.modern.js
++++ b/node_modules/gantt-task-react/dist/index.modern.js
+@@ -99,7 +99,7 @@ var startOfDate = function startOfDate(date, scale) {
+   var newDate = new Date(date.getFullYear(), shouldReset("year") ? 0 : date.getMonth(), shouldReset("month") ? 1 : date.getDate(), shouldReset("day") ? 0 : date.getHours(), shouldReset("hour") ? 0 : date.getMinutes(), shouldReset("minute") ? 0 : date.getSeconds(), shouldReset("second") ? 0 : date.getMilliseconds());
+   return newDate;
+ };
+-var ganttDateRange = function ganttDateRange(tasks, viewMode, preStepsCount) {
++var ganttDateRange = function ganttDateRange(tasks, viewMode, preStepsCount, chartRangeBounds) {
+   var newStartDate = tasks[0].start;
+   var newEndDate = tasks[0].start;
+ 
+@@ -115,6 +115,16 @@ var ganttDateRange = function ganttDateRange(tasks, viewMode, preStepsCount) {
+     }
+   }
+ 
++  if (chartRangeBounds != null && chartRangeBounds.min != null && chartRangeBounds.max != null) {
++    if (chartRangeBounds.min < newStartDate) {
++      newStartDate = chartRangeBounds.min;
++    }
++
++    if (chartRangeBounds.max > newEndDate) {
++      newEndDate = chartRangeBounds.max;
++    }
++  }
++
+   switch (viewMode) {
+     case ViewMode.Year:
+       newStartDate = addToDate(newStartDate, -1, "year");
+@@ -208,6 +218,12 @@ var seedDates = function seedDates(startDate, endDate, viewMode) {
+ 
+   return dates;
+ };
++var filterWeekdaysOnly = function filterWeekdaysOnly(dates) {
++  return dates.filter(function (d) {
++    var day = d.getDay();
++    return day !== 0 && day !== 6;
++  });
++};
+ var getLocaleMonth = function getLocaleMonth(date, locale) {
+   var bottomValue = getCachedDateTimeFormat(locale, {
+     month: "long"
+@@ -1208,13 +1224,65 @@ var convertToMilestone = function convertToMilestone(task, index, dates, columnW
+ };
+ 
+ var taskXCoordinate = function taskXCoordinate(xDate, dates, columnWidth) {
+-  var index = dates.findIndex(function (d) {
+-    return d.getTime() >= xDate.getTime();
+-  }) - 1;
+-  var remainderMillis = xDate.getTime() - dates[index].getTime();
+-  var percentOfInterval = remainderMillis / (dates[index + 1].getTime() - dates[index].getTime());
+-  var x = index * columnWidth + percentOfInterval * columnWidth;
+-  return x;
++  if (!dates || dates.length === 0) {
++    return 0;
++  }
++
++  var t = xDate.getTime();
++  var dayMs = 86400000;
++
++  if (dates.length === 1) {
++    var d0 = dates[0].getTime();
++    var synth = d0 + dayMs;
++    var p0 = (t - d0) / (synth - d0);
++
++    if (p0 < 0) {
++      p0 = 0;
++    }
++
++    if (p0 > 1) {
++      p0 = 1;
++    }
++
++    return p0 * columnWidth;
++  }
++
++  var i = 0;
++
++  for (i = 0; i < dates.length - 1; i++) {
++    var dA = dates[i].getTime();
++    var dB = dates[i + 1].getTime();
++
++    if (t >= dA && t < dB) {
++      var denom = dB - dA;
++      var pct = denom > 0 ? (t - dA) / denom : 0;
++      return i * columnWidth + pct * columnWidth;
++    }
++  }
++
++  if (t < dates[0].getTime()) {
++    var denom2 = dates[1].getTime() - dates[0].getTime();
++    var pct2 = denom2 > 0 ? (t - dates[0].getTime()) / denom2 : 0;
++    var xb = pct2 * columnWidth;
++    return xb < 0 ? 0 : xb;
++  }
++
++  var lastIdx = dates.length - 1;
++  var dLast = dates[lastIdx].getTime();
++
++  if (t >= dLast) {
++    var dayAfterLast = dLast + dayMs;
++    var denom3 = dayAfterLast - dLast;
++    var pct3 = denom3 > 0 ? (t - dLast) / denom3 : 1;
++
++    if (pct3 > 1) {
++      pct3 = 1;
++    }
++
++    return lastIdx * columnWidth + pct3 * columnWidth;
++  }
++
++  return (dates.length - 1) * columnWidth;
+ };
+ 
+ var taskXCoordinateRTL = function taskXCoordinateRTL(xDate, dates, columnWidth) {
+@@ -2256,6 +2324,9 @@ var Gantt = function Gantt(_ref) {
+       _ref$todayColor = _ref.todayColor,
+       todayColor = _ref$todayColor === void 0 ? "rgba(252, 248, 227, 0.5)" : _ref$todayColor,
+       viewDate = _ref.viewDate,
++      _ref$excludeWeekends = _ref.excludeWeekends,
++      excludeWeekends = _ref$excludeWeekends === void 0 ? false : _ref$excludeWeekends,
++      chartRangeBounds = _ref.chartRangeBounds,
+       _ref$TooltipContent = _ref.TooltipContent,
+       TooltipContent = _ref$TooltipContent === void 0 ? StandardTooltipContent : _ref$TooltipContent,
+       _ref$TaskListHeader = _ref.TaskListHeader,
+@@ -2273,13 +2344,17 @@ var Gantt = function Gantt(_ref) {
+   var taskListRef = useRef(null);
+ 
+   var _useState = useState(function () {
+-    var _ganttDateRange = ganttDateRange(tasks, viewMode, preStepsCount),
++    var _ganttDateRange = ganttDateRange(tasks, viewMode, preStepsCount, chartRangeBounds),
+         startDate = _ganttDateRange[0],
+         endDate = _ganttDateRange[1];
+ 
++    var dates = seedDates(startDate, endDate, viewMode);
++    if (excludeWeekends && viewMode === ViewMode.Day) {
++      dates = filterWeekdaysOnly(dates);
++    }
+     return {
+       viewMode: viewMode,
+-      dates: seedDates(startDate, endDate, viewMode)
++      dates: dates
+     };
+   }),
+       dateSetup = _useState[0],
+@@ -2349,11 +2424,14 @@ var Gantt = function Gantt(_ref) {
+ 
+     filteredTasks = filteredTasks.sort(sortTasks);
+ 
+-    var _ganttDateRange2 = ganttDateRange(filteredTasks, viewMode, preStepsCount),
++    var _ganttDateRange2 = ganttDateRange(filteredTasks, viewMode, preStepsCount, chartRangeBounds),
+         startDate = _ganttDateRange2[0],
+         endDate = _ganttDateRange2[1];
+ 
+     var newDates = seedDates(startDate, endDate, viewMode);
++    if (excludeWeekends && viewMode === ViewMode.Day) {
++      newDates = filterWeekdaysOnly(newDates);
++    }
+ 
+     if (rtl) {
+       newDates = newDates.reverse();
+@@ -2368,7 +2446,7 @@ var Gantt = function Gantt(_ref) {
+       viewMode: viewMode
+     });
+     setBarTasks(convertToBarTasks(filteredTasks, newDates, columnWidth, rowHeight, taskHeight, barCornerRadius, handleWidth, rtl, barProgressColor, barProgressSelectedColor, barBackgroundColor, barBackgroundSelectedColor, projectProgressColor, projectProgressSelectedColor, projectBackgroundColor, projectBackgroundSelectedColor, milestoneBackgroundColor, milestoneBackgroundSelectedColor));
+-  }, [tasks, viewMode, preStepsCount, rowHeight, barCornerRadius, columnWidth, taskHeight, handleWidth, barProgressColor, barProgressSelectedColor, barBackgroundColor, barBackgroundSelectedColor, projectProgressColor, projectProgressSelectedColor, projectBackgroundColor, projectBackgroundSelectedColor, milestoneBackgroundColor, milestoneBackgroundSelectedColor, rtl, scrollX, onExpanderClick]);
++  }, [tasks, viewMode, preStepsCount, excludeWeekends, chartRangeBounds, rowHeight, barCornerRadius, columnWidth, taskHeight, handleWidth, barProgressColor, barProgressSelectedColor, barBackgroundColor, barBackgroundSelectedColor, projectProgressColor, projectProgressSelectedColor, projectBackgroundColor, projectBackgroundSelectedColor, milestoneBackgroundColor, milestoneBackgroundSelectedColor, rtl, scrollX, onExpanderClick]);
+   useEffect(function () {
+     if (viewMode === dateSetup.viewMode && (viewDate && !currentViewDate || viewDate && (currentViewDate === null || currentViewDate === void 0 ? void 0 : currentViewDate.valueOf()) !== viewDate.valueOf())) {
+       var dates = dateSetup.dates;
+diff --git a/node_modules/gantt-task-react/dist/types/public-types.d.ts b/node_modules/gantt-task-react/dist/types/public-types.d.ts
+index 6124ee7..b77f255 100644
+--- a/node_modules/gantt-task-react/dist/types/public-types.d.ts
++++ b/node_modules/gantt-task-react/dist/types/public-types.d.ts
+@@ -75,6 +75,17 @@ export interface DisplayOption {
+      */
+     locale?: string;
+     rtl?: boolean;
++    /**
++     * When true and viewMode is Day, Saturday and Sunday columns are omitted from the grid.
++     */
++    excludeWeekends?: boolean;
++    /**
++     * Expands the computed chart date range (e.g. to include real execution dates that sit outside planned bounds).
++     */
++    chartRangeBounds?: {
++        min: Date;
++        max: Date;
++    };
+ }
+ export interface StylingOption {
+     headerHeight?: number;

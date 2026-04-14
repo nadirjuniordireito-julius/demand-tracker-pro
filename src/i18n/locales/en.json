@@ -161,7 +161,9 @@
     "step3Title": "Planning Term",
     "step3Description": "Define specifications, schedule and costs",
     "step4Title": "Closing Term",
-    "step4Description": "Record results and actual costs"
+    "step4Description": "Record results and actual costs",
+    "unidadeDescentralizadora": "Coord. IBAMA",
+    "unidadeDescentralizada": "Coord. UFLA"
   },
   "home": {
     "welcomeAdmin": "Administrator Area",
@@ -340,6 +342,11 @@
       "gray": "Gray · no information"
     }
   },
+  "viewTermos": {
+    "title": "Demand terms",
+    "loadError": "Could not load the PDF.",
+    "noTermId": "Term not provided or invalid."
+  },
   "disbursements": {
     "title": "Disbursements",
     "description": "Manage financial disbursements for the selected project.",
@@ -403,7 +410,48 @@
     "recentDemands": "Recent Demands",
     "demandsByProject": "Demands by Project",
     "demandsByStatus": "Demands by Status",
-    "monthlyOverview": "Monthly Overview"
+    "monthlyOverview": "Monthly Overview",
+    "map": {
+      "welcome": "Welcome",
+      "goals": "Goals",
+      "plannedValue": "Planned Value",
+      "executedValue": "Executed Value",
+      "period": "Period",
+      "progress": "Progress",
+      "selectGoal": "Select a goal.",
+      "selectGoalHint": "Select a goal from the list to view details on the right.",
+      "products": "Products",
+      "selectProductHint": "Select a product in the table to view its demands below.",
+      "code": "Code",
+      "name": "Name",
+      "planned": "Planned",
+      "budgeted": "Budgeted",
+      "executed": "Executed",
+      "noProducts": "No products for the selected goal.",
+      "featuredDemands": "Featured Demands",
+      "demandsOf": "Demands of",
+      "noProductSelected": "no product selected",
+      "description": "Description",
+      "status": "Status",
+      "noDemands": "No demands for the selected product.",
+      "selectProductToViewDemands": "Select a product in the table above to load demands.",
+      "dateRangeSeparator": "to",
+      "marketShareButton": "Market Share",
+      "marketShareTitle": "Product Market Share",
+      "marketShareSelectedGoal": "Selected goal",
+      "marketShareGoalPlannedTotal": "Goal planned total",
+      "marketShareNoData": "No data to calculate market share.",
+      "marketShareTooltipShare": "Market share",
+      "marketShareTooltipPlanned": "Planned",
+      "marketShareProductFallback": "Product",
+      "quarterlyEvolutionTooltip": "Show product quarterly evolution chart",
+      "viewTermosDemandTooltip": "View opening, planning, and closing term PDFs",
+      "viewExecutionGanttTooltip": "View demand execution Gantt",
+      "quarterlyEvolutionModalTitle": "Product Quarterly Evolution",
+      "quarterlyEvolutionPlaceholder": "Quarterly evolution chart coming soon.",
+      "quarterLabel": "Quarter",
+      "quarterlyEvolutionNoData": "No quarterly evolution data for the selected product."
+    }
   },
   "users": {
     "title": "Users",
@@ -571,9 +619,9 @@
     "statusB": "In opening",
     "statusC": "Opened and signed",
     "statusD": "In planning",
-    "statusE": "Planned and signed",
+    "statusE": "In execution",
     "statusF": "In closing",
-    "statusG": "Closed and signed",
+    "statusG": "Closed",
     "statusZ": "Cancelled",
     "cancelDemand": "Cancel demand",
     "cancelDemandConfirm": "Are you sure you want to cancel this demand? The status will be changed to Cancelled.",
@@ -703,7 +751,9 @@
       "start": "Start",
       "end": "End",
       "actions": "Info",
-      "realPeriod": "Actual execution"
+      "realPeriod": "Actual execution",
+      "barForecast": "Forecast",
+      "barExecutedWithPercent": "Executed ({{percent}}%)"
     }
   },
   "avaliacaoDemanda": {
@@ -840,7 +890,7 @@
       "descriptivo": "Description:",
       "signature": "Signature:",
       "signatureNote": "Date and time on electronic signature",
-      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerName": "Lawrence NÒ³brega de Oliveira",
       "signerRole": "TED Manager - IBAMA",
       "pageOf": "Page {{page}} of {{total}}"
     }
@@ -911,7 +961,7 @@
       "costs": "Costs:",
       "signature": "Signature:",
       "signatureNote": "Date and time on electronic signature",
-      "signerName": "Lawrence Nóbrega de Oliveira",
+      "signerName": "Lawrence NÒ³brega de Oliveira",
       "signerRole": "TED Manager - IBAMA",
       "pageOf": "Page {{page}} of {{total}}"
     }

@@ -374,9 +374,9 @@ export default function TedHealthMapPage() {
       B: ['B', 'Em abertura', 'abertura', 'opened'],
       C: ['C', 'Aberta', 'Aberta e assinada', 'aberta'],
       D: ['D', 'Em planejamento', 'planejamento', 'inPlanning'],
-      E: ['E', 'Planejado', 'Planejado e assinado', 'planejado'],
+      E: ['E', 'Em execução', 'Em execução', 'execução'],
       F: ['F', 'Em encerramento', 'encerramento', 'inExecution'],
-      G: ['G', 'Encerrado', 'Encerrado e assinado', 'encerrado', 'closed'],
+      G: ['G', 'Encerrado', 'Encerrado', 'encerrado', 'closed'],
       Z: ['Z', 'Cancelada', 'cancelada'],
     };
     const statusMatches = (nodeStatus: string): boolean => {

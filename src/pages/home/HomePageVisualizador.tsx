@@ -1,31 +1,18 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  FileText,
-  FolderKanban,
-  TrendingUp,
-  ArrowRight,
-  Eye,
-} from 'lucide-react';
-import { DataTable, type Column, type Action } from '@/components/common/DataTable';
 import { dashboardService } from '@/services/dashboardService';
-import { DemandaTecnicaDTO, Page } from '@/types';
+import { Page } from '@/types';
 import { useProject } from '@/contexts/ProjectContext';
-import { TablePagination } from '@/components/common/PageComponents';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { DemandaTecnica, TermoEncerramentoDocResponseDTO } from '@/types';
+import type { DemandaTecnica } from '@/types';
 import { getStatusBadge } from '@/components/common/statusBadge';
-import { formatDateTime } from '@/helpers/formatDate';
-import { ptBR } from 'date-fns/locale';
-import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Signature, Download, Upload } from 'lucide-react';
+import { Eye, Download, Upload } from 'lucide-react';
+import { Card, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
 import { termoAberturaDocService, termoPlanejamentoDocService, termoEncerramentoDocService } from '@/services/termoDocService';
-import { TermoEncerramentoDoc, TermoPlanejamentoDoc, TermoAberturaDoc}  from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
 import type { AssinarEletronicaTipo } from '@/components/common/PdfSignaturePositionDialog';
 
 export default function HomePageVisualizador() {
@@ -41,47 +28,73 @@ export default function HomePageVisualizador() {
   const projetoId = selectedProject.id; // ou vindo do contexto
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaTecnica | null>(null);
   const [isAssinarEletronicaOpen, setIsAssinarEletronicaOpen] = useState(false);
-  const [documento, setDocumento] = useState(null);
-  const [termoEncerramentoDoc, setTermoEncerramentoDoc] = useState<TermoEncerramentoDocResponseDTO>();
-  const [termoPlanejamentoDoc, setTermoPlanejamentoDoc] = useState<TermoPlanejamentoDoc>();
-  const [termoAberturaDoc, setTermoAberturaDoc] = useState<TermoAberturaDoc>();
+  const [documentoNome, setDocumentoNome] = useState<string | null>(null);
+  const [documentoFetcher, setDocumentoFetcher] = useState<(() => Promise<Blob>) | null>(null);
   const [assinarEletronicaConfig, setAssinarEletronicaConfig] = useState<{
     tipo: AssinarEletronicaTipo;
     docId: number;
     userId: number;
   } | null>(null);
-  const { user } = useAuth();
-  const columns: Column<DemandaTecnica>[] = useMemo(() => [
-    {
-      key: 'codigo',
-      label: t('demands.code'),
-    },
-    {
-      key: 'nome',
-      label: t('demands.name'),
-    },
-    {
-      key: 'dataAbertura',
-      label: t('demands.openingDate'),
-      render: (demanda) => format(new Date(demanda.dataAbertura), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }),
-      hideOnMobile: true,
-    },
-    {
-      key: 'status',
-      label: t('demands.status'),
-      render: (demanda) => {
-        const statusValue = demanda.status ?? demanda.situacao;
-        return getStatusBadge(statusValue, t);
-      },
-    },
-  ],[]);
+/** ajustar o documento para trabalho */
+const ajustarDocumentoParaTrabalho = async (demanda: DemandaTecnica): Promise<boolean> => {
+  setSelectedDemanda(demanda);
+  setDocumentoNome(null);
+  setDocumentoFetcher(null);
+  setAssinarEletronicaConfig(null);
+
+  if (demanda.status === 'F' && demanda.termoEncerramento) {
+    try {
+      const doc1 = await termoEncerramentoDocService.findByTermoEncerramentoId(demanda.termoEncerramento.id);
+      setDocumentoNome(doc1?.nomeArquivo ?? null);
+    } catch {
+      setDocumentoNome(null);
+    }
+    setDocumentoFetcher(() => () => termoEncerramentoDocService.downloadByTermoEncerramentoId(demanda.termoEncerramento.id));
+    return true;
+  } else if (demanda.status === 'D' && demanda.termoPlanejamento) {
+    try {
+      const doc2 = await termoPlanejamentoDocService.findByTermoPlanejamentoId(demanda.termoPlanejamento.id);
+      setDocumentoNome(doc2?.nomeArquivo ?? null);
+    } catch {
+      setDocumentoNome(null);
+    }
+    setDocumentoFetcher(() => () => termoPlanejamentoDocService.downloadByTermoPlanejamentoId(demanda.termoPlanejamento.id));
+    return true;
+  } else if (demanda.status === 'B' && demanda.termoAbertura) {
+    try {
+      const doc3 = await termoAberturaDocService.findByTermoAberturaId(demanda.termoAbertura.id);
+      setDocumentoNome(doc3?.nomeArquivo ?? null);
+    } catch {
+      setDocumentoNome(null);
+    }
+    setDocumentoFetcher(() => () => termoAberturaDocService.downloadByTermoAberturaId(demanda.termoAbertura.id));
+    return true;
+  } else {
+    toast({
+      title: t('common.error'),
+      description: t('openingTerm.documentViewError'),
+      variant: 'destructive',
+    });
+    return false;
+  }
+};
+
+  /**
+   * Abre o PDF em modo somente leitura (sem fluxo de assinatura eletrônica).
+   */
+  const visualizarDocumento = async (demanda: DemandaTecnica) => {
+    const ok = await ajustarDocumentoParaTrabalho(demanda);
+    if (!ok) return;
+    setIsAssinarEletronicaOpen(true);
+  };
 
   /**
    * 
    * @param demanda Abrir o visualizador de PDF com o termo especifico conforme status da demanda e permitir o download.
    */
-  const download = (demanda: DemandaTecnica) => {
+  const download = async (demanda: DemandaTecnica) => {
     setSelectedDemanda(demanda);
+    await ajustarDocumentoParaTrabalho(demanda);
   }; 
 
   /**
@@ -97,73 +110,20 @@ export default function HomePageVisualizador() {
    * 
    * @param demanda assinar o documento eletronicamente.
    */
-   const assinarEletronica = async (demanda: DemandaTecnica) => {
-    setSelectedDemanda(demanda);
-    setDocumento(null);
-    setAssinarEletronicaConfig(null);
-
-    if (demanda.status === 'F') {
-      try {
-        const doc1 = await termoEncerramentoDocService.findByTermoEncerramentoId(demanda.termoEncerramento!.id);
-        setTermoEncerramentoDoc(doc1);
-        setAssinarEletronicaConfig({ tipo: 'encerramento', docId: doc1.id, userId: user.id });
-      } catch {
-        setTermoEncerramentoDoc(undefined);
-      }
-      setDocumento(termoEncerramentoDocService.downloadByTermoEncerramentoId(demanda.termoEncerramento!.id));
-    } else if (demanda.status === 'D') {
-      try {
-        const doc2 = await termoPlanejamentoDocService.findByTermoPlanejamentoId(demanda.termoPlanejamento!.id);
-        setTermoPlanejamentoDoc(doc2);
-        setAssinarEletronicaConfig({ tipo: 'planejamento', docId: doc2.id, userId: user.id });
-      } catch {
-        setTermoPlanejamentoDoc(undefined);
-      }
-      setDocumento(termoPlanejamentoDocService.downloadByTermoPlanejamentoId(demanda.termoPlanejamento!.id));
-    } else if (demanda.status === 'B') {
-      try {
-        const doc3 = await termoAberturaDocService.findByTermoAberturaId(demanda.termoAbertura!.id);
-        setTermoAberturaDoc(doc3);
-        setAssinarEletronicaConfig({ tipo: 'abertura', docId: doc3.id, userId: user.id });
-      } catch {
-        setTermoAberturaDoc(undefined);
-      }
-      setDocumento(termoAberturaDocService.downloadByTermoAberturaId(demanda.termoAbertura!.id));
-    }
-    setIsAssinarEletronicaOpen(true);
-  };
-
-  const handleCloseAssinatura = () => {
-    setIsAssinarEletronicaOpen(false);
-  };
-
-  const actions: Action<DemandaTecnica>[] = useMemo(() => [
-    {
-      label: t('assinaturaEletronica'),
-      icon: <Signature className="h-4 w-4" />,
-      onClick: assinarEletronica,
-    },  {
-      label: t('download'),
-      icon: <Download className="h-4 w-4" />,
-      onClick: download,
-    },
-    {
-      label: t('upload'),
-      icon: <Upload className="h-4 w-4" />,
-      onClick: upload,
-    },
-    
-  ], [t, assinarEletronica, download, upload]);
-
   const reloadTable = async () => {
     setLoading(true);
-    const data = await dashboardService.getDemandasEmFluxoPaginado(
-      projetoId,
-      currentPage,
-      pageSize
-    );
-    setPage(data as Page<DemandaTecnica>);
-    setLoading(false);
+    try {
+      const data = await dashboardService.getDemandasEmFluxoPaginado(
+        projetoId,
+        currentPage,
+        pageSize
+      );
+      setPage(data as Page<DemandaTecnica>);
+      setTotalPages(data.totalPages);
+      setTotalElements(data.totalElements);
+    } finally {
+      setLoading(false);
+    }
   };
   
   useEffect(() => {
@@ -174,39 +134,80 @@ export default function HomePageVisualizador() {
 
     <div className="space-y-8">
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Eye className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-normal tracking-tight">
-            {t('home.welcomeVisualizador')}
-          </h1>
-        </div>
-        <p className="text-muted-foreground">
-          {t('home.descriptionVisualizador')}
-        </p>
-      </div>
-
-      {loading && <p>Carregando...</p>}
+      {loading && <p>{t('loading')}</p>}
 
       {page && (
         <>
  
-        <div>
-          <DataTable
-            data={page.content}
-            actions={actions}
-            columns={columns}
-          />
-          <TablePagination 
-            currentPage={currentPage + 1} 
-            totalPages={totalPages} 
-            pageSize={pageSize} 
-            totalItems={totalElements} 
-            onPageChange={(p) => setCurrentPage(p - 1)} 
-            onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(0); }} 
-          />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {page.content.map((demanda) => (
+              <Card key={demanda.id} className="flex flex-col overflow-hidden">
+                <CardHeader className="space-y-2 pb-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <CardTitle className="text-base font-medium leading-snug">
+                      {demanda.codigo}
+                    </CardTitle>
+                  </div>
+                  <p className="text-sm font-medium text-foreground line-clamp-2">{demanda.nome}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {getStatusBadge(demanda.status ?? demanda.situacao, t)}
+                  </div>
+                </CardHeader>
+                <CardFooter className="mt-auto flex justify-end gap-1 border-t bg-muted/30 px-3 py-3 sm:px-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label={t('openingTerm.viewDocumentTitle')}
+                        onClick={() => void visualizarDocumento(demanda)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('openingTerm.viewDocumentTitle')}</TooltipContent>
+                  </Tooltip>
+                  
+                  <Tooltip visible={false}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label={t('download')}
+                        onClick={() => download(demanda)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('download')}</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label={t('upload')}
+                        onClick={() => upload(demanda)}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('upload')}</TooltipContent>
+                  </Tooltip>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </div>
-        
+ 
         <div>
           <PdfPreviewDialog
             open={isAssinarEletronicaOpen}
@@ -215,8 +216,11 @@ export default function HomePageVisualizador() {
               setIsAssinarEletronicaOpen(next);
             }}
             title={t('openingTerm.viewDocumentTitle')}
-            description={documento?.nomeArquivo}
-            fetchPdf={() => documento}
+            description={documentoNome ?? undefined}
+            fetchPdf={() => {
+              if (!documentoFetcher) return Promise.reject(new Error('Documento indisponivel'));
+              return documentoFetcher();
+            }}
             loadingLabel={t('common.loading')}
             errorMessage={t('openingTerm.documentViewError')}
             onError={(err: unknown) =>
@@ -235,6 +239,8 @@ export default function HomePageVisualizador() {
               setCurrentPage(0);
               reloadTable();
             }}
+
+            /*
             renderSignButton={({ pdfBlob, openSignatureDialog }) => (
               <Button
                 type="button"
@@ -247,6 +253,8 @@ export default function HomePageVisualizador() {
                 {t('pdf.signButton')}
               </Button>
             )}
+            */
+
           />
         </div>
  

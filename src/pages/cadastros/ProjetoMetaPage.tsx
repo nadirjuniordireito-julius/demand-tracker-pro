@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Edit, Trash2, Target, ChevronDown, ChevronRight, Package, Plus, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,14 +43,21 @@ import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/Lo
 import { DataTable, type Column, type Action } from '@/components/common/DataTable';
 import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { useApi } from '@/hooks/useApi';
-import { projetoMetaSchema, type ProjetoMetaFormData, metaProdutoSchema, type MetaProdutoFormData } from '@/lib/validations';
+import { metaProdutoSchema, type MetaProdutoFormData } from '@/lib/validations';
 import { projetoMetaService } from '@/services/projetoMetaService';
 import { metaProdutoService } from '@/services/metaProdutoService';
-import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
 import type { ProjetoMeta, MetaProduto, PaginatedResponse } from '@/types';
+
+type ProjetoMetaListMemory = {
+  search: string;
+  currentPage: number;
+  pageSize: number;
+};
+
+let projetoMetaListMemory: ProjetoMetaListMemory | null = null;
 
 const getStatusBadge = (status: 'A' | 'I', t: (key: string) => string) => {
   if (status === 'A') {
@@ -72,16 +80,21 @@ const formatInicioFimFromBase = (baseDateStr: string | undefined, monthOrdinal: 
 
 export default function ProjetoMetaPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { selectedProject } = useProject();
   const { toast } = useToast();
+  const initialListState = projetoMetaListMemory ?? {
+    search: '',
+    currentPage: 0,
+    pageSize: 5,
+  };
   const [projetoMetas, setProjetoMetas] = useState<ProjetoMeta[]>([]);
-  const [search, setSearch] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [search, setSearch] = useState(initialListState.search);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedMeta, setSelectedMeta] = useState<ProjetoMeta | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(5);
+  const [currentPage, setCurrentPage] = useState(initialListState.currentPage);
+  const [pageSize, setPageSize] = useState(initialListState.pageSize);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -99,7 +112,6 @@ export default function ProjetoMetaPage() {
 
   // API states
   const { isLoading, error, execute } = useApi<PaginatedResponse<ProjetoMeta>>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
   // Form para produto
@@ -153,12 +165,6 @@ export default function ProjetoMetaPage() {
     });
   }, [loadProdutos]);
 
-  const form = useForm<ProjetoMetaFormData>({
-    resolver: zodResolver(projetoMetaSchema),
-    defaultValues: { codigo: '', nome: '', descricao: '', status: 'A' },
-  });
-
-
   // Carrega metas filtradas por projeto
   const loadData = useCallback(async () => {
     if (!selectedProject) {
@@ -191,6 +197,14 @@ export default function ProjetoMetaPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    projetoMetaListMemory = {
+      search,
+      currentPage,
+      pageSize,
+    };
+  }, [search, currentPage, pageSize]);
+
   // Metas ordenadas por código (ordem natural: 1, 1.1, 2, 2.1, ...)
   const paginatedMetas = useMemo(
     () => [...projetoMetas].sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })),
@@ -217,74 +231,18 @@ export default function ProjetoMetaPage() {
       });
       return;
     }
-    setSelectedMeta(null);
-    form.reset({ codigo: '', nome: '', descricao: '', status: 'A' });
-    setIsFormOpen(true);
+    const returnTo = `${location.pathname}${location.search}`;
+    navigate(`/cadastros/projeto-meta/novo?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   const handleEdit = (meta: ProjetoMeta) => {
-    setSelectedMeta(meta);
-    form.reset({
-      codigo: meta.codigo,
-      nome: meta.nome,
-      descricao: meta.descricao || '',
-      status: meta.status,
-    });
-    setIsFormOpen(true);
+    const returnTo = `${location.pathname}${location.search}`;
+    navigate(`/cadastros/projeto-meta/${meta.id}/editar?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   const handleDelete = (meta: ProjetoMeta) => {
     setSelectedMeta(meta);
     setIsDeleteOpen(true);
-  };
-
-  const onSubmit = async (data: ProjetoMetaFormData) => {
-    if (!selectedProject) {
-      toast({
-        title: t('common.error'),
-        description: t('projects.selectProject'),
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      if (selectedMeta) {
-        await projetoMetaService.update(selectedMeta.id, {
-          codigo: data.codigo,
-          nome: data.nome,
-          descricao: data.descricao || undefined,
-          status: data.status,
-        });
-        toast({
-          title: t('common.success'),
-          description: t('projectMeta.updatedSuccess'),
-        });
-      } else {
-        await projetoMetaService.create({
-          projetoId: selectedProject.id,
-          codigo: data.codigo,
-          nome: data.nome,
-          descricao: data.descricao || undefined,
-          status: data.status,
-        });
-        toast({
-          title: t('common.success'),
-          description: t('projectMeta.createdSuccess'),
-        });
-      }
-      setIsFormOpen(false);
-      loadData();
-    } catch (err: unknown) {
-      toast({
-        title: t('common.error'),
-        description: getErrorMessage(err, t('common.errorMessage')),
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleConfirmDelete = async () => {
@@ -734,90 +692,6 @@ export default function ProjetoMetaPage() {
           icon={<Target className="h-6 w-6 text-muted-foreground" />} 
         />
       )}
-
-      {/* Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeaderStandard
-            title={selectedMeta ? t('projectMeta.editMeta') : t('projectMeta.newMeta')}
-            description={selectedMeta ? t('common.editInformation') : t('common.fillInformation')}
-          />
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField 
-                  control={form.control} 
-                  name="codigo" 
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('projectMeta.code')} *</FormLabel>
-                      <FormControl><Input placeholder={t('projectMeta.codePlaceholder')} {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} 
-                />
-                <FormField 
-                  control={form.control} 
-                  name="status" 
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('common.status')} *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t('common.selectStatus')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="A">{t('common.active')}</SelectItem>
-                          <SelectItem value="I">{t('common.inactive')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} 
-                />
-              </div>
-              <FormField 
-                control={form.control} 
-                name="nome" 
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('projectMeta.name')} *</FormLabel>
-                    <FormControl><Input placeholder={t('projectMeta.namePlaceholder')} {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} 
-              />
-              <FormField 
-                control={form.control} 
-                name="descricao" 
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('projectMeta.description')}</FormLabel>
-                    <FormControl>
-                      <RichTextEditor
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        placeholder={t('projectMeta.descriptionPlaceholder')}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} 
-              />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
-                  {t('common.cancel')}
-                </Button>
-                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
-                  {t('common.save')}
-                </LoadingButton>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

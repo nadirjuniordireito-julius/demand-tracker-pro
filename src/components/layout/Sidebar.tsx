@@ -225,16 +225,6 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
           isCollapsed={isCollapsed}
         />
 
-        {/* Visão de Saúde do Projeto (Semáforo) - requer projeto selecionado */}
-        {selectedProject && (
-          <NavItem
-            to={`/projetos/${selectedProject.id}/semaforo`}
-            icon={<HeartPulse className="h-5 w-5" />}
-            label={t('nav.projectHealth')}
-            isCollapsed={isCollapsed}
-          />
-        )}
-
         {/* Cadastros Group - apenas perfil Admin (A) */}
         {user?.perfil === 'A' && (
           <NavGroup

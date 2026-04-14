@@ -4,6 +4,8 @@ const defaultLogoUfla = `${typeof window !== 'undefined' ? window.location.origi
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { useTranslation } from "react-i18next";
 
+import { COORDENADOR_UNID_DESCENTRALIZADA, COORDENADOR_UNID_DESCENTRALIZADORA } from '@/types';
+
 export type TPELabels = {
   documentTitle: string;
   demandNumber: string;
@@ -16,6 +18,8 @@ export type TPELabels = {
   signatureNote: string;
   signerName: string;
   signerRole: string;
+  unidadeDescentralizadora: string;
+  unidadeDescentralizada: string;
   pageOf: (page: number, total: number) => string;
 };
 
@@ -206,6 +210,16 @@ export function TermoPlanejamentoReportInner(props: TPEPropsWithLabels) {
         <Text style={styles.title}>{L.documentTitle}</Text>
 
         <View style={styles.labelRow}>
+            <Text style={styles.label}>{L.unidadeDescentralizadora}</Text>
+            <Text style={styles.value}>{COORDENADOR_UNID_DESCENTRALIZADORA}</Text>
+          </View>
+          
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>{L.unidadeDescentralizada}</Text>
+            <Text style={styles.value}>{COORDENADOR_UNID_DESCENTRALIZADA}</Text>
+          </View>
+
+        <View style={styles.labelRow}>
           <Text style={styles.label}>{L.demandNumber}</Text>
           <Text style={styles.value}>{DEMANDA_CODIGO}</Text>
         </View>
@@ -294,6 +308,8 @@ export default function TPE(props: TPEProps) {
         signatureNote: t("planningTerm.report.signatureNote"),
         signerName: t("planningTerm.report.signerName"),
         signerRole: t("planningTerm.report.signerRole"),
+        unidadeDescentralizadora: t("common.unidadeDescentralizadora"),
+        unidadeDescentralizada: t("common.unidadeDescentralizada"),
         pageOf: (p: number, tot: number) => t("planningTerm.report.pageOf", { page: p, total: tot }),
       };
 

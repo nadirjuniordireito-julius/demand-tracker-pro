@@ -8,13 +8,15 @@ import type {
   MetaProduto, 
   MetaProdutoCreateDTO, 
   MetaProdutoUpdateDTO, 
-  PaginatedResponse 
+  PaginatedResponse,
+  ProdutoEvolucaoTrimestralDTO,
 } from '@/types';
 
 const ENDPOINTS = {
   base: '/meta-produtos',
   byId: (id: number) => `/meta-produtos/${id}`,
   byProjetoMeta: (projetoMetaId: number) => `/meta-produtos/projeto-meta/${projetoMetaId}`,
+  evolucaoTrimestral: (id: number) => `/meta-produtos/${id}/evolucao-trimestral`,
 };
 
 export interface MetaProdutoFilters {
@@ -86,6 +88,10 @@ export const metaProdutoService = {
    */
   async delete(id: number): Promise<void> {
     return api.delete(ENDPOINTS.byId(id));
+  },
+
+  async getEvolucaoTrimestral(id: number): Promise<ProdutoEvolucaoTrimestralDTO> {
+    return api.get<ProdutoEvolucaoTrimestralDTO>(ENDPOINTS.evolucaoTrimestral(id));
   },
 };
 

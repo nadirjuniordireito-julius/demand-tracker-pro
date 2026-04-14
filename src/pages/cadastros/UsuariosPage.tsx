@@ -1,8 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { 
   Edit, 
   Trash2, 
@@ -19,27 +17,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { DataTable, type Column, type Action } from '@/components/common/DataTable';
 import { useApi } from '@/hooks/useApi';
-import { usuarioSchema, usuarioCreateSchema, type UsuarioFormData } from '@/lib/validations';
 import { usuarioService } from '@/services/usuarioService';
 import { projetoService, usuarioProjetoService } from '@/services';
 import { useAuth } from '@/contexts/AuthContext';
@@ -61,18 +42,36 @@ const getStatusBadge = (status: UserStatus, t: (key: string) => string) => {
   return <Badge variant="secondary">{t('users.inactive')}</Badge>;
 };
 
+type UsuariosListMemory = {
+  search: string;
+  sortField: 'nome' | 'perfil';
+  sortDirection: 'asc' | 'desc';
+  currentPage: number;
+  pageSize: number;
+};
+
+let usuariosListMemory: UsuariosListMemory | null = null;
+
 export default function UsuariosPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  const initialListState = usuariosListMemory ?? {
+    search: '',
+    sortField: 'nome',
+    sortDirection: 'asc',
+    currentPage: 0,
+    pageSize: 5,
+  };
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [search, setSearch] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [search, setSearch] = useState(initialListState.search);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
-  const [sortField, setSortField] = useState<'nome' | 'perfil'>('nome');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(5);
+  const [sortField, setSortField] = useState<'nome' | 'perfil'>(initialListState.sortField);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(initialListState.sortDirection);
+  const [currentPage, setCurrentPage] = useState(initialListState.currentPage);
+  const [pageSize, setPageSize] = useState(initialListState.pageSize);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -83,7 +82,6 @@ export default function UsuariosPage() {
 
   // API states
   const { isLoading, error, execute } = useApi<PaginatedResponse<Usuario>>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Estado para manutenção de projetos por usuário
@@ -96,16 +94,6 @@ export default function UsuariosPage() {
   const [selectedAssignedIds, setSelectedAssignedIds] = useState<number[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isSavingProjects, setIsSavingProjects] = useState(false);
-
-  const form = useForm<UsuarioFormData>({
-    resolver: zodResolver(selectedUsuario ? usuarioSchema : usuarioCreateSchema),
-    defaultValues: {
-      nome: '',
-      password: '',
-      perfil: 'O',
-      status: 'A',
-    },
-  });
 
   // Carrega dados iniciais
   const loadData = useCallback(async () => {
@@ -131,6 +119,16 @@ export default function UsuariosPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    usuariosListMemory = {
+      search,
+      sortField,
+      sortDirection,
+      currentPage,
+      pageSize,
+    };
+  }, [search, sortField, sortDirection, currentPage, pageSize]);
+
   const paginatedUsuarios = usuarios;
 
   const handleSort = (field: string) => {
@@ -145,20 +143,13 @@ export default function UsuariosPage() {
   };
 
   const handleAdd = () => {
-    setSelectedUsuario(null);
-    form.reset({ nome: '', password: '', perfil: 'O', status: 'A' });
-    setIsFormOpen(true);
+    const returnTo = `${location.pathname}${location.search}`;
+    navigate(`/cadastros/usuarios/novo?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   const handleEdit = (usuario: Usuario) => {
-    setSelectedUsuario(usuario);
-    form.reset({
-      nome: usuario.nome,
-      password: '',
-      perfil: usuario.perfil,
-      status: usuario.status,
-    });
-    setIsFormOpen(true);
+    const returnTo = `${location.pathname}${location.search}`;
+    navigate(`/cadastros/usuarios/${usuario.id}/editar?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   const handleManageProjects = async (usuario: Usuario) => {
@@ -239,32 +230,6 @@ export default function UsuariosPage() {
       separator: true,
     },
   ], [t, handleEdit, handleDelete]);
-
-  const onSubmit = async (data: UsuarioFormData) => {
-    setIsSaving(true);
-    try {
-      if (selectedUsuario) {
-        await usuarioService.update(selectedUsuario.id, {
-          nome: data.nome,
-          perfil: data.perfil,
-          status: data.status,
-          ...(data.password && { password: data.password }),
-        });
-      } else {
-        await usuarioService.create({
-          nome: data.nome,
-          password: data.password,
-          perfil: data.perfil,
-          status: data.status,
-        });
-      }
-      setIsFormOpen(false);
-      form.reset();
-      loadData();
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleConfirmDelete = async () => {
     if (!selectedUsuario) return;
@@ -413,114 +378,6 @@ export default function UsuariosPage() {
           />
         </>
       )}
-
-      {/* Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedUsuario ? t('users.editUser') : t('users.newUser')}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedUsuario 
-                ? t('common.editUser')
-                : t('common.fillUser')}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="nome"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.username')} *</FormLabel>
-                    <FormControl>
-                      <Input placeholder={t('auth.usernamePlaceholder')} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('users.password')} {!selectedUsuario && '*'}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder={selectedUsuario ? t('common.passwordKeepBlank') : t('common.passwordPlaceholder')}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="perfil"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('users.profile')} *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="A">{t('users.administrator')}</SelectItem>
-                        <SelectItem value="O">{t('users.operator')}</SelectItem>
-                        <SelectItem value="V">{t('users.viewer')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {selectedUsuario && (
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('users.status')} *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="A">{t('users.active')}</SelectItem>
-                          <SelectItem value="I">{t('users.inactive')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                /> 
-              )}
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={isSaving}>
-                  {t('common.cancel')}
-                </Button>
-                <LoadingButton type="submit" isLoading={isSaving} loadingText={t('common.saving')}>
-                  {t('common.save')}
-                </LoadingButton>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

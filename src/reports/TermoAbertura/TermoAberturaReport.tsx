@@ -1,6 +1,8 @@
 const defaultLogoIbama = `${typeof window !== 'undefined' ? window.location.origin : ''}/ibama.jpg`;
 const defaultLogoUfla = `${typeof window !== 'undefined' ? window.location.origin : ''}/ufla1.png`;
 
+import { COORDENADOR_UNID_DESCENTRALIZADA, COORDENADOR_UNID_DESCENTRALIZADORA } from '@/types';
+
 import {
     Document,
     Page,
@@ -21,6 +23,8 @@ import {
     signatureNote: string;
     signerName: string;
     signerRole: string;
+    unidadeDescentralizadora: string;
+    unidadeDescentralizada: string;
     pageOf: (page: number, total: number) => string;
   };
 
@@ -183,7 +187,17 @@ const styles = StyleSheet.create({
           <View style={styles.headerLine} fixed />
 
           <Text style={styles.title}>{L.documentTitle}</Text>
-         
+
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>{L.unidadeDescentralizadora}</Text>
+            <Text style={styles.value}>{COORDENADOR_UNID_DESCENTRALIZADORA}</Text>
+          </View>
+          
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>{L.unidadeDescentralizada}</Text>
+            <Text style={styles.value}>{COORDENADOR_UNID_DESCENTRALIZADA}</Text>
+          </View>
+
           <View style={styles.labelRow}>
             <Text style={styles.label}>{L.demandNumber}</Text>
             <Text style={styles.value}>{DEMANDA_CODIGO}</Text>
@@ -211,7 +225,7 @@ const styles = StyleSheet.create({
 
           <View style={styles.assinatura}>
             <Text>________________________________________</Text>
-            <Text>{L.signerName}</Text>
+            <Text>{COORDENADOR_UNID_DESCENTRALIZADORA}</Text>
             <Text>{L.signerRole}</Text>
           </View>
 
@@ -241,6 +255,8 @@ const styles = StyleSheet.create({
           signatureNote: t("openingTerm.report.signatureNote"),
           signerName: t("openingTerm.report.signerName"),
           signerRole: t("openingTerm.report.signerRole"),
+          unidadeDescentralizadora: t("openingTerm.report.unidadeDescentralizadora"),
+          unidadeDescentralizada: t("openingTerm.report.unidadeDescentralizada"),
           pageOf: (p: number, tot: number) => t("openingTerm.report.pageOf", { page: p, total: tot }),
         };
 

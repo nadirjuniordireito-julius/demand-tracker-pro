@@ -19,13 +19,21 @@ import LoginPage from "./pages/LoginPage";
 const HomePage = lazy(() => import("./pages/HomePage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const UsuariosPage = lazy(() => import("./pages/cadastros/UsuariosPage"));
+const EditUsuarioPage = lazy(() => import("./pages/cadastros/EditUsuarioPage"));
 const ProjetosPage = lazy(() => import("./pages/cadastros/ProjetosPage"));
+const EditProjetoPage = lazy(() => import("./pages/cadastros/EditProjetoPage"));
+const ProjectDocumentsPage = lazy(() => import("./pages/cadastros/ProjectDocumentsPage"));
 const ProjetoMetaPage = lazy(() => import("./pages/cadastros/ProjetoMetaPage"));
+const EditProjetoMetaPage = lazy(() => import("./pages/cadastros/EditProjetoMetaPage"));
 const PerfisPage = lazy(() => import("./pages/cadastros/PerfisPage"));
+const EditPerfilPage = lazy(() => import("./pages/cadastros/EditPerfilPage"));
 const ProfissionaisPage = lazy(() => import("./pages/cadastros/ProfissionaisPage"));
+const EditProfissionalPage = lazy(() => import("./pages/cadastros/EditProfissionalPage"));
 const DesembolsosPage = lazy(() => import("./pages/cadastros/DesembolsosPage"));
+const EditDesembolsoPage = lazy(() => import("./pages/cadastros/EditDesembolsoPage"));
 const TemplatesPage = lazy(() => import("./pages/cadastros/TemplatesPage"));
 const DemandasPage = lazy(() => import("./pages/demandas/DemandasPage"));
+const EditDemandaPage = lazy(() => import("./pages/demandas/EditDemandaPage"));
 const TermoAberturaPage = lazy(() => import("./pages/demandas/TermoAberturaPage"));
 const TermoPlanejamentoPage = lazy(() => import("./pages/demandas/TermoPlanejamentoPage"));
 const TermoEncerramentoPage = lazy(() => import("./pages/demandas/TermoEncerramentoPage"));
@@ -72,14 +80,28 @@ const App = () => {
                           <Route path="/" element={<HomePage />} />
                           <Route path="/dashboard" element={<DashboardPage />} />
                           <Route path="/cadastros/usuarios" element={<UsuariosPage />} />
+                          <Route path="/cadastros/usuarios/novo" element={<EditUsuarioPage />} />
+                          <Route path="/cadastros/usuarios/:usuarioId/editar" element={<EditUsuarioPage />} />
                           <Route path="/cadastros/projetos" element={<ProjetosPage />} />
+                          <Route path="/cadastros/projetos/novo" element={<EditProjetoPage />} />
+                          <Route path="/cadastros/projetos/:projetoId/editar" element={<EditProjetoPage />} />
+                          <Route path="/cadastros/projetos/:projetoId/documentos" element={<ProjectDocumentsPage />} />
                           <Route path="/cadastros/projeto-meta" element={<ProjetoMetaPage />} />
+                          <Route path="/cadastros/projeto-meta/novo" element={<EditProjetoMetaPage />} />
+                          <Route path="/cadastros/projeto-meta/:metaId/editar" element={<EditProjetoMetaPage />} />
                           <Route path="/cadastros/perfis" element={<PerfisPage />} />
+                          <Route path="/cadastros/perfis/novo" element={<EditPerfilPage />} />
+                          <Route path="/cadastros/perfis/:perfilId/editar" element={<EditPerfilPage />} />
                           <Route path="/cadastros/profissionais" element={<ProfissionaisPage />} />
+                          <Route path="/cadastros/profissionais/novo" element={<EditProfissionalPage />} />
+                          <Route path="/cadastros/profissionais/:profissionalId/editar" element={<EditProfissionalPage />} />
                           <Route path="/cadastros/desembolsos" element={<DesembolsosPage />} />
+                          <Route path="/cadastros/desembolsos/novo" element={<EditDesembolsoPage />} />
+                          <Route path="/cadastros/desembolsos/:desembolsoId/editar" element={<EditDesembolsoPage />} />
                           <Route path="/cadastros/templates" element={<TemplatesPage />} />
                           <Route path="/projetos/:id/semaforo" element={<ProjetoSemaforoPage />} />
                           <Route path="/demandas" element={<DemandasPage />} />
+                          <Route path="/demandas/:demandaId/editar" element={<EditDemandaPage />} />
                           <Route path="/demandas/termo-abertura" element={<TermoAberturaPage />} />
                           <Route path="/demandas/termo-planejamento" element={<TermoPlanejamentoPage />} />
                           <Route path="/demandas/termo-encerramento" element={<TermoEncerramentoPage />} />

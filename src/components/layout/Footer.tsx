@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import juliusLogo from '@/assets/julius-xpt-976-TW.png';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.5.0';
 
 export function Footer() {
   const { t } = useTranslation();

@@ -132,6 +132,8 @@ export const termoAberturaService = {
         signatureNote: i18n.t('openingTerm.report.signatureNote'),
         signerName: i18n.t('openingTerm.report.signerName'),
         signerRole: i18n.t('openingTerm.report.signerRole'),
+        unidadeDescentralizadora: i18n.t('common.unidadeDescentralizadora'),
+        unidadeDescentralizada: i18n.t('common.unidadeDescentralizada'),
         pageOf: (page: number, total: number) => i18n.t('openingTerm.report.pageOf', { page, total }),
       },
     };
@@ -272,6 +274,8 @@ export const termoPlanejamentoService = {
         signatureNote: i18n.t('planningTerm.report.signatureNote'),
         signerName: i18n.t('planningTerm.report.signerName'),
         signerRole: i18n.t('planningTerm.report.signerRole'),
+        unidadeDescentralizadora: i18n.t('common.unidadeDescentralizadora'),
+        unidadeDescentralizada: i18n.t('common.unidadeDescentralizada'),
         pageOf: (page: number, total: number) => i18n.t('planningTerm.report.pageOf', { page, total }),
       },
     };

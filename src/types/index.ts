@@ -3,6 +3,9 @@
 // Baseado no modelo de dados ORM especificado
 // =====================================================
 
+export const COORDENADOR_UNID_DESCENTRALIZADA = 'PAULO HENRIQUE MONTAGNANA VICENTE LEME';
+export const COORDENADOR_UNID_DESCENTRALIZADORA = 'LAWRENCE NOBREGA DE OLIVEIRA';
+
 // Enum para status de usuário
 export type UserStatus = 'A' | 'I'; // A = Ativo, I = Inativo
 
@@ -698,7 +701,29 @@ export interface SemaforoNodeDTO {
   valorTotalExecutado?: number | null;
   /** Status da demanda técnica (quando nivel === 'DEMANDA'). 'Z' = cancelada. Usado para não listar demandas canceladas no semáforo. */
   statusDemanda?: string | null;
+  idTermoAbertura: number | null;
+  idTermoPlanejamento: number | null;
+  idTermoEncerramento: number | null;
   children: SemaforoNodeDTO[];
+}
+
+export interface ProdutoEvolucaoTrimestralItemDTO {
+  trimestreSequencia: number;
+  dataInicio: string;
+  dataFim: string;
+  totalPrevisto: number;
+  totalExecutado: number;
+}
+
+export interface ProdutoEvolucaoTrimestralDTO {
+  metaProdutoId: number;
+  codigoProduto: string;
+  nomeProduto: string;
+  dataInicioAnalise: string;
+  dataFimAnalise: string;
+  totalPrevistoProduto: number;
+  totalExecutadoProduto: number;
+  trimestres: ProdutoEvolucaoTrimestralItemDTO[];
 }
 
 // =====================================================

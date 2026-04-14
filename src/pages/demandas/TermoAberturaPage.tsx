@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { PdfPreviewDialog } from '@/components/common/PdfPreviewDialog';
+import { PageHeader } from '@/components/common/PageComponents';
 import {
   Select,
   SelectContent,
@@ -66,7 +66,6 @@ export default function TermoAberturaPage() {
   const { user } = useAuth();
   const { selectedProject } = useProject();
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTermo, setSelectedTermo] = useState<TermoAbertura | null>(null);
   const [isLoadingDemanda, setIsLoadingDemanda] = useState(true);
   const [isLoadingTermo, setIsLoadingTermo] = useState(true);
@@ -84,6 +83,14 @@ export default function TermoAberturaPage() {
   const [isViewDocOpen, setIsViewDocOpen] = useState(false);
   const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
   const { toast } = useToast();
+
+  const isSafeInternalPath = (value: string | null): value is string =>
+    !!value && value.startsWith('/') && !value.startsWith('//');
+
+  const returnTo = (() => {
+    const queryReturnTo = searchParams.get('returnTo');
+    return isSafeInternalPath(queryReturnTo) ? queryReturnTo : null;
+  })();
 
   // Evita deslocamento de timezone: "2025-01-15" sem hora é interpretado como UTC meia-noite
   const parseDateOnly = (dateStr: string) => {
@@ -156,8 +163,6 @@ export default function TermoAberturaPage() {
         });
       }
 
-      // Abre o modal automaticamente
-      setIsFormOpen(true);
     } catch (err: unknown) {
       if (import.meta.env.DEV) console.error('Erro ao carregar dados:', err);
       setError(getErrorMessage(err, 'Erro ao carregar dados da demanda'));
@@ -255,7 +260,10 @@ export default function TermoAberturaPage() {
   };
 
   const handleClose = () => {
-    setIsFormOpen(false);
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
     navigate('/demandas');
   };
 
@@ -276,9 +284,7 @@ export default function TermoAberturaPage() {
         await demandaService.update(demanda.id, { status: 'A' });
       }
       setIsDeleteOpen(false);
-      setIsFormOpen(false);
-      // Redireciona de volta para a página de demandas
-      navigate('/demandas');
+      handleClose();
     } catch (error) {
       // Erro já é tratado automaticamente pela API (toast será exibido)
     } finally {
@@ -456,18 +462,13 @@ export default function TermoAberturaPage() {
 
   return (
     <div className="space-y-6">
-      {/* Form Dialog - fecha pelo X do header ou botões (regra global no DialogContent) */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-          <DialogHeaderStandard
-            title={selectedTermo ? t('openingTerm.editTerm') : t('openingTerm.newTerm')}
-            description={selectedTermo 
-              ? t('common.editTerm')
-              : t('common.fillTerm')}
-          />
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <PageHeader
+        title={selectedTermo ? t('openingTerm.editTerm') : t('openingTerm.newTerm')}
+        description={selectedTermo ? t('common.editTerm') : t('common.fillTerm')}
+      />
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                
                 <FormField
@@ -657,11 +658,8 @@ export default function TermoAberturaPage() {
                   ) : null}
                 </div>
               </DialogFooter>
-            </form>
-          </Form>
-          
-        </DialogContent>
-      </Dialog>
+        </form>
+      </Form>
 
       {/* Delete Confirmation Dialog - fecha apenas pelos botões */}
       <Dialog
