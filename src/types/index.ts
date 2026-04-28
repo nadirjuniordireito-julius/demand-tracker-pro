@@ -3,6 +3,8 @@
 // Baseado no modelo de dados ORM especificado
 // =====================================================
 
+import type { DemandaExecucaoDTO } from '@/modules/execucaoDemanda/types';
+
 export const COORDENADOR_UNID_DESCENTRALIZADA = 'PAULO HENRIQUE MONTAGNANA VICENTE LEME';
 export const COORDENADOR_UNID_DESCENTRALIZADORA = 'LAWRENCE NOBREGA DE OLIVEIRA';
 
@@ -59,6 +61,7 @@ export interface Usuario {
 
 export interface UsuarioCreateDTO {
   nome: string;
+  email?: string;
   password: string;
   perfil: UserProfile;
   status: UserStatus;
@@ -280,6 +283,32 @@ export interface ProfissionalUpdateDTO {
   dataInicioAtividade?: string;
   projetoId?: number;
   perfilId?: number;
+}
+
+// =====================================================
+// Entidade: ProfissionalCustoMensal
+// =====================================================
+export interface ProfissionalCustoMensalDTO {
+  id: number;
+  profissionalId: number;
+  profissional?: Profissional;
+  ano: number;
+  mes: number; // 1..12
+  custoTotal: number;
+}
+
+export interface ProfissionalCustoMensalCreateDTO {
+  profissionalId: number;
+  ano: number; // 1900..3000
+  mes: number; // 1..12
+  custoTotal: number; // >= 0
+}
+
+export interface ProfissionalCustoMensalUpdateDTO {
+  profissionalId?: number;
+  ano?: number;
+  mes?: number;
+  custoTotal?: number;
 }
 
 // =====================================================
@@ -689,6 +718,8 @@ export interface SemaforoNodeDTO {
   nivel: SemaforoNivel;
   codigo: string;
   nome: string;
+  /** Descrição (ex.: produto), quando enviada pelo backend no semáforo. */
+  descricao?: string | null;
   status: SemaforoStatus;
   dataInicio: string | null;
   dataFim: string | null;
@@ -704,6 +735,7 @@ export interface SemaforoNodeDTO {
   idTermoAbertura: number | null;
   idTermoPlanejamento: number | null;
   idTermoEncerramento: number | null;
+  execucao: DemandaExecucaoDTO | null;
   children: SemaforoNodeDTO[];
 }
 

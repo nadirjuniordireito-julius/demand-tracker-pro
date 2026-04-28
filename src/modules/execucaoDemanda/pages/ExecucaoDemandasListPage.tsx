@@ -3,16 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Settings2 } from 'lucide-react';
+import { FileText, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState } from '@/components/common/LoadingStates';
-import { DataTable, type Column, type Action } from '@/components/common/DataTable';
+import { DataTable, type Column } from '@/components/common/DataTable';
 import { useApi } from '@/hooks/useApi';
 import { demandaService } from '@/services/demandaService';
 import { useProject } from '@/contexts/ProjectContext';
 import type { DemandaTecnica, PaginatedResponse } from '@/types';
-import { getStatusBadge } from '@/components/common/statusBadge';
 
 export default function ExecucaoDemandasListPage() {
   const { t } = useTranslation();
@@ -55,26 +54,43 @@ export default function ExecucaoDemandasListPage() {
   }, [loadData]);
 
   const columns: Column<DemandaTecnica>[] = [
+    {
+      key: 'acoes',
+      label: t('common.actions'),
+      minWidth: '70px',
+      className: 'text-center',
+      render: (row) => (
+        <div className="flex justify-center">
+          <Button
+            variant="link"
+            className="h-auto p-0 text-[navy]"
+            onClick={() => navigate(`/execucao-demandas/${row.id}`)}
+            aria-label={t('execucao.manageExecution', 'Gerenciar Execução')}
+            title={t('execucao.manageExecution', 'Gerenciar Execução')}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+    {
+      key: 'meta',
+      label: t('demands.metaCodeLabel', 'Meta'),
+      minWidth: '90px',
+      render: (row) => row.metaProduto?.projetoMeta?.codigo ?? '—',
+    },
+    {
+      key: 'produto',
+      label: t('projectProducts.title', 'Produto'),
+      minWidth: '100px',
+      render: (row) => row.metaProduto?.codigo ?? '—',
+    },
     { key: 'codigo', label: t('demands.code'), minWidth: '100px' },
     {
       key: 'descricao',
       label: t('execucao.description', 'Descrição'),
       minWidth: '200px',
       render: (row) => (row.descricao ? stripHtml(row.descricao).slice(0, 80) + (stripHtml(row.descricao).length > 80 ? '...' : '') : row.nome ?? '—'),
-    },
-    {
-      key: 'status',
-      label: t('demands.status'),
-      minWidth: '120px',
-      render: (row) => getStatusBadge(row.status ?? row.situacao, t),
-    },
-  ];
-
-  const actions: Action<DemandaTecnica>[] = [
-    {
-      label: t('execucao.manageExecution', 'Gerenciar Execução'),
-      icon: <Settings2 className="h-4 w-4" />,
-      onClick: (row) => navigate(`/execucao-demandas/${row.id}`),
     },
   ];
 
@@ -116,9 +132,7 @@ export default function ExecucaoDemandasListPage() {
         <DataTable
             data={demandas}
             columns={columns}
-            actions={actions}
             getRowId={(row) => row.id}
-            actionsLabel={t('common.actions')}
           />
           <TablePagination
             currentPage={currentPage + 1}

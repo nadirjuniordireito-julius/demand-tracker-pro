@@ -7,6 +7,13 @@ export const usuarioSchema = z.object({
     .trim()
     .min(1, { message: 'validation.nameRequired' })
     .max(100, { message: 'validation.nameMax100' }),
+  email: z
+    .string()
+    .trim()
+    .email({ message: 'validation.emailInvalid' })
+    .max(255, { message: 'validation.emailMax255' })
+    .optional()
+    .or(z.literal('')),
   password: z
     .string()
     .min(6, { message: 'validation.passwordMin6' })

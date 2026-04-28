@@ -38,6 +38,7 @@ interface TarefaFormModalProps {
     descricao?: string;
     status: TarefaStatus;
     prioridade: string;
+    sequencia: number;
     dataInicioPlanejada: string;
     dataFimPlanejada: string;
     dataInicioReal?: string;
@@ -62,6 +63,7 @@ export function TarefaFormModal({ open, onOpenChange, tarefa, onSubmit, saving }
         descricao: tarefa.descricao ?? '',
         status: tarefa.status as TarefaStatus,
         prioridade: tarefa.prioridade || '3',
+        sequencia: Number(tarefa.sequencia) || 1,
         dataInicioPlanejada: toDateOnly(tarefa.dataInicioPlanejada),
         dataFimPlanejada: toDateOnly(tarefa.dataFimPlanejada),
         dataInicioReal: tarefa.dataInicioReal ? toDateOnly(tarefa.dataInicioReal) : '',
@@ -76,6 +78,7 @@ export function TarefaFormModal({ open, onOpenChange, tarefa, onSubmit, saving }
       descricao: '',
       status: 'PLANEJADA' as TarefaStatus,
       prioridade: '3',
+      sequencia: 1,
       dataInicioPlanejada: today,
       dataFimPlanejada: today,
       dataInicioReal: '',
@@ -99,10 +102,11 @@ export function TarefaFormModal({ open, onOpenChange, tarefa, onSubmit, saving }
       descricao: form.descricao?.trim() || undefined,
       status: form.status,
       prioridade: form.prioridade,
+      sequencia: form.sequencia,
       dataInicioPlanejada: form.dataInicioPlanejada,
       dataFimPlanejada: form.dataFimPlanejada,
-       dataInicioReal: form.dataInicioReal || undefined,
-       dataFimReal: form.dataFimReal || undefined,
+      dataInicioReal: form.dataInicioReal || undefined,
+      dataFimReal: form.dataFimReal || undefined,
       percentualProgresso: form.percentualProgresso,
       estimativaHoras: form.estimativaHoras,
     });
@@ -177,6 +181,22 @@ export function TarefaFormModal({ open, onOpenChange, tarefa, onSubmit, saving }
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="sequencia">{t('execucao.taskSequence', 'Sequência')}</Label>
+            <Input
+              id="sequencia"
+              type="number"
+              min={1}
+              step={1}
+              value={form.sequencia}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  sequencia: Math.max(1, Number(e.target.value) || 1),
+                }))
+              }
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

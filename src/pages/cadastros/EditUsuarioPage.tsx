@@ -51,6 +51,7 @@ export default function EditUsuarioPage() {
     resolver: zodResolver(isCreate ? usuarioCreateSchema : usuarioSchema),
     defaultValues: {
       nome: '',
+      email: '',
       password: '',
       perfil: 'O',
       status: 'A',
@@ -87,6 +88,7 @@ export default function EditUsuarioPage() {
       setUsuario(data);
       form.reset({
         nome: data.nome,
+        email: data.email ?? '',
         password: '',
         perfil: data.perfil,
         status: data.status,
@@ -109,6 +111,7 @@ export default function EditUsuarioPage() {
       if (isCreate) {
         await usuarioService.create({
           nome: data.nome,
+          email: data.email || undefined,
           password: data.password,
           perfil: data.perfil,
           status: data.status,
@@ -116,6 +119,7 @@ export default function EditUsuarioPage() {
       } else if (usuario) {
         await usuarioService.update(usuario.id, {
           nome: data.nome,
+          email: data.email || undefined,
           perfil: data.perfil,
           status: data.status,
           ...(data.password && { password: data.password }),
@@ -169,6 +173,20 @@ export default function EditUsuarioPage() {
                 <FormLabel>{t('auth.username')} *</FormLabel>
                 <FormControl>
                   <Input placeholder={t('auth.usernamePlaceholder')} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('users.email')}</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder={t('users.email')} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

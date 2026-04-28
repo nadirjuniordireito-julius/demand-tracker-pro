@@ -198,6 +198,12 @@ export default function UsuariosPage() {
       sortable: true,
     },
     {
+      key: 'email',
+      label: t('users.email'),
+      render: (usuario) => usuario.email ?? '-',
+      hideOnMobile: true,
+    },
+    {
       key: 'perfil',
       label: t('users.profile'),
       sortable: true,

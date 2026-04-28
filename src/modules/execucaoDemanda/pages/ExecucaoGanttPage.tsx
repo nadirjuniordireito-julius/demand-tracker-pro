@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
 import { Fragment, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Bed, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Bed, CheckCircle2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Gantt, Task, ViewMode } from 'gantt-task-react';
 import 'gantt-task-react/dist/index.css';
@@ -14,10 +14,12 @@ import type {
   DemandaExecucaoGanttTarefaDTO,
   DemandaExecucaoTarefaApontamentoProgressoDTO,
 } from '../types';
+import { generateExecucaoGanttPdfBlob } from '@/reports/ExecucaoGantt/ExecucaoGanttReport';
 import { LoadingSpinner } from '@/components/common/LoadingStates';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ExecucaoGanttPageProps {
   demandaTecnicaId?: number;
@@ -553,9 +555,10 @@ function WeekdayDayOverlay({
 function ganttTarefaToTask(t: DemandaExecucaoGanttTarefaDTO): Task {
   const start = parseDateForGanttBar(t.dataInicioPlanejada);
   const end = parseEndDateForGanttBar(t.dataFimPlanejada);
+  const taskName = typeof t.sequencia === 'number' ? `${t.sequencia} - ${t.titulo}` : t.titulo;
   return {
     id: String(t.id),
-    name: t.titulo,
+    name: taskName,
     type: 'task',
     start,
     end,
@@ -577,6 +580,7 @@ export default function ExecucaoGanttPage({
   embedded = false,
 }: ExecucaoGanttPageProps = {}) {
   const { t } = useTranslation();
+  const location = useLocation();
   const { demandaTecnicaId } = useParams<{ demandaTecnicaId: string }>();
   const navigate = useNavigate();
   const id =
@@ -607,6 +611,92 @@ export default function ExecucaoGanttPage({
   const [monthHeaderWidth, setMonthHeaderWidth] = useState<number | null>(null);
   const [chartViewportElement, setChartViewportElement] = useState<HTMLElement | null>(null);
   const [viewDate, setViewDate] = useState<Date | undefined>(undefined);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleBack = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    const returnTo = params.get('returnTo');
+    if (returnTo && returnTo.startsWith('/')) {
+      navigate(returnTo);
+      return;
+    }
+    navigate(-1);
+  }, [location.search, navigate]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!data) return;
+    const pdfWindow = window.open('', '_blank');
+    if (!pdfWindow) {
+      window.alert(
+        t(
+          'execucao.gantt.exportPdfPopupBlocked',
+          'O navegador bloqueou a abertura do PDF. Permita popups para continuar.',
+        ),
+      );
+      return;
+    }
+
+    pdfWindow.document.title = t('execucao.gantt.exportingPdf', 'Gerando PDF...');
+    pdfWindow.document.body.innerHTML = `<div style="font-family: Arial, sans-serif; padding: 16px;">${t(
+      'execucao.gantt.exportingPdf',
+      'Gerando PDF...',
+    )}</div>`;
+
+    setExportingPdf(true);
+    try {
+      const blob = await generateExecucaoGanttPdfBlob(data, {
+        title: t('execucao.gantt.reportTitle', 'Relatorio do Gantt de Execucao'),
+        subtitle: t('execucao.gantt.reportSubtitle', 'Demanda tecnica'),
+        generatedAt: t('execucao.gantt.generatedAt', 'Gerado em'),
+        summaryTitle: t('execucao.gantt.reportSummaryTitle', 'Resumo executivo'),
+        summaryTotalTasks: t('execucao.gantt.reportSummaryTotalTasks', 'Total de tarefas'),
+        summaryAverageProgress: t(
+          'execucao.gantt.reportSummaryAverageProgress',
+          'Progresso medio',
+        ),
+        summaryTotalEstimateHours: t(
+          'execucao.gantt.reportSummaryTotalEstimateHours',
+          'Total estimado (h)',
+        ),
+        summaryPlannedRange: t('execucao.gantt.reportSummaryPlannedRange', 'Faixa planejada'),
+        summaryRealRange: t('execucao.gantt.reportSummaryRealRange', 'Faixa real'),
+        sequence: t('execucao.taskSequence', 'Seq.'),
+        task: t('execucao.gantt.task', 'Tarefa'),
+        status: t('execucao.taskStatus', 'Status'),
+        priority: t('execucao.priority', 'Prioridade'),
+        progress: t('execucao.percentualProgresso', 'Progresso'),
+        estimateHours: t('execucao.estimativaHoras', 'Est. horas'),
+        plannedPeriod: t('execucao.gantt.planning', 'Planejamento'),
+        realPeriod: t('execucao.gantt.execution', 'Execucao'),
+        resources: t('execucao.professional', 'Recursos'),
+        gantt: t('execucao.gantt.reportGantt', 'Gantt'),
+        plannedLegend: t('execucao.gantt.reportLegendPlanned', 'Barra planejada'),
+        realLegend: t('execucao.gantt.reportLegendReal', 'Barra real'),
+        notStartedLegend: t('execucao.gantt.reportLegendNotStarted', 'Sem inicio real'),
+        noResources: t('execucao.noResourcesInTask', 'Nenhum recurso'),
+        pageOf: (page, total) =>
+          t('execucao.gantt.reportPageOf', 'Pagina {{page}} de {{total}}', {
+            page,
+            total,
+          }),
+      });
+
+      const url = URL.createObjectURL(blob);
+      pdfWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      pdfWindow.close();
+      console.error('Erro ao exportar Gantt para PDF:', error);
+      window.alert(
+        t(
+          'execucao.gantt.exportPdfError',
+          'Nao foi possivel gerar o PDF do Gantt. Tente novamente.',
+        ),
+      );
+    } finally {
+      setExportingPdf(false);
+    }
+  }, [data, t]);
 
   const loadGantt = useCallback(async () => {
     if (!id || Number.isNaN(id)) {
@@ -684,6 +774,8 @@ export default function ExecucaoGanttPage({
       overlayContainerRef.current = null;
       setOverlayContainer(null);
       setOverlayDimensions(null);
+      chartViewportRef.current = null;
+      setChartViewportElement(null);
       monthHeaderContainerRef.current?.remove();
       monthHeaderContainerRef.current = null;
       setMonthHeaderContainer(null);
@@ -979,9 +1071,18 @@ export default function ExecucaoGanttPage({
                 aria-selected={isSelected}
               >
                 <span className={cn('w-28 text-left font-medium', isSelected && 'border-l-4 border-primary pl-2')}>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
                     {isSelected && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                    {task.name}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <span className="block min-w-0 max-w-[90px] truncate cursor-pointer" title={task.name}>
+                          {task.name}
+                        </span>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 max-w-[75vw] break-words text-xs">
+                        {task.name}
+                      </PopoverContent>
+                    </Popover>
                   </span>
                 </span>
                 <span className="w-28 text-right pr-2 text-muted-foreground">
@@ -1032,9 +1133,13 @@ export default function ExecucaoGanttPage({
                       <ul className="space-y-0.5">
                         {ganttTask.recursos.map((r) => (
                           <li key={r.id} className="flex justify-between gap-2">
-                            <span className="text-foreground">{r.nome}</span>
+                            <span className="text-foreground">
+                              {r.nome}
+                              {r.perfilNome ? ` (${r.perfilNome})` : ''}
+                            </span>
                             <span className="text-muted-foreground">
-                              {Number(r.horasPlanejadas).toFixed(1)} h
+                              {Number(r.horasPlanejadas).toFixed(1)} h /{' '}
+                              {r.horasExecutadas != null ? Number(r.horasExecutadas).toFixed(1) : '—'} h
                             </span>
                           </li>
                         ))}
@@ -1123,7 +1228,7 @@ export default function ExecucaoGanttPage({
     return (
       <div className="space-y-4 p-4">
         {!embedded && (
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             {t('common.back')}
           </Button>
@@ -1136,12 +1241,26 @@ export default function ExecucaoGanttPage({
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        {!embedded && (
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            {t('common.back')}
+        <div className="flex items-center gap-2">
+          {!embedded && (
+            <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              {t('common.back')}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || !data}
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            {exportingPdf
+              ? t('execucao.gantt.exportingPdf', 'Gerando PDF...')
+              : t('execucao.gantt.exportPdf', 'Exportar PDF')}
           </Button>
-        )}
+        </div>
         <div className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{data.demandaTecnicaCodigo}</span>
           {' — '}

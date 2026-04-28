@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LogIn } from 'lucide-react';
 import logoImage from '@/assets/logo.png';
-
+import { APP_VERSION } from '@/constants/appInfo';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Usuário é obrigatório'),
@@ -131,8 +131,8 @@ const LoginPage = () => {
           </Form>
         </CardContent>
         <footer className="border-t px-6 py-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span className="min-w-0 truncate" title={`${t('common.appName')} – ${t('common.appNameDesc')}`}>
-            <span className="font-semibold text-foreground">{t('common.appName')}</span> – {t('common.appNameDesc')}
+          <span className="min-w-0 truncate" title={`${t('common.appName')} – v.${APP_VERSION}`}>
+            <span className="font-semibold text-foreground">{t('common.appName')}</span> – V.{APP_VERSION}
           </span>
           <span className="flex-shrink-0">{t('common.copyright')}</span>
         </footer>

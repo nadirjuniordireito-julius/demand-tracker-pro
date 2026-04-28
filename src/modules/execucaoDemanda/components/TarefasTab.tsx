@@ -94,6 +94,7 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
     descricao?: string;
     status: TarefaStatus;
     prioridade: string;
+    sequencia: number;
     dataInicioPlanejada: string;
     dataFimPlanejada: string;
     dataInicioReal?: string;
@@ -113,6 +114,7 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
           descricao: payload.descricao,
           status: payload.status,
           prioridade: payload.prioridade,
+          sequencia: payload.sequencia,
           dataInicioPlanejada: dataInicio,
           dataFimPlanejada: dataFim,
           dataInicioReal,
@@ -128,6 +130,7 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
           descricao: payload.descricao,
           status: payload.status,
           prioridade: payload.prioridade,
+          sequencia: payload.sequencia,
           dataInicioPlanejada: dataInicio,
           dataFimPlanejada: dataFim,
           dataInicioReal,
@@ -173,6 +176,7 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
   };
 
   const columns: Column<DemandaExecucaoTarefaDTO>[] = [
+    { key: 'sequencia', label: t('execucao.taskSequence', 'Sequência'), minWidth: '90px' },
     { key: 'titulo', label: t('execucao.taskTitle', 'Título'), minWidth: '180px' },
     { key: 'status', label: t('execucao.taskStatus', 'Status'), minWidth: '120px' },
     { key: 'prioridade', label: t('execucao.priority', 'Prioridade'), minWidth: '80px' },
@@ -221,7 +225,7 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
         addLabel={t('execucao.newTask', 'Nova tarefa')}
       />
       {loading ? (
-        <TableSkeleton rows={5} columns={7} />
+        <TableSkeleton rows={5} columns={8} />
       ) : (
         <DataTable
           data={tarefas}

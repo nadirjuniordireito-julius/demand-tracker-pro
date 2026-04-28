@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ChevronUp,
   ChevronRight,
   Eye,
   FileText,
   Files,
   Frown,
+  Info,
   Package,
   PieChart,
+  Star,
   Target,
   X,
 } from 'lucide-react';
@@ -27,10 +31,17 @@ import { useApi } from '@/hooks/useApi';
 import type { ProdutoEvolucaoTrimestralDTO, SemaforoNodeDTO } from '@/types';
 import ProductMarketSharePieChart from '@/pages/charts/ProductMarketSharePieChart';
 import ProductBarChart3 from '@/pages/charts/ProductBarChart3';
-import ExecucaoGanttPage from '@/modules/execucaoDemanda/pages/ExecucaoGanttPage';
 import { ViewTermos } from '@/pages/demandas/ViewTermos';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+const DASHBOARD_MAP_RETURN_CONTEXT_KEY = 'dashboardMap:returnContext';
+
+type DashboardMapReturnContext = {
+  selectedMetaId: number | null;
+  selectedProdutoId: number | null;
+  scrollY: number;
+};
 
 const parseDateOnly = (dateStr?: string | null) => {
   if (!dateStr) return null;
@@ -62,6 +73,42 @@ const formatCurrencyWithoutSymbol = (value?: number | null) =>
 const formatPercent = (value?: number | null) =>
   typeof value === 'number' ? `${Math.round(value)}%` : '—';
 
+const isRichTextEmpty = (raw?: string | null) => {
+  if (!raw?.trim()) return true;
+  const text = raw.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+  return !text;
+};
+
+const looksLikeHtml = (s: string) => /<[a-z][\s\S]*?>/i.test(s);
+
+/** Remove trechos mais arriscados antes de renderizar HTML no tooltip. */
+const sanitizeTooltipHtml = (html: string) =>
+  html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe\b[\s\S]*?<\/iframe>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^>\s]+)/gi, '');
+
+function ProductDescriptionTooltipBody({
+  raw,
+  emptyLabel,
+}: {
+  raw?: string | null;
+  emptyLabel: string;
+}): ReactNode {
+  if (isRichTextEmpty(raw)) return emptyLabel;
+  const s = raw!.trim();
+  if (looksLikeHtml(s)) {
+    return (
+      <div
+        className="max-h-[min(40vh,280px)] overflow-y-auto text-left font-normal text-popover-foreground [&_*]:font-normal [&_p]:mb-2 [&_p:last-child]:mb-0 [&_br]:block [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_a]:break-all [&_a]:underline [&_a]:text-primary [&_strong]:font-semibold [&_em]:italic [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/40 [&_blockquote]:pl-2 [&_blockquote]:italic"
+        // eslint-disable-next-line react/no-danger -- conteúdo já vem do editor rico no backend (mesmo padrão de DemandaTimelineModal)
+        dangerouslySetInnerHTML={{ __html: sanitizeTooltipHtml(s) }}
+      />
+    );
+  }
+  return <span className="whitespace-pre-wrap break-words font-normal">{s}</span>;
+}
+
 const getDemandaStatusLabel = (node: SemaforoNodeDTO, t: (key: string) => string) => {
   const code = String(node.statusDemanda ?? '').toUpperCase();
   if (!code) return '—';
@@ -78,6 +125,8 @@ const getDemandaStatusBadgeClass = (code: string) => {
 
 export default function DashboardMap() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { selectedProject } = useProject();
   const projectId = selectedProject?.id ?? null;
 
@@ -89,7 +138,7 @@ export default function DashboardMap() {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
-      console.log(semaforo);
+      console.log('SemaforoNodeDTO obtido:', semaforo);
       return semaforo;
     });
   }, [projectId, execute]);
@@ -108,15 +157,164 @@ export default function DashboardMap() {
   const [isQuarterlyEvolutionModalOpen, setIsQuarterlyEvolutionModalOpen] = useState(false);
   const [quarterlySelectedProdutoName, setQuarterlySelectedProdutoName] = useState<string>('');
   const [viewTermosOpen, setViewTermosOpen] = useState(false);
+  const [showGoToTop, setShowGoToTop] = useState(false);
   const [viewTermosIds, setViewTermosIds] = useState({
     idTermoAbertura: 0,
     idTermoPlanejamento: 0,
     idTermoEncerramento: 0,
   });
-  const [execucaoGanttOpen, setExecucaoGanttOpen] = useState(false);
-  const [execucaoGanttDemandaId, setExecucaoGanttDemandaId] = useState<number | null>(null);
+  const pendingMetaIdRef = useRef<number | null>(null);
+  const pendingProdutoIdRef = useRef<number | null>(null);
+  const pendingScrollYRef = useRef<number | null>(null);
+  const restoredScrollRef = useRef(false);
+  const pageRootRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const rightColumnRef = useRef<HTMLDivElement | null>(null);
+  const demandasCardRef = useRef<HTMLDivElement | null>(null);
+  const scrollAnimationFrameRef = useRef<number | null>(null);
 
   const reduceMotion = useReducedMotion();
+
+  const getScrollContainer = useCallback(() => {
+    if (scrollContainerRef.current) return scrollContainerRef.current;
+    const root = pageRootRef.current;
+    const main = root?.closest('main') as HTMLElement | null;
+    scrollContainerRef.current = main;
+    return main;
+  }, []);
+
+  const animateScrollTo = useCallback(
+    (targetTop: number) => {
+      const scrollContainer = getScrollContainer();
+      const isWindowScroll = !scrollContainer;
+      const getCurrentTop = () => (isWindowScroll ? window.scrollY : scrollContainer.scrollTop);
+      const setTop = (top: number) => {
+        if (isWindowScroll) {
+          window.scrollTo({ top, behavior: 'auto' });
+          return;
+        }
+        scrollContainer.scrollTo({ top, behavior: 'auto' });
+      };
+
+      const startTop = getCurrentTop();
+      const maxTop = isWindowScroll
+        ? Math.max(document.documentElement.scrollHeight - window.innerHeight, 0)
+        : Math.max(scrollContainer.scrollHeight - scrollContainer.clientHeight, 0);
+      const clampedTarget = Math.min(Math.max(targetTop, 0), maxTop);
+
+      if (reduceMotion) {
+        setTop(clampedTarget);
+        return;
+      }
+
+      if (scrollAnimationFrameRef.current) {
+        window.cancelAnimationFrame(scrollAnimationFrameRef.current);
+      }
+
+      const durationMs = 900;
+      const startTime = performance.now();
+      const easeInOutCubic = (x: number) =>
+        x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+
+      const step = (now: number) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / durationMs, 1);
+        const eased = easeInOutCubic(progress);
+        setTop(startTop + (clampedTarget - startTop) * eased);
+
+        if (progress < 1) {
+          scrollAnimationFrameRef.current = window.requestAnimationFrame(step);
+          return;
+        }
+        scrollAnimationFrameRef.current = null;
+      };
+
+      scrollAnimationFrameRef.current = window.requestAnimationFrame(step);
+    },
+    [getScrollContainer, reduceMotion],
+  );
+
+  const scrollToDemandasCard = useCallback(() => {
+    const demandasCard = demandasCardRef.current;
+    if (!demandasCard) return;
+
+    const scrollContainer = getScrollContainer();
+    const targetTop = (() => {
+      if (!scrollContainer) {
+        const cardRect = demandasCard.getBoundingClientRect();
+        return window.scrollY + cardRect.top - 20;
+      }
+      const cardRect = demandasCard.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+      return scrollContainer.scrollTop + (cardRect.top - containerRect.top) - 20;
+    })();
+
+    animateScrollTo(targetTop);
+  }, [animateScrollTo, getScrollContainer]);
+
+  const handleProdutoRowClick = useCallback(
+    (produtoId: number) => {
+      setSelectedProdutoId(produtoId);
+      window.requestAnimationFrame(() => {
+        scrollToDemandasCard();
+      });
+    },
+    [scrollToDemandasCard],
+  );
+
+  const scrollRightColumnToTopIfNeeded = useCallback(() => {
+    const rightColumn = rightColumnRef.current;
+    if (!rightColumn) return;
+
+    const scrollContainer = getScrollContainer();
+    const topOffset = 16;
+
+    const relativeTop = (() => {
+      const rightRect = rightColumn.getBoundingClientRect();
+      if (!scrollContainer) return rightRect.top;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      return rightRect.top - containerRect.top;
+    })();
+
+    const isAlreadyNearTop = relativeTop >= 0 && relativeTop <= 28;
+    if (isAlreadyNearTop) return;
+
+    const targetTop = (() => {
+      const rightRect = rightColumn.getBoundingClientRect();
+      if (!scrollContainer) return window.scrollY + rightRect.top - topOffset;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      return scrollContainer.scrollTop + (rightRect.top - containerRect.top) - topOffset;
+    })();
+
+    animateScrollTo(targetTop);
+  }, [animateScrollTo, getScrollContainer]);
+
+  const handleMetaCardClick = useCallback(
+    (metaId: number) => {
+      setSelectedMetaId(metaId);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          scrollRightColumnToTopIfNeeded();
+        });
+      });
+    },
+    [scrollRightColumnToTopIfNeeded],
+  );
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DASHBOARD_MAP_RETURN_CONTEXT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as DashboardMapReturnContext;
+      pendingMetaIdRef.current = parsed.selectedMetaId;
+      pendingProdutoIdRef.current = parsed.selectedProdutoId;
+      pendingScrollYRef.current = parsed.scrollY;
+      restoredScrollRef.current = false;
+      sessionStorage.removeItem(DASHBOARD_MAP_RETURN_CONTEXT_KEY);
+    } catch {
+      // ignora contexto inválido
+    }
+  }, []);
   const mapColumnContainerVariants = useMemo(
     () => ({
       hidden: {},
@@ -157,9 +355,16 @@ export default function DashboardMap() {
   } = useApi<ProdutoEvolucaoTrimestralDTO | null>(null, { showErrorToast: true });
 
   useEffect(() => {
-    const firstMetaId = metas[0]?.id ?? null;
-    setSelectedMetaId(firstMetaId);
-  }, [metas]);
+    if (pendingMetaIdRef.current != null && metas.some((m) => m.id === pendingMetaIdRef.current)) {
+      setSelectedMetaId(pendingMetaIdRef.current);
+      pendingMetaIdRef.current = null;
+      return;
+    }
+    if (selectedMetaId == null) {
+      const firstMetaId = metas[0]?.id ?? null;
+      setSelectedMetaId(firstMetaId);
+    }
+  }, [metas, selectedMetaId]);
 
   const selectedMeta = useMemo(
     () => metas.find((m) => m.id === selectedMetaId) ?? null,
@@ -175,9 +380,53 @@ export default function DashboardMap() {
   );
 
   useEffect(() => {
-    const firstProdutoId = produtos[0]?.id ?? null;
-    setSelectedProdutoId(firstProdutoId);
-  }, [produtos]);
+    if (pendingProdutoIdRef.current != null && produtos.some((p) => p.id === pendingProdutoIdRef.current)) {
+      setSelectedProdutoId(pendingProdutoIdRef.current);
+      pendingProdutoIdRef.current = null;
+      return;
+    }
+    if (selectedProdutoId == null || !produtos.some((p) => p.id === selectedProdutoId)) {
+      const firstProdutoId = produtos[0]?.id ?? null;
+      setSelectedProdutoId(firstProdutoId);
+    }
+  }, [produtos, selectedProdutoId]);
+
+  useEffect(() => {
+    if (restoredScrollRef.current || pendingScrollYRef.current == null) return;
+    if (selectedProdutoId == null) return;
+    const raf = window.requestAnimationFrame(() => {
+      const scrollContainer = getScrollContainer();
+      if (scrollContainer) {
+        scrollContainer.scrollTo({ top: pendingScrollYRef.current ?? 0, behavior: 'auto' });
+      } else {
+        window.scrollTo({ top: pendingScrollYRef.current ?? 0, behavior: 'auto' });
+      }
+      pendingScrollYRef.current = null;
+      restoredScrollRef.current = true;
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [getScrollContainer, selectedProdutoId]);
+
+  useEffect(() => {
+    const scrollContainer = getScrollContainer();
+    const target: HTMLElement | Window = scrollContainer ?? window;
+    const onScroll = () => {
+      const scrollTop = scrollContainer ? scrollContainer.scrollTop : window.scrollY;
+      setShowGoToTop(scrollTop > 10);
+    };
+    onScroll();
+    target.addEventListener('scroll', onScroll, { passive: true });
+    return () => target.removeEventListener('scroll', onScroll);
+  }, [getScrollContainer]);
+
+  useEffect(
+    () => () => {
+      if (scrollAnimationFrameRef.current) {
+        window.cancelAnimationFrame(scrollAnimationFrameRef.current);
+      }
+    },
+    [],
+  );
 
   const selectedProduto = useMemo(
     () => produtos.find((p) => p.id === selectedProdutoId) ?? null,
@@ -206,7 +455,7 @@ export default function DashboardMap() {
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={pageRootRef} className="space-y-6">
      
 
       {isLoading && (
@@ -236,7 +485,7 @@ export default function DashboardMap() {
                   <button
                     key={meta.id}
                     type="button"
-                    onClick={() => setSelectedMetaId(meta.id)}
+                    onClick={() => handleMetaCardClick(meta.id)}
                     className={`group w-full rounded-lg border p-3 text-left transition-[background-color,box-shadow] duration-200 hover:bg-muted/60 ${
                       active
                         ? 'border-primary bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]'
@@ -275,6 +524,7 @@ export default function DashboardMap() {
           </Card>
 
           <motion.div
+            ref={rightColumnRef}
             key={selectedMetaId ?? 'none'}
             className="space-y-4 xl:col-span-9"
             initial="hidden"
@@ -383,7 +633,7 @@ export default function DashboardMap() {
                         className={`cursor-pointer border-b transition ${
                           produto.id === selectedProdutoId ? 'bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]' : ''
                         }`}
-                        onClick={() => setSelectedProdutoId(produto.id)}
+                        onClick={() => handleProdutoRowClick(produto.id)}
                         aria-selected={produto.id === selectedProdutoId}
                       >
                         <td className={`text-sm px-2 py-2 font-semibold ${produto.id === selectedProdutoId ? 'border-l-4 border-primary' : ''}`}>
@@ -393,12 +643,32 @@ export default function DashboardMap() {
                           </div>
                         </td>
                         <td className="px-3 py-2 max-w-[280px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="block truncate">{produto.nome}</span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[420px] break-words">{produto.nome}</TooltipContent>
-                          </Tooltip>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[navy] transition hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                  aria-label={t('dashboard.map.productDescriptionInfo')}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Info className="h-4 w-4" strokeWidth={2.25} />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[min(420px,80vw)] break-words text-sm">
+                                <ProductDescriptionTooltipBody
+                                  raw={produto.descricao}
+                                  emptyLabel={t('dashboard.map.noProductDescription')}
+                                />
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="min-w-0 flex-1 truncate">{produto.nome}</span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[420px] break-words">{produto.nome}</TooltipContent>
+                            </Tooltip>
+                          </div>
                         </td>
                         <td className="px-3 py-2">{formatMonthYearRange(produto.dataInicio, produto.dataFim, t('dashboard.map.dateRangeSeparator'))}</td>
                         <td className="px-3 py-2 text-right">{formatCurrencyWithoutSymbol(produto.valorTotalPrevisto)}</td>
@@ -471,22 +741,6 @@ export default function DashboardMap() {
               idTermoPlanejamento={viewTermosIds.idTermoPlanejamento}
               idTermoEncerramento={viewTermosIds.idTermoEncerramento}
             />
-            <Dialog open={execucaoGanttOpen} onOpenChange={setExecucaoGanttOpen}>
-              <DialogContent className="max-w-[96vw] w-[1380px] h-[92vh] p-0 overflow-hidden">
-                <DialogTitle className="sr-only">{t('dashboard.map.viewExecutionGanttTooltip')}</DialogTitle>
-                <button
-                  type="button"
-                  aria-label={t('common.close')}
-                  className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background/95 text-muted-foreground transition hover:text-foreground"
-                  onClick={() => setExecucaoGanttOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-                {execucaoGanttDemandaId ? (
-                  <ExecucaoGanttPage demandaTecnicaId={execucaoGanttDemandaId} embedded />
-                ) : null}
-              </DialogContent>
-            </Dialog>
 
             <Dialog open={isQuarterlyEvolutionModalOpen} onOpenChange={setIsQuarterlyEvolutionModalOpen}>
               <DialogContent className="max-w-[94vw] w-[980px] p-0 overflow-hidden">
@@ -516,7 +770,7 @@ export default function DashboardMap() {
               </DialogContent>
             </Dialog>
 
-            <motion.div variants={mapCardVariants} className="will-change-[filter,opacity]">
+            <motion.div ref={demandasCardRef} variants={mapCardVariants} className="will-change-[filter,opacity]">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xl font-semibold">
@@ -555,9 +809,33 @@ export default function DashboardMap() {
                       )}
                       {demandas.map((demanda) => {
                         const code = String(demanda.statusDemanda ?? '').toUpperCase();
+                        const execucaoSituacao = (demanda.execucao?.situacao ?? '')
+                          .normalize('NFD')
+                          .replace(/[\u0300-\u036f]/g, '')
+                          .toLowerCase();
+                        const isExecucaoAtrasada = execucaoSituacao.includes('atras');
                         return (
                           <tr key={demanda.id} className="border-b">
-                            <td className="px-1 py-2 font-semibold">{demanda.codigo}</td>
+                            <td className="px-1 py-2 font-semibold">
+                              <span className="relative inline-flex">
+                                {isExecucaoAtrasada && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="absolute -right-2 -top-1.5 inline-flex cursor-pointer">
+                                        <Star className="h-3 w-3 fill-red-600 text-red-600" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs text-xs">
+                                      {t(
+                                        'dashboard.map.delayedDemandTooltip',
+                                        'Demanda em atraso de execução',
+                                      )}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <span>{demanda.codigo}</span>
+                              </span>
+                            </td>
                             <td className="px-1 py-2 max-w-[280px]">
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -612,8 +890,19 @@ export default function DashboardMap() {
                                         className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-muted-foreground transition hover:text-foreground"
                                         aria-label={t('dashboard.map.viewExecutionGanttTooltip')}
                                         onClick={() => {
-                                          setExecucaoGanttDemandaId(demanda.id);
-                                          setExecucaoGanttOpen(true);
+                                          const contextToRestore: DashboardMapReturnContext = {
+                                            selectedMetaId,
+                                            selectedProdutoId,
+                                            scrollY: getScrollContainer()?.scrollTop ?? window.scrollY,
+                                          };
+                                          sessionStorage.setItem(
+                                            DASHBOARD_MAP_RETURN_CONTEXT_KEY,
+                                            JSON.stringify(contextToRestore),
+                                          );
+                                          const returnTo = `${location.pathname}${location.search}`;
+                                          navigate(
+                                            `/execucao-demandas/${demanda.id}/gantt?returnTo=${encodeURIComponent(returnTo)}`,
+                                          );
                                         }}
                                       >
                                         <Eye className="h-4 w-4" />
@@ -636,6 +925,24 @@ export default function DashboardMap() {
             </motion.div>
           </motion.div>
         </div>
+      )}
+      {showGoToTop && (
+        <button
+          type="button"
+          onClick={() => {
+            const scrollContainer = getScrollContainer();
+            if (scrollContainer) {
+              scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
+          aria-label={t('common.backToTop', 'Voltar ao topo')}
+          className="fixed bottom-6 right-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full border text-muted-foreground shadow-md transition hover:text-foreground"
+          style={{ backgroundColor: '#ebeaea' }}
+        >
+          <ChevronUp className="h-5 w-5" />
+        </button>
       )}
     </div>
   );

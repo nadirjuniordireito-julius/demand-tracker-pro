@@ -4,6 +4,7 @@ import type {
   DemandaExecucaoCreateDTO,
   DemandaExecucaoUpdateDTO,
   DemandaExecucaoGanttDTO,
+  DemandaExecucaoPerfilCheckDTO,
 } from '../types';
 
 const BASE = '/demandas-execucao';
@@ -60,10 +61,27 @@ export const demandaExecucaoService = {
   },
 
   /**
+   * POST /api/demandas-execucao/{id}/reabrir
+   * Reabre uma execução previamente encerrada (status CONCLUIDA → EM_ANDAMENTO),
+   * trazendo a demanda de volta para status 'E'. O Termo de Encerramento é mantido.
+   */
+  async reabrir(id: number): Promise<DemandaExecucaoDTO> {
+    return api.post<DemandaExecucaoDTO>(`${BASE}/${id}/reabrir`, undefined);
+  },
+
+  /**
    * GET /api/demandas-execucao/gantt/demanda/{demandaTecnicaId}
    * Dados da execução e tarefas prontos para exibição em Gantt. 404 se não existir execução.
    */
   async getGanttByDemandaId(demandaTecnicaId: number) {
     return api.get<DemandaExecucaoGanttDTO>(`${BASE}/gantt/demanda/${demandaTecnicaId}`);
+  },
+
+  /**
+   * GET /api/demandas-execucao/check/perfis/{demandaTecnicaId}
+   * Compara horas planejadas por perfil entre termo de planejamento e execução.
+   */
+  async getPerfilCheckByDemandaId(demandaTecnicaId: number) {
+    return api.get<DemandaExecucaoPerfilCheckDTO[]>(`${BASE}/check/perfis/${demandaTecnicaId}`);
   },
 };

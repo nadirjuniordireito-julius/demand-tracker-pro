@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, Pencil, Trash2, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, BarChart3, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -57,8 +57,6 @@ export default function ExecucaoDemandaDetailPage() {
   const [savingExecucao, setSavingExecucao] = useState(false);
   const [deleteExecucaoOpen, setDeleteExecucaoOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [closeExecucaoOpen, setCloseExecucaoOpen] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
   const { toast } = useToast();
 
   const loadExecucao = useCallback(async () => {
@@ -78,6 +76,7 @@ export default function ExecucaoDemandaDetailPage() {
           dataInicioPlanejada: today,
           dataFimPlanejada: today,
           status: 'PLANEJADA',
+          situacao: 'Normal',
           percentualProgresso: 0,
         });
       }
@@ -146,25 +145,8 @@ export default function ExecucaoDemandaDetailPage() {
     }
   };
 
-  const handleEncerrarExecucao = async () => {
-    if (!execucao || !user?.id) return;
-    setIsClosing(true);
-    try {
-      const updated = await demandaExecucaoService.encerrar(execucao.id, user.id);
-      setExecucao(updated);
-      toast({
-        title: t('common.success'),
-        description: t('execucao.execucaoEncerrada', 'Execução encerrada com sucesso.'),
-      });
-    } catch (e: unknown) {
-      toast({
-        title: t('common.error'),
-        description: (e as Error)?.message ?? t('common.errorMessage'),
-        variant: 'destructive',
-      });
-    } finally {
-      setIsClosing(false);
-    }
+  const handleOpenChecklist = () => {
+    navigate(`/execucao-demandas/${id}/checklist`);
   };
 
   if (loading) {
@@ -211,11 +193,13 @@ export default function ExecucaoDemandaDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCloseExecucaoOpen(true)}
+            onClick={handleOpenChecklist}
             className="gap-2"
-            disabled={isClosing || !user?.id}
+            disabled={!user?.id}
+            title={t('execucao.openChecklistTitle', 'Abrir checklist de encerramento')}
           >
-            {isClosing ? t('execucao.closing', 'Encerrando...') : t('execucao.encerrar', 'Encerrar')}
+            <ClipboardCheck className="h-4 w-4" />
+            {t('execucao.encerrar', 'Encerrar')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setEditExecucaoOpen(true)} className="gap-2">
             <Pencil className="h-4 w-4" />
@@ -273,6 +257,14 @@ export default function ExecucaoDemandaDetailPage() {
               </span>
               <span>{formatDate(toDateOnly(execucao.dataFimPlanejada))}</span>
             </div>
+            <div className="flex items-center gap-2 border-t border-border/60 pt-2">
+              <span className="w-40 text-xs font-medium uppercase text-muted-foreground">
+                {t('execucao.situacaoExecucao', 'Situação da execução')}
+              </span>
+              <span className="font-medium text-foreground">
+                {execucao.situacao?.trim() ? execucao.situacao : '—'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -291,7 +283,7 @@ export default function ExecucaoDemandaDetailPage() {
           <DependenciasTab demandaExecucaoId={execucao.id} />
         </TabsContent>
         <TabsContent value="recursos">
-          <RecursosTab demandaExecucaoId={execucao.id} />
+          <RecursosTab demandaExecucaoId={execucao.id} demandaTecnicaId={id} />
         </TabsContent>
         <TabsContent value="apontamentos">
           <ApontamentosTab demandaExecucaoId={execucao.id} />
@@ -305,33 +297,6 @@ export default function ExecucaoDemandaDetailPage() {
         onSubmit={handleEditExecucaoSubmit}
         saving={savingExecucao}
       />
-
-      <AlertDialog open={closeExecucaoOpen} onOpenChange={setCloseExecucaoOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('execucao.confirmCloseExecucao', 'Encerrar execução?')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                'execucao.confirmCloseExecucaoDescription',
-                'Esta ação encerrará a execução da demanda. Deseja continuar?'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClosing}>
-              {t('common.cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEncerrarExecucao}
-              disabled={isClosing}
-            >
-              {isClosing ? t('execucao.closing', 'Encerrando...') : t('execucao.encerrar', 'Encerrar')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={deleteExecucaoOpen} onOpenChange={setDeleteExecucaoOpen}>
         <AlertDialogContent>

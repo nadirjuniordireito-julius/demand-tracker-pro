@@ -17,6 +17,7 @@ import {
   ChevronDown,
   MoreHorizontal,
   UserCircle,
+  Unlock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,6 +73,8 @@ import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { termoEncerramentoService, termoPlanejamentoService } from '@/services/termoService';
 import { termoEncerramentoDocService, termoPlanejamentoDocService } from '@/services/termoDocService';
 import { demandaService } from '@/services/demandaService';
+import { demandaExecucaoService } from '@/modules/execucaoDemanda/services/demandaExecucaoService';
+import type { DemandaExecucaoDTO } from '@/modules/execucaoDemanda/types';
 import { perfilService } from '@/services/perfilService';
 import { profissionalService } from '@/services/profissionalService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -96,6 +99,7 @@ export default function TermoEncerramentoPage() {
   const { user } = useAuth();
   const { selectedProject } = useProject();
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
+  const [execucao, setExecucao] = useState<DemandaExecucaoDTO | null>(null);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [selectedTermo, setSelectedTermo] = useState<TermoEncerramento | null>(null);
@@ -121,6 +125,8 @@ export default function TermoEncerramentoPage() {
   const [isViewDocOpen, setIsViewDocOpen] = useState(false);
   const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
   const [isAnexosOpen, setIsAnexosOpen] = useState(false);
+  const [isReabrirOpen, setIsReabrirOpen] = useState(false);
+  const [isReabrindo, setIsReabrindo] = useState(false);
   const { toast } = useToast();
   const isSafeInternalPath = (value: string | null): value is string =>
     !!value && value.startsWith('/') && !value.startsWith('//');
@@ -186,7 +192,15 @@ export default function TermoEncerramentoPage() {
       // Carrega a demanda
       const demandaData = await demandaService.findById(Number(demandaId));
       setDemanda(demandaData);
-      
+
+      // Carrega a execução vinculada (necessária para regra de "Reabrir")
+      try {
+        const execucaoData = await demandaExecucaoService.getByDemandaId(Number(demandaId));
+        setExecucao(execucaoData);
+      } catch {
+        setExecucao(null);
+      }
+
       // Pré-preenche o campo de demanda no formulário
       form.setValue('demandaTecnicaId', String(demandaId));
 
@@ -513,6 +527,33 @@ export default function TermoEncerramentoPage() {
       return;
     }
     navigate('/demandas');
+  };
+
+  const handleConfirmReabrir = async () => {
+    if (!execucao) return;
+    setIsReabrindo(true);
+    try {
+      const updated = await demandaExecucaoService.reabrir(execucao.id);
+      setExecucao(updated);
+      // Recarrega a demanda para refletir o novo status (deve voltar para 'E')
+      if (demanda) {
+        const demandaAtualizada = await demandaService.findById(demanda.id);
+        setDemanda(demandaAtualizada);
+      }
+      setIsReabrirOpen(false);
+      toast({
+        title: t('common.success'),
+        description: t('closingTerm.reabrirSuccess', 'Execução reaberta com sucesso.'),
+      });
+    } catch (err: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(err, t('closingTerm.reabrirError', 'Erro ao reabrir execução.')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsReabrindo(false);
+    }
   };
 
   const handleDelete = () => {
@@ -1147,6 +1188,20 @@ export default function TermoEncerramentoPage() {
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
+                  {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) === 'F' && execucao?.status === 'CONCLUIDA' && (
+                    <LoadingButton
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsReabrirOpen(true)}
+                      isLoading={isReabrindo}
+                      loadingText={t('closingTerm.reabrindo', 'Reabrindo...')}
+                      disabled={isSaving || isDeleting}
+                      className="gap-2 border-amber-500/40 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/15"
+                    >
+                      <Unlock className="h-4 w-4" />
+                      {t('closingTerm.reabrirExecucao', 'Reabrir execução')}
+                    </LoadingButton>
+                  )}
                   {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
                     <LoadingButton
                       type="submit"
@@ -1161,6 +1216,45 @@ export default function TermoEncerramentoPage() {
               </DialogFooter>
         </form>
       </Form>
+
+      {/* Reabrir Execução Confirmation Dialog */}
+      <Dialog
+        open={isReabrirOpen}
+        onOpenChange={(open) => {
+          if (!isReabrindo) setIsReabrirOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('closingTerm.reabrirConfirmTitle', 'Reabrir execução?')}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'closingTerm.reabrirConfirmDescription',
+                'A execução voltará para o status "Em andamento" e a demanda voltará para "Em execução". O Termo de Encerramento existente será mantido e poderá ser atualizado em um novo encerramento.',
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsReabrirOpen(false)}
+              disabled={isReabrindo}
+            >
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton
+              onClick={handleConfirmReabrir}
+              isLoading={isReabrindo}
+              loadingText={t('closingTerm.reabrindo', 'Reabrindo...')}
+              className="bg-amber-600 text-white hover:bg-amber-600/90"
+            >
+              {t('closingTerm.reabrirExecucao', 'Reabrir execução')}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog - fecha apenas pelos botões */}
       <Dialog

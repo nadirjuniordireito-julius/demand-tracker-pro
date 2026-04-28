@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Edit, Trash2, Briefcase } from 'lucide-react';
+import { Edit, Trash2, Briefcase, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
@@ -97,6 +97,10 @@ export default function ProfissionaisPage() {
     navigate(`/cadastros/profissionais/novo?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
+  const handleOpenCustosMensais = () => {
+    navigate('/cadastros/profissionais/custos-mensais');
+  };
+
   const handleEdit = (profissional: Profissional) => {
     const returnTo = `${location.pathname}${location.search}`;
     navigate(`/cadastros/profissionais/${profissional.id}/editar?returnTo=${encodeURIComponent(returnTo)}`);
@@ -188,7 +192,17 @@ export default function ProfissionaisPage() {
         description={t('professionals.description')}
         onAdd={selectedProject ? handleAdd : undefined}
         addLabel={t('professionals.newProfessional')}
-      />
+      >
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleOpenCustosMensais}
+          disabled={!selectedProject}
+        >
+          <CalendarClock className="h-4 w-4" />
+          {t('professionalMonthlyCost.title', 'Custo Mensal')}
+        </Button>
+      </PageHeader>
 
       <SearchFilterBar
         searchValue={search}

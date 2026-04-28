@@ -9,7 +9,8 @@ import {
   LogOut,
   Settings,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ import logoImage from '@/assets/logo.png';
 import juliusLogo from '@/assets/julius-xpt-976-TW.png';
 import { formatDate } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { APP_VERSION } from '@/constants/appInfo';
 
 export function Header() {
   const { t, i18n } = useTranslation();
@@ -319,6 +321,14 @@ export function Header() {
       {/* Modal Sobre (duplo clique no logo) */}
       <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <button
+            type="button"
+            aria-label={t('common.close')}
+            className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background/95 text-muted-foreground transition hover:text-foreground"
+            onClick={() => setAboutOpen(false)}
+          >
+            <X className="h-4 w-4" />
+          </button>
           <div className="flex flex-col items-center pt-8 pb-6 px-6">
             <img
               src={logoImage}
@@ -332,11 +342,13 @@ export function Header() {
               {t('common.appNameDesc')}
             </p>
           </div>
-          <footer className="border-t bg-muted/40 px-6 py-3 flex flex-col gap-1 text-xs text-emerald-900">
+          <footer className="text-center border-t bg-muted/40 px-6 py-3 flex flex-col gap-1 text-xs text-emerald-900">
             <span className="font-bold">{t('common.aboutDevelopedBy')}</span>
             <span>
-              {t('common.aboutCreatedDate')} · {t('common.aboutAllRightsReserved')}
+              {t('common.aboutCreatedDate')} · © {t('common.aboutAllRightsReserved')} - V.{APP_VERSION}
             </span>
+           
+            
           </footer>
         </DialogContent>
       </Dialog>

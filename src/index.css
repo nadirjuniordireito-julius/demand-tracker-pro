@@ -357,6 +357,16 @@
 }
 
 @layer utilities {
+  /**
+   * Sombra só em baixo + direita (card principal visualizador).
+   * Precisa ficar em utilities: `shadow-none` do Tailwind sobrescreve box-shadow de @layer components.
+   */
+  .card-shadow-bottom-right {
+    box-shadow:
+      0 10px 22px -8px rgb(15 23 42 / 0.2),
+      10px 0 22px -8px rgb(15 23 42 / 0.16) !important;
+  }
+
   .flex-shrink-0 {
     flex-shrink: 0;
   }

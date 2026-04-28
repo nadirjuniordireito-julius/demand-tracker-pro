@@ -21,9 +21,18 @@ export interface DemandaExecucaoDTO {
   dataInicioReal: string | null;
   dataFimReal: string | null;
   status: string;
+  /** "Atrasada" ou "Normal" — derivado de datas planejadas/reais, progresso e tarefas. */
+  situacao: string;
   percentualProgresso: number;
   dataCriacaoExecucao?: string;
   tarefas?: DemandaExecucaoTarefaDTO[];
+}
+
+export interface DemandaExecucaoPerfilCheckDTO {
+  perfilId: number;
+  perfilNome: string;
+  horasPlanejadasTermo: number;
+  horasPlanejadasExecucao: number;
 }
 
 export interface DemandaExecucaoCreateDTO {
@@ -34,6 +43,7 @@ export interface DemandaExecucaoCreateDTO {
   dataInicioReal?: string;
   dataFimReal?: string;
   status: string;
+  situacao: string;
   percentualProgresso: number;
 }
 
@@ -53,7 +63,10 @@ export interface DemandaExecucaoGanttRecursoDTO {
   id: number;
   profissionalId: number;
   nome: string;
+  perfilId?: number | null;
+  perfilNome?: string | null;
   horasPlanejadas: number;
+  horasExecutadas?: number | null;
 }
 
 export interface DemandaExecucaoGanttTarefaDTO {
@@ -69,6 +82,7 @@ export interface DemandaExecucaoGanttTarefaDTO {
   percentualProgresso: number;
   estimativaHoras: number;
   predecessorIds: number[];
+  sequencia: number;
   recursos: DemandaExecucaoGanttRecursoDTO[];
 }
 
@@ -101,6 +115,7 @@ export interface DemandaExecucaoTarefaDTO {
   dataFimReal?: string | null;
   percentualProgresso: number;
   estimativaHoras: number;
+  sequencia: number;
   recursos?: DemandaExecucaoTarefaRecursoDTO[];
   apontamentos?: DemandaExecucaoTarefaApontamentoProgressoDTO[];
 }
@@ -117,6 +132,7 @@ export interface DemandaExecucaoTarefaCreateDTO {
   dataFimReal?: string;
   percentualProgresso: number;
   estimativaHoras: number;
+  sequencia: number;
 }
 
 export interface DemandaExecucaoTarefaUpdateDTO {
@@ -130,6 +146,7 @@ export interface DemandaExecucaoTarefaUpdateDTO {
   dataFimReal?: string;
   percentualProgresso?: number;
   estimativaHoras?: number;
+  sequencia: number;
 }
 
 // --- Dependências entre tarefas ---
@@ -147,23 +164,35 @@ export interface ProfissionalRecursoDTO {
   nome: string;
 }
 
+export interface PerfilRecursoDTO {
+  id: number;
+  nome: string;
+}
+
 export interface DemandaExecucaoTarefaRecursoDTO {
   id: number;
   demandaExecucaoTarefaId: number;
   profissionalId: number;
   profissional: ProfissionalRecursoDTO;
+  perfilId?: number | null;
+  perfil?: PerfilRecursoDTO | null;
   horasPlanejadas: number;
+  horasExecutadas?: number | null;
 }
 
 export interface DemandaExecucaoTarefaRecursoCreateDTO {
   demandaExecucaoTarefaId: number;
   profissionalId: number;
+  perfilId?: number;
   horasPlanejadas: number;
+  horasExecutadas?: number;
 }
 
 export interface DemandaExecucaoTarefaRecursoUpdateDTO {
   profissionalId?: number;
+  perfilId?: number;
   horasPlanejadas?: number;
+  horasExecutadas?: number;
 }
 
 // --- Apontamentos de progresso ---
