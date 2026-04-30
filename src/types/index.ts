@@ -739,6 +739,25 @@ export interface SemaforoNodeDTO {
   children: SemaforoNodeDTO[];
 }
 
+export interface ProdutoResumoDTO {
+  idMeta: number;
+  codigoMeta: string;
+  nomeMeta: string;
+  idProduto: number;
+  codigoProduto: string;
+  nomeProduto: string;
+  situacao: string | null;
+  inicioPrevisaoExecucao: string | null;
+  fimPrevisaoExecucao: string | null;
+  mesesPrevistosExecucao: number | null;
+  valorTotalOrcamento: number | null;
+  valorTotalEmExecucao: number | null;
+  valorTotalExecutado: number | null;
+  percentualExecucao: number | null;
+  valorMediaEntregaPrevistaMensal: number | null;
+  valorMediaEntregaRealMensal: number | null;
+}
+
 export interface ProdutoEvolucaoTrimestralItemDTO {
   trimestreSequencia: number;
   dataInicio: string;

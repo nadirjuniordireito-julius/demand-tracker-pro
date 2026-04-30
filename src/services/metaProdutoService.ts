@@ -3,13 +3,16 @@
 // Serviço de CRUD para entidade MetaProduto
 // =====================================================
 
+import { z } from 'zod';
 import api from './api';
-import type { 
-  MetaProduto, 
-  MetaProdutoCreateDTO, 
-  MetaProdutoUpdateDTO, 
+import { produtoResumoSchema } from '@/lib/schemas';
+import type {
+  MetaProduto,
+  MetaProdutoCreateDTO,
+  MetaProdutoUpdateDTO,
   PaginatedResponse,
   ProdutoEvolucaoTrimestralDTO,
+  ProdutoResumoDTO,
 } from '@/types';
 
 const ENDPOINTS = {
@@ -17,6 +20,7 @@ const ENDPOINTS = {
   byId: (id: number) => `/meta-produtos/${id}`,
   byProjetoMeta: (projetoMetaId: number) => `/meta-produtos/projeto-meta/${projetoMetaId}`,
   evolucaoTrimestral: (id: number) => `/meta-produtos/${id}/evolucao-trimestral`,
+  resumo: (idMeta: number) => `/meta-produtos/resumo?idMeta=${idMeta}`,
 };
 
 export interface MetaProdutoFilters {
@@ -92,6 +96,14 @@ export const metaProdutoService = {
 
   async getEvolucaoTrimestral(id: number): Promise<ProdutoEvolucaoTrimestralDTO> {
     return api.get<ProdutoEvolucaoTrimestralDTO>(ENDPOINTS.evolucaoTrimestral(id));
+  },
+
+  /**
+   * Retorna o resumo dos produtos de uma meta (orçado, em execução, executado, etc.).
+   */
+  async getResumoByMeta(idMeta: number): Promise<ProdutoResumoDTO[]> {
+    const data = await api.get<unknown>(ENDPOINTS.resumo(idMeta));
+    return z.array(produtoResumoSchema).parse(data) as ProdutoResumoDTO[];
   },
 };
 

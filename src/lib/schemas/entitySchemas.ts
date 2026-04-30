@@ -168,6 +168,26 @@ export const semaforoNodeSchema: z.ZodType<unknown> = z.lazy(() =>
   })
 );
 
+// --- Resumo de Produto por Meta (endpoint /meta-produtos/resumo?idMeta=...) ---
+export const produtoResumoSchema = z.object({
+  idMeta: z.number(),
+  codigoMeta: z.string(),
+  nomeMeta: z.string(),
+  idProduto: z.number(),
+  codigoProduto: z.string(),
+  nomeProduto: z.string(),
+  situacao: z.string().nullable().optional(),
+  inicioPrevisaoExecucao: z.string().nullable().optional(),
+  fimPrevisaoExecucao: z.string().nullable().optional(),
+  mesesPrevistosExecucao: z.number().nullable().optional(),
+  valorTotalOrcamento: z.number().nullable().optional(),
+  valorTotalEmExecucao: z.number().nullable().optional(),
+  valorTotalExecutado: z.number().nullable().optional(),
+  percentualExecucao: z.number().nullable().optional(),
+  valorMediaEntregaPrevistaMensal: z.number().nullable().optional(),
+  valorMediaEntregaRealMensal: z.number().nullable().optional(),
+});
+
 // --- PaginatedResponse helper ---
 export function paginatedSchema<T extends z.ZodType>(itemSchema: T) {
   return z.object({

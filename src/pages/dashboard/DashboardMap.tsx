@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   BarChart3,
   CalendarDays,
+  Check,
   CheckCircle2,
   ChevronUp,
   ChevronRight,
@@ -11,6 +12,7 @@ import {
   FileText,
   Files,
   Frown,
+  HeartPulse,
   Info,
   Package,
   PieChart,
@@ -19,8 +21,6 @@ import {
   X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -28,12 +28,21 @@ import { useProject } from '@/contexts/ProjectContext';
 import { projetoService } from '@/services/projetoService';
 import { metaProdutoService } from '@/services/metaProdutoService';
 import { useApi } from '@/hooks/useApi';
-import type { ProdutoEvolucaoTrimestralDTO, SemaforoNodeDTO } from '@/types';
+import type { ProdutoEvolucaoTrimestralDTO, ProdutoResumoDTO, SemaforoNodeDTO } from '@/types';
 import ProductMarketSharePieChart from '@/pages/charts/ProductMarketSharePieChart';
 import ProductBarChart3 from '@/pages/charts/ProductBarChart3';
 import { ViewTermos } from '@/pages/demandas/ViewTermos';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import ProdutoVidaModal from '@/components/produto/ProdutoVidaModal';
+import {
+  formatCurrencyWithoutSymbol,
+  formatMonthYearRange,
+  formatPercent,
+  monthsElapsedInclusive,
+  numberToWords,
+  parseDateOnly,
+} from '@/lib/formatters';
 
 const DASHBOARD_MAP_RETURN_CONTEXT_KEY = 'dashboardMap:returnContext';
 
@@ -42,36 +51,6 @@ type DashboardMapReturnContext = {
   selectedProdutoId: number | null;
   scrollY: number;
 };
-
-const parseDateOnly = (dateStr?: string | null) => {
-  if (!dateStr) return null;
-  const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
-  if ([y, m, d].some((n) => Number.isNaN(n))) return null;
-  return new Date(y, m - 1, d);
-};
-
-const formatMonthYearRange = (start?: string | null, end?: string | null, separator = 'a') => {
-  const s = parseDateOnly(start);
-  const e = parseDateOnly(end);
-  if (!s || !e) return '—';
-  return `${format(s, 'MM/yyyy', { locale: ptBR })} ${separator} ${format(e, 'MM/yyyy', { locale: ptBR })}`;
-};
-
-const formatCurrency = (value?: number | null) =>
-  typeof value === 'number'
-    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-    : '—';
-
-const formatCurrencyWithoutSymbol = (value?: number | null) =>
-  typeof value === 'number'
-    ? new Intl.NumberFormat('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(value)
-    : '—';
-
-const formatPercent = (value?: number | null) =>
-  typeof value === 'number' ? `${Math.round(value)}%` : '—';
 
 const isRichTextEmpty = (raw?: string | null) => {
   if (!raw?.trim()) return true;
@@ -120,11 +99,12 @@ const getDemandaStatusBadgeClass = (code: string) => {
   if (code === 'A') return 'bg-blue-50 text-blue-700 border-blue-200';
   if (code === 'D') return 'bg-amber-50 text-amber-700 border-amber-200';
   if (code === 'F') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (code === 'G') return 'bg-green-100 text-green-800 border-green-300';
   return 'bg-muted text-muted-foreground border-border';
 };
 
 export default function DashboardMap() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedProject } = useProject();
@@ -134,11 +114,20 @@ export default function DashboardMap() {
     showErrorToast: true,
   });
 
+  const {
+    data: produtosResumoData,
+    isLoading: isProdutosResumoLoading,
+    error: produtosResumoError,
+    execute: executeProdutosResumo,
+    setData: setProdutosResumoData,
+  } = useApi<ProdutoResumoDTO[] | null>(null, { showErrorToast: false });
+
+  const produtosResumoSeqRef = useRef(0);
+
   useEffect(() => {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
-      console.log('SemaforoNodeDTO obtido:', semaforo);
       return semaforo;
     });
   }, [projectId, execute]);
@@ -155,6 +144,8 @@ export default function DashboardMap() {
   const [selectedProdutoId, setSelectedProdutoId] = useState<number | null>(null);
   const [isMarketShareModalOpen, setIsMarketShareModalOpen] = useState(false);
   const [isQuarterlyEvolutionModalOpen, setIsQuarterlyEvolutionModalOpen] = useState(false);
+  const [isProdutoVidaModalOpen, setIsProdutoVidaModalOpen] = useState(false);
+  const [produtoVidaSelected, setProdutoVidaSelected] = useState<ProdutoResumoDTO | null>(null);
   const [quarterlySelectedProdutoName, setQuarterlySelectedProdutoName] = useState<string>('');
   const [viewTermosOpen, setViewTermosOpen] = useState(false);
   const [showGoToTop, setShowGoToTop] = useState(false);
@@ -371,13 +362,87 @@ export default function DashboardMap() {
     [metas, selectedMetaId]
   );
 
-  const produtos = useMemo(
+  // Produtos vindos do semáforo (origem da árvore meta -> produto -> demanda).
+  // Continuam sendo a fonte do Card Demandas e da descrição do produto (tooltip).
+  const produtosSemaforo = useMemo(
     () =>
       [...(selectedMeta?.children ?? [])]
         .filter((n) => n.nivel === 'PRODUTO')
         .sort((a, b) => (a.codigo ?? '').localeCompare(b.codigo ?? '', undefined, { numeric: true })),
     [selectedMeta]
   );
+
+  // Carrega o resumo dos produtos sempre que a meta selecionada muda.
+  // Usa um seq ref para descartar respostas antigas (evita race quando o usuário
+  // troca de meta rapidamente). Limpa o estado a cada troca para que as métricas
+  // do Card Meta (valorEmExecucao e mesesExecucao) não exibam valores da meta anterior.
+  useEffect(() => {
+    produtosResumoSeqRef.current += 1;
+    setProdutosResumoData(null);
+    if (selectedMetaId == null) return;
+    const requestId = produtosResumoSeqRef.current;
+    const metaId = selectedMetaId;
+    void executeProdutosResumo(async () => {
+      const list = await metaProdutoService.getResumoByMeta(metaId);
+      console.log(`ProdutoResumoDTO[] obtido (idMeta=${metaId}):`, list);
+      if (requestId !== produtosResumoSeqRef.current) {
+        return null;
+      }
+      return list;
+    });
+  }, [selectedMetaId, executeProdutosResumo, setProdutosResumoData]);
+
+  // Meses de execução: do menor inicioPrevisaoExecucao do resumo até hoje (inclusivo).
+  const mesesExecucaoMeta = useMemo(() => {
+    const lista = produtosResumoData ?? [];
+    const inicios = lista
+      .map((p) => parseDateOnly(p.inicioPrevisaoExecucao))
+      .filter((d): d is Date => d !== null);
+    if (inicios.length === 0) return null;
+    const minStart = inicios.reduce((min, d) => (d < min ? d : min), inicios[0]);
+    return monthsElapsedInclusive(minStart, new Date());
+  }, [produtosResumoData]);
+
+  // Soma `valorTotalEmExecucao` dos produtos do resumo (regra E + F do backend,
+  // via custos do termo de planejamento).
+  const valorEmExecucaoMeta = useMemo(() => {
+    const lista = produtosResumoData ?? [];
+    return lista.reduce((acc, p) => acc + (p.valorTotalEmExecucao ?? 0), 0);
+  }, [produtosResumoData]);
+
+  type ProdutoView = {
+    id: number;
+    codigo: string;
+    nome: string;
+    descricao: string | null;
+    dataInicio: string | null;
+    dataFim: string | null;
+    valorTotalPrevisto: number | null;
+    valorTotalExecutado: number | null;
+    percentualExecutado: number | null;
+  };
+
+  // Tabela de produtos e donut de market share usam o resumo como fonte oficial.
+  // A `descricao` (apenas para o tooltip) é mesclada via lookup no semáforo por idProduto.
+  const produtos = useMemo<ProdutoView[]>(() => {
+    const lista = produtosResumoData ?? [];
+    if (lista.length === 0) return [];
+    const descricaoById = new Map<number, string | null | undefined>();
+    produtosSemaforo.forEach((p) => descricaoById.set(p.id, p.descricao));
+    return lista
+      .map<ProdutoView>((r) => ({
+        id: r.idProduto,
+        codigo: r.codigoProduto ?? '',
+        nome: r.nomeProduto ?? '',
+        descricao: descricaoById.get(r.idProduto) ?? null,
+        dataInicio: r.inicioPrevisaoExecucao ?? null,
+        dataFim: r.fimPrevisaoExecucao ?? null,
+        valorTotalPrevisto: r.valorTotalOrcamento ?? null,
+        valorTotalExecutado: r.valorTotalExecutado ?? null,
+        percentualExecutado: r.percentualExecucao ?? null,
+      }))
+      .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
+  }, [produtosResumoData, produtosSemaforo]);
 
   useEffect(() => {
     if (pendingProdutoIdRef.current != null && produtos.some((p) => p.id === pendingProdutoIdRef.current)) {
@@ -428,17 +493,19 @@ export default function DashboardMap() {
     [],
   );
 
-  const selectedProduto = useMemo(
-    () => produtos.find((p) => p.id === selectedProdutoId) ?? null,
-    [produtos, selectedProdutoId]
+  // Card de Demandas continua se baseando na árvore do semáforo
+  // (somente o semáforo traz `children` com as demandas).
+  const selectedProdutoSemaforo = useMemo(
+    () => produtosSemaforo.find((p) => p.id === selectedProdutoId) ?? null,
+    [produtosSemaforo, selectedProdutoId]
   );
 
   const demandas = useMemo(
     () =>
-      [...(selectedProduto?.children ?? [])]
+      [...(selectedProdutoSemaforo?.children ?? [])]
         .filter((n) => n.nivel === 'DEMANDA' && String(n.statusDemanda ?? '').toUpperCase() !== 'Z')
         .sort((a, b) => (a.codigo ?? '').localeCompare(b.codigo ?? '', undefined, { numeric: true })),
-    [selectedProduto]
+    [selectedProdutoSemaforo]
   );
 
   if (!selectedProject) {
@@ -550,7 +617,7 @@ export default function DashboardMap() {
                        
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.plannedValue')}</p>
                         <p className="text-2xl font-semibold">{formatCurrencyWithoutSymbol(selectedMeta.valorTotalPrevisto)}</p>
@@ -558,6 +625,10 @@ export default function DashboardMap() {
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.executedValue')}</p>
                         <p className="text-2xl font-semibold">{formatCurrencyWithoutSymbol(selectedMeta.valorTotalExecutado)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t('dashboard.map.executingValue')}</p>
+                        <p className="text-2xl font-semibold">{formatCurrencyWithoutSymbol(valorEmExecucaoMeta)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.period')}</p>
@@ -568,6 +639,14 @@ export default function DashboardMap() {
                             t('dashboard.map.dateRangeSeparator'),
                           )}
                         </p>
+                        {mesesExecucaoMeta != null && (
+                          <p className="-mt-0.5 text-xs italic text-orange-600">
+                            {t('dashboard.map.executionMonths', {
+                              count: mesesExecucaoMeta,
+                              countWord: numberToWords(mesesExecucaoMeta, i18n.language),
+                            })}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.progress')}</p>
@@ -620,14 +699,28 @@ export default function DashboardMap() {
                     </tr>
                   </thead>
                   <tbody>
-                    {produtos.length === 0 && (
+                    {isProdutosResumoLoading && (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">
+                          {t('common.loadingData')}
+                        </td>
+                      </tr>
+                    )}
+                    {!isProdutosResumoLoading && produtosResumoError && (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-4 text-center text-destructive">
+                          {produtosResumoError}
+                        </td>
+                      </tr>
+                    )}
+                    {!isProdutosResumoLoading && !produtosResumoError && produtos.length === 0 && (
                       <tr>
                         <td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">
                           {t('dashboard.map.noProducts')}
                         </td>
                       </tr>
                     )}
-                    {produtos.map((produto) => (
+                    {!isProdutosResumoLoading && !produtosResumoError && produtos.map((produto) => (
                       <tr
                         key={produto.id}
                         className={`cursor-pointer border-b transition ${
@@ -681,27 +774,53 @@ export default function DashboardMap() {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-muted-foreground transition hover:text-foreground"
-                                aria-label={t('dashboard.map.quarterlyEvolutionTooltip')}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setSelectedProdutoId(produto.id);
-                                  setQuarterlySelectedProdutoName([produto.codigo, produto.nome].filter(Boolean).join(' - '));
-                                  setIsQuarterlyEvolutionModalOpen(true);
-                                  void executeQuarterlyEvolution(() => metaProdutoService.getEvolucaoTrimestral(produto.id));
-                                }}
-                              >
-                                <BarChart3 className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">
-                              {t('dashboard.map.quarterlyEvolutionTooltip')}
-                            </TooltipContent>
-                          </Tooltip>
+                          <div className="flex items-center justify-center gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-rose-500 transition hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300"
+                                  aria-label={t('dashboard.map.viewProductLifeTooltip')}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    const resumo = (produtosResumoData ?? []).find(
+                                      (r) => r.idProduto === produto.id,
+                                    );
+                                    if (!resumo) return;
+                                    setSelectedProdutoId(produto.id);
+                                    setProdutoVidaSelected(resumo);
+                                    setIsProdutoVidaModalOpen(true);
+                                  }}
+                                >
+                                  <HeartPulse className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                {t('dashboard.map.viewProductLifeTooltip')}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-muted-foreground transition hover:text-foreground"
+                                  aria-label={t('dashboard.map.quarterlyEvolutionTooltip')}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedProdutoId(produto.id);
+                                    setQuarterlySelectedProdutoName([produto.codigo, produto.nome].filter(Boolean).join(' - '));
+                                    setIsQuarterlyEvolutionModalOpen(true);
+                                    void executeQuarterlyEvolution(() => metaProdutoService.getEvolucaoTrimestral(produto.id));
+                                  }}
+                                >
+                                  <BarChart3 className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                {t('dashboard.map.quarterlyEvolutionTooltip')}
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -770,6 +889,12 @@ export default function DashboardMap() {
               </DialogContent>
             </Dialog>
 
+            <ProdutoVidaModal
+              open={isProdutoVidaModalOpen}
+              onOpenChange={setIsProdutoVidaModalOpen}
+              produto={produtoVidaSelected}
+            />
+
             <motion.div ref={demandasCardRef} variants={mapCardVariants} className="will-change-[filter,opacity]">
               <Card>
                 <CardHeader className="pb-2">
@@ -779,7 +904,9 @@ export default function DashboardMap() {
                       <span>{t('projectSemaphore.demands')}</span>
                     </span>{' '}
                     <p className="mt-1 text-sm font-medium text-orange-700">
-                      {selectedProduto ? `${selectedProduto.codigo} - ${selectedProduto.nome}` : t('dashboard.map.noProductSelected')}
+                      {selectedProdutoSemaforo
+                        ? `${selectedProdutoSemaforo.codigo} - ${selectedProdutoSemaforo.nome}`
+                        : t('dashboard.map.noProductSelected')}
                     </p>
                   </CardTitle>
                 </CardHeader>
@@ -789,7 +916,7 @@ export default function DashboardMap() {
                       <tr className="border-b bg-muted/40 text-muted-foreground">
                         <th className="px-3 py-2 text-left">{t('dashboard.map.code')}</th>
                         <th className="px-3 py-2 text-left">{t('dashboard.map.description')}</th>
-                        <th className="px-3 py-2 text-left">{t('dashboard.map.status')}</th>
+                        <th className="px-3 py-2 text-left w-[140px]">{t('dashboard.map.status')}</th>
                         <th className="px-3 py-2 text-right">{t('dashboard.map.planned')}</th>
                         <th className="px-3 py-2 text-right">{t('dashboard.map.executed')}</th>
                         <th className="px-3 py-2 text-left">{t('dashboard.map.progress')}</th>
@@ -802,7 +929,7 @@ export default function DashboardMap() {
                           <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
                             <div className="flex flex-col items-center justify-center gap-3">
                               <Frown className="h-14 w-14 text-red-500" />
-                              <span>{selectedProduto ? t('dashboard.map.noDemands') : t('dashboard.map.selectProductToViewDemands')}</span>
+                              <span>{selectedProdutoSemaforo ? t('dashboard.map.noDemands') : t('dashboard.map.selectProductToViewDemands')}</span>
                             </div>
                           </td>
                         </tr>
@@ -844,13 +971,32 @@ export default function DashboardMap() {
                                 <TooltipContent className="max-w-[420px] break-words">{demanda.nome}</TooltipContent>
                               </Tooltip>
                             </td>
-                            <td className="px-1 py-2">
-                              <Badge variant="outline" className={getDemandaStatusBadgeClass(code)}>
-                                {getDemandaStatusLabel(demanda, t)}
-                              </Badge>
+                            <td className="px-1 py-2 w-[140px] max-w-[140px]">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className={`${getDemandaStatusBadgeClass(code)} block max-w-full truncate text-left`}
+                                  >
+                                    {getDemandaStatusLabel(demanda, t)}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs break-words text-xs">
+                                  {getDemandaStatusLabel(demanda, t)}
+                                </TooltipContent>
+                              </Tooltip>
                             </td>
                             <td className="px-1 py-2 text-right">{formatCurrencyWithoutSymbol(demanda.valorTotalPrevisto)}</td>
-                            <td className="px-1 py-2 text-right">{formatCurrencyWithoutSymbol(demanda.valorTotalExecutado)}</td>
+                            <td className={`relative px-1 py-2 text-right ${code === 'G' ? 'font-bold' : ''}`}>
+                              {formatCurrencyWithoutSymbol(demanda.valorTotalExecutado)}
+                              {code === 'G' && (
+                                <Check
+                                  className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 translate-x-[110%] text-green-600"
+                                  strokeWidth={1.25}
+                                  aria-label={t('demands.statusG')}
+                                />
+                              )}
+                            </td>
                             <td className="px-1 py-2">
                               <div className="flex items-center gap-2">
                                 <span className="w-12 text-right text-primary font-semibold">

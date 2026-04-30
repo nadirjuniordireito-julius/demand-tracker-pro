@@ -9,6 +9,7 @@ export {
   termoPlanejamentoSchema,
   termoEncerramentoSchema,
   semaforoNodeSchema,
+  produtoResumoSchema,
   paginatedPerfilSchema,
   paginatedProfissionalSchema,
   paginatedProjetoSchema,

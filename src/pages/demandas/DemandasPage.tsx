@@ -237,6 +237,11 @@ export default function DemandasPage() {
         const metas = await projetoMetaService.findByProjeto(selectedProjectId);
         const ordenadas = [...metas].sort((a, b) => a.codigo.localeCompare(b.codigo));
         setMetasFiltro(ordenadas);
+        // Default de entrada: pré-seleciona a primeira meta quando ainda não há escolha do usuário.
+        if (ordenadas.length > 0 && (selectedMetaId === 'all' || !selectedMetaId)) {
+          setSelectedMetaId(String(ordenadas[0].id));
+          setCurrentPage(0);
+        }
       } catch (err) {
         console.warn('Erro ao carregar metas para filtro de demandas:', err);
         setMetasFiltro([]);
@@ -314,23 +319,12 @@ export default function DemandasPage() {
   // Definição das colunas da tabela
   const columns: Column<DemandaTecnica>[] = useMemo(() => [
     {
-      key: 'meta',
-      label: t('demands.meta'),
-      render: (demanda) => {
-        // Usa o id da meta vindo de MetaProduto e resolve o código via lista de metas já carregada
-        const metaId = demanda.metaProduto?.projetoMetaId;
-        if (!metaId) return '-';
-
-        const meta = metasFiltro.find((m) => m.id === metaId);
-        return meta?.codigo ?? '-';
-      },
-      hideOnMobile: true,
-    },
-    {
       key: 'produto',
-      label: t('demands.product'),
+      label: 'Prod',
       render: (demanda) => demanda.metaProduto?.codigo ?? '-',
       hideOnMobile: true,
+      minWidth: '64px',
+      className: 'w-[72px]',
     },    {
       key: 'codigo',
       label: t('demands.code'),
@@ -354,7 +348,7 @@ export default function DemandasPage() {
         return getStatusBadge(statusValue, t);
       },
     },
-  ], [t, metasFiltro]);
+  ], [t]);
 
   // Definição das ações da tabela
   const actions: Action<DemandaTecnica>[] = useMemo(() => [

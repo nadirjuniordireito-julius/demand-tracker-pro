@@ -147,8 +147,9 @@ export function DataTable<T extends Record<string, any>>({
               </TableCell>
             </TableRow>
           ) : (
-            data.map((item) => {
-              const rowId = getRowId(item);
+            data.map((item, index) => {
+              const rawRowId = getRowId(item);
+              const rowId = rawRowId !== '' && rawRowId !== null && rawRowId !== undefined ? rawRowId : `row-${index}`;
               const isExpanded = expandedRowIds
                 ? expandedRowIds instanceof Set
                   ? expandedRowIds.has(rowId)

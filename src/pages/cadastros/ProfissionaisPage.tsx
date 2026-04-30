@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,33 +49,53 @@ export default function ProfissionaisPage() {
   const [pageSize, setPageSize] = useState(initialListState.pageSize);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const requestSeqRef = useRef(0);
 
   const { isLoading, error, execute } = useApi<PaginatedResponse<Profissional>>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const paginatedProfissionais = useMemo(() => {
+    const start = currentPage * pageSize;
+    return profissionais.slice(start, start + pageSize);
+  }, [profissionais, currentPage, pageSize]);
+
   const loadData = useCallback(async () => {
     if (!selectedProject) return;
+    const requestId = ++requestSeqRef.current;
+
     await execute(
       () =>
         profissionalService.findAll({
           nome: search || undefined,
           projetoId: selectedProject.id,
-          page: currentPage,
-          size: pageSize,
+          // Workaround definitivo: paginação local para contornar inconsistência do endpoint.
+          page: 1,
+          size: 1000,
           sort: 'nome,asc',
         }),
       {
         onSuccess: (data) => {
+          // Evita race condition: ignora respostas antigas que chegam depois.
+          if (requestId !== requestSeqRef.current) return;
+          const total = data.totalElements || data.content.length;
           setProfissionais(data.content);
-          setTotalPages(data.totalPages);
-          setTotalElements(data.totalElements);
+          setTotalElements(total);
+          setTotalPages(Math.max(1, Math.ceil(total / pageSize)));
         },
       }
     );
-  }, [execute, search, selectedProject, currentPage, pageSize]);
+  }, [execute, search, selectedProject, pageSize]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const computedTotalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+    setTotalPages(computedTotalPages);
+    if (currentPage > computedTotalPages - 1) {
+      setCurrentPage(computedTotalPages - 1);
+    }
+  }, [totalElements, pageSize, currentPage]);
 
   useEffect(() => {
     profissionaisListMemory = {
@@ -226,7 +246,7 @@ export default function ProfissionaisPage() {
       ) : (
         <>
           <DataTable
-            data={profissionais}
+            data={paginatedProfissionais}
             columns={columns}
             actions={actions}
             actionsLabel={t('common.actions')}
