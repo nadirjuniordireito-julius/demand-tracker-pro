@@ -21,22 +21,22 @@ export function ProdutoVidaModal({ open, onOpenChange, produto }: ProdutoVidaMod
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[92vh] w-[1080px] max-w-[94vw] overflow-y-auto p-0"
+        className="h-[92vh] w-[1080px] max-w-[94vw] overflow-hidden p-0"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{t('produto.vida.title')}</DialogTitle>
         <button
           type="button"
           aria-label={t('common.close')}
-          className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background/95 text-muted-foreground transition hover:text-foreground"
+          className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-background/95 text-muted-foreground transition hover:text-foreground"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
         </button>
 
-        <div className="p-6 pt-8">
+        <div className="h-full overflow-y-auto p-6 pt-8">
           {produto ? (
-            <ProdutoVidaView produto={produto} />
+            <ProdutoVidaView produto={produto} stickyHero />
           ) : (
             <p className="py-12 text-center text-sm text-muted-foreground">
               {t('produto.vida.noData')}

@@ -80,7 +80,7 @@ const SortIcon = ({
   );
 };
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T>({
   data,
   columns,
   actions,

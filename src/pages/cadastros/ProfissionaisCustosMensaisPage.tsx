@@ -144,14 +144,7 @@ export default function ProfissionaisCustosMensaisPage() {
               : '',
         };
       });
-      console.log('ProfissionaisCustosMensaisPage.loadData retorno:', {
-        ano,
-        mes,
-        profissionais: profissionaisPage.content,
-        custosMensaisRaw: custos,
-        custosMensaisStrict: custosStrictAnoMes,
-        mergedRows,
-      });
+     
       setRows(mergedRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.errorMessage'));

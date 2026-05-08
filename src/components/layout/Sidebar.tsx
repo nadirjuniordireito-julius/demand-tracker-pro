@@ -16,6 +16,7 @@ import {
   HeartPulse,
   CircleDollarSign,
   Settings2,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -176,6 +177,7 @@ function NavSubGroup({ icon, label, isCollapsed, children, defaultOpen = false }
 
 const CADASTROS_GROUP_ID = 'cadastros';
 const DEMANDAS_GROUP_ID = 'demandas';
+const GERENCIAL_GROUP_ID = 'gerencial';
 
 export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
   const { t } = useTranslation();
@@ -192,6 +194,8 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
       setOpenGroupId(CADASTROS_GROUP_ID);
     } else if (location.pathname.startsWith('/demandas') || location.pathname.startsWith('/execucao-demandas')) {
       setOpenGroupId(DEMANDAS_GROUP_ID);
+    } else if (location.pathname.startsWith('/gerencial-mes')) {
+      setOpenGroupId(GERENCIAL_GROUP_ID);
     }
   }, [location.pathname]);
 
@@ -267,6 +271,12 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
               label={t('nav.professionals')} 
               isCollapsed={isCollapsed}
             />
+            <NavItem
+              to="/cadastros/profissionais/analise"
+              icon={<BarChart3 className="h-4 w-4" />}
+              label={t('nav.professionalsAnalysis', 'Análise de profissionais')}
+              isCollapsed={isCollapsed}
+            />
             <NavItem 
               to="/cadastros/desembolsos" 
               icon={<CircleDollarSign className="h-4 w-4" />} 
@@ -319,6 +329,27 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
             end
           />
         </NavGroup>
+
+        {user?.perfil !== 'V' && (
+          <NavGroup
+            id={GERENCIAL_GROUP_ID}
+            icon={<BarChart3 className="h-5 w-5" />}
+            label={t('nav.gerencial')}
+            isCollapsed={isCollapsed}
+            pathPrefix="/gerencial-mes"
+            onExpandSidebar={() => isCollapsed && onToggleSidebar()}
+            isOpen={openGroupId === GERENCIAL_GROUP_ID}
+            onToggle={() => handleGroupToggle(GERENCIAL_GROUP_ID)}
+          >
+            <NavItem
+              to="/gerencial-mes/relatorio"
+              icon={<BarChart3 className="h-4 w-4" />}
+              label={t('nav.gerencialMonthlyReport')}
+              isCollapsed={isCollapsed}
+              end
+            />
+          </NavGroup>
+        )}
       </nav>
 
       {/* Botão expandir/recolher - semicírculo projetando para fora da sidebar */}

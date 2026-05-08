@@ -68,6 +68,7 @@ export default function EditProfissionalPage() {
       documento: '',
       funcao: '',
       valorHora: 0,
+      custoTotalMensal: 0,
       dataInicioAtividade: new Date(),
       projetoId: 0,
       perfilId: 0,
@@ -124,6 +125,7 @@ export default function EditProfissionalPage() {
         documento: data.documento,
         funcao: data.funcao ?? '',
         valorHora: data.valorHora,
+        custoTotalMensal: data.custoTotalMensal,
         dataInicioAtividade: parseDateOnly(data.dataInicioAtividade) ?? new Date(),
         projetoId: data.projetoId,
         perfilId: data.perfilId,
@@ -149,6 +151,7 @@ export default function EditProfissionalPage() {
       documento: '',
       funcao: '',
       valorHora: 0,
+      custoTotalMensal: 0,
       dataInicioAtividade: new Date(),
       projetoId: selectedProject.id,
       perfilId: 0,
@@ -167,6 +170,7 @@ export default function EditProfissionalPage() {
           tipoPessoa: data.tipoPessoa,
           documento: data.documento.trim(),
           valorHora: data.valorHora,
+          custoTotalMensal: data.custoTotalMensal,
           dataInicioAtividade: data.dataInicioAtividade.toISOString().split('T')[0],
           projetoId: selectedProject.id,
           perfilId: data.perfilId,
@@ -198,6 +202,7 @@ export default function EditProfissionalPage() {
         documento: data.documento.trim(),
         funcao: funcaoTrimmed ?? '',
         valorHora: data.valorHora,
+        custoTotalMensal: data.custoTotalMensal,
         dataInicioAtividade: data.dataInicioAtividade.toISOString().split('T')[0],
         projetoId: profissional.projetoId,
         perfilId: data.perfilId,
@@ -257,153 +262,185 @@ export default function EditProfissionalPage() {
       <PageHeader title={pageTitle} description={pageDescription} />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="nome"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.name')} *</FormLabel>
-                <FormControl>
-                  <Input placeholder={t('professionals.namePlaceholder')} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="tipoPessoa"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.tipoPessoa')} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+          {/* Linha 1: Nome | Tipo de Pessoa | Documento */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="nome"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.name')} *</FormLabel>
                   <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('professionals.selectTipoPessoa')} />
-                    </SelectTrigger>
+                    <Input placeholder={t('professionals.namePlaceholder')} {...field} />
                   </FormControl>
-                  <SelectContent>
-                    <SelectItem value="F">{t('professionals.pessoaFisica')}</SelectItem>
-                    <SelectItem value="J">{t('professionals.pessoaJuridica')}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="documento"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.document')} *</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder={t('professionals.documentPlaceholder')}
-                    inputMode="numeric"
-                    value={field.value}
-                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="funcao"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.funcao')}</FormLabel>
-                <FormControl>
-                  <Input placeholder={t('professionals.funcaoPlaceholder')} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="perfilId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.perfil')} *</FormLabel>
-                <Select
-                  onValueChange={(value) => field.onChange(Number(value))}
-                  value={field.value ? String(field.value) : ''}
-                  disabled={isLoadingPerfis}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('professionals.selectPerfil')} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {perfis.map((perfil) => (
-                      <SelectItem key={perfil.id} value={String(perfil.id)}>
-                        {perfil.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="valorHora"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.valorHora')} (R$) *</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="0,00"
-                    value={field.value || ''}
-                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 0)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="dataInicioAtividade"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('professionals.dataInicioAtividade')} *</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="tipoPessoa"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.tipoPessoa')} *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn('w-full justify-start text-left font-normal', !field.value && 'text-muted-foreground')}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {field.value ? format(field.value, 'dd/MM/yyyy') : t('common.select')}
-                      </Button>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('professionals.selectTipoPessoa')} />
+                      </SelectTrigger>
                     </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      initialFocus
-                      className="pointer-events-auto"
+                    <SelectContent>
+                      <SelectItem value="F">{t('professionals.pessoaFisica')}</SelectItem>
+                      <SelectItem value="J">{t('professionals.pessoaJuridica')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="documento"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.document')} *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('professionals.documentPlaceholder')}
+                      inputMode="numeric"
+                      value={field.value}
+                      onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
                     />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Linha 2: Data início | Perfil | Função */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="dataInicioAtividade"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>{t('professionals.dataInicioAtividade')} *</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn('w-full justify-start text-left font-normal', !field.value && 'text-muted-foreground')}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {field.value ? format(field.value, 'dd/MM/yyyy') : t('common.select')}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="perfilId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.perfil')} *</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    value={field.value ? String(field.value) : ''}
+                    disabled={isLoadingPerfis}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('professionals.selectPerfil')} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {perfis.map((perfil) => (
+                        <SelectItem key={perfil.id} value={String(perfil.id)}>
+                          {perfil.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="funcao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.funcao')}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t('professionals.funcaoPlaceholder')} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Linha 3: Valor hora | Custo total mensal */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="valorHora"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.valorHora')} (R$) *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0,00"
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="custoTotalMensal"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('professionals.custoTotalMensal')} (R$) *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0,00"
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={handleBack} disabled={isSaving}>
               {t('common.cancel')}

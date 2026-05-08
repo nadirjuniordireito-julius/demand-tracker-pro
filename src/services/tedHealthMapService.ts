@@ -4,8 +4,8 @@
  */
 
 import { api } from './api';
-import type { BubbleNode } from '@/types/tedHealthMap';
+import type { ApiNode } from '@/lib/tedHealthMapNormalize';
 
-export async function fetchTedHealth(tedId: string | number): Promise<BubbleNode> {
-  return api.get<BubbleNode>(`/ted/${tedId}/health`, { allow404: false, silent: true });
+export async function fetchTedHealth(tedId: string | number): Promise<ApiNode> {
+  return api.get<ApiNode>(`/ted/${tedId}/health`, { allow404: false, silent: true });
 }

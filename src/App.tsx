@@ -29,6 +29,7 @@ const PerfisPage = lazy(() => import("./pages/cadastros/PerfisPage"));
 const EditPerfilPage = lazy(() => import("./pages/cadastros/EditPerfilPage"));
 const ProfissionaisPage = lazy(() => import("./pages/cadastros/ProfissionaisPage"));
 const ProfissionaisCustosMensaisPage = lazy(() => import("./pages/cadastros/ProfissionaisCustosMensaisPage"));
+const AnaliseProfissionaisPage = lazy(() => import("./pages/cadastros/AnaliseProfissionais"));
 const EditProfissionalPage = lazy(() => import("./pages/cadastros/EditProfissionalPage"));
 const DesembolsosPage = lazy(() => import("./pages/cadastros/DesembolsosPage"));
 const EditDesembolsoPage = lazy(() => import("./pages/cadastros/EditDesembolsoPage"));
@@ -44,6 +45,8 @@ const ExecucaoDemandasListPage = lazy(() => import("./modules/execucaoDemanda/pa
 const ExecucaoDemandaDetailPage = lazy(() => import("./modules/execucaoDemanda/pages/ExecucaoDemandaDetailPage"));
 const ExecucaoGanttPage = lazy(() => import("./modules/execucaoDemanda/pages/ExecucaoGanttPage"));
 const ExecucaoDemandaChecklistPage = lazy(() => import("./modules/execucaoDemanda/pages/ExecucaoDemandaChecklistPage"));
+const ProdutoGerencialMesPage = lazy(() => import("./modules/gerencialMes/pages/ProdutoGerencialMesPage"));
+const RelatorioGestorMesPage = lazy(() => import("./modules/gerencialMes/pages/RelatorioGestorMesPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -96,6 +99,7 @@ const App = () => {
                           <Route path="/cadastros/perfis/:perfilId/editar" element={<EditPerfilPage />} />
                           <Route path="/cadastros/profissionais" element={<ProfissionaisPage />} />
                           <Route path="/cadastros/profissionais/custos-mensais" element={<ProfissionaisCustosMensaisPage />} />
+                          <Route path="/cadastros/profissionais/analise" element={<AnaliseProfissionaisPage />} />
                           <Route path="/cadastros/profissionais/novo" element={<EditProfissionalPage />} />
                           <Route path="/cadastros/profissionais/:profissionalId/editar" element={<EditProfissionalPage />} />
                           <Route path="/cadastros/desembolsos" element={<DesembolsosPage />} />
@@ -114,6 +118,8 @@ const App = () => {
                           <Route path="/execucao-demandas/:demandaTecnicaId" element={<ExecucaoDemandaDetailPage />} />
                           <Route path="/execucao-demandas/:demandaTecnicaId/gantt" element={<ExecucaoGanttPage />} />
                           <Route path="/execucao-demandas/:demandaTecnicaId/checklist" element={<ExecucaoDemandaChecklistPage />} />
+                          <Route path="/gerencial-mes/produto/:metaProdutoId" element={<ProdutoGerencialMesPage />} />
+                          <Route path="/gerencial-mes/relatorio" element={<RelatorioGestorMesPage />} />
                           <Route path="/perfil" element={<ProfilePage />} />
                           <Route path="/configuracoes" element={<SettingsPage />} />
                         </Route>

@@ -1,4 +1,11 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
+
+/**
+ * Maior valor monetário aceito (DECIMAL(18,2) no backend).
+ * Em IEEE-754 isto é exatamente representável (1e16),
+ * evitando o lint `no-loss-of-precision`.
+ */
+const MAX_DECIMAL_18_2 = 1e16;
 
 // ==================== Usuario ====================
 export const usuarioSchema = z.object({
@@ -125,7 +132,7 @@ export const metaProdutoSchema = z.object({
       invalid_type_error: 'validation.unitValueNumber',
     })
     .positive({ message: 'validation.unitValuePositive' })
-    .max(9999999999999999.99, { message: 'validation.unitValueTooLarge' }),
+    .max(MAX_DECIMAL_18_2, { message: 'validation.unitValueTooLarge' }),
   inicio: z
     .number({
       required_error: 'validation.startRequired',
@@ -173,7 +180,7 @@ export const perfilSchema = z.object({
       invalid_type_error: 'validation.valueNumber',
     })
     .positive({ message: 'validation.valuePositive' })
-    .max(9999999999999999.99, { message: 'validation.valueTooLarge' }), // Limite baseado em precision 18, scale 2
+    .max(MAX_DECIMAL_18_2, { message: 'validation.valueTooLarge' }), // Limite baseado em precision 18, scale 2
 }).refine((data) => data.termoFinal >= data.termoInicial, {
   message: 'validation.dateFinalGteInitial',
   path: ['termoFinal'],
@@ -206,6 +213,12 @@ export const profissionalSchema = z.object({
       invalid_type_error: 'validation.valueNumber',
     })
     .positive({ message: 'validation.valuePositive' }),
+  custoTotalMensal: z
+    .number({
+      required_error: 'validation.custoTotalMensalRequired',
+      invalid_type_error: 'validation.custoTotalMensalNumber',
+    })
+    .positive({ message: 'validation.custoTotalMensalPositive' }),
   dataInicioAtividade: z.date({
     required_error: 'validation.dateRequired',
     invalid_type_error: 'validation.dateInvalid',
@@ -234,13 +247,13 @@ export const desembolsoSchema = z.object({
       required_error: 'validation.valueRequired',
       invalid_type_error: 'validation.valueNumber',
     })
-    .max(9999999999999999.99, { message: 'validation.valueTooLarge' }),
+    .max(MAX_DECIMAL_18_2, { message: 'validation.valueTooLarge' }),
   valor: z
     .number({
       required_error: 'validation.valueRequired',
       invalid_type_error: 'validation.valueNumber',
     })
-    .max(9999999999999999.99, { message: 'validation.valueTooLarge' }),
+    .max(MAX_DECIMAL_18_2, { message: 'validation.valueTooLarge' }),
   dataDesembolso: z.date({
     required_error: 'validation.dateRequired',
     invalid_type_error: 'validation.dateInvalid',
@@ -287,19 +300,19 @@ export type DemandaFormData = z.infer<typeof demandaSchema>;
 export const templateDemandaSchema = z.object({
   projetoId: z
     .string()
-    .min(1, { message: 'Projeto é obrigatório' }),
+    .min(1, { message: 'validation.projectRequired' }),
   tipo: z
     .enum(['A', 'P', 'E'], {
-      required_error: 'Tipo é obrigatório',
-      invalid_type_error: 'Tipo deve ser A, P ou E',
+      required_error: 'validation.typeRequired',
+      invalid_type_error: 'validation.typeInvalid',
     }),
   arquivoDocx: z
-    .instanceof(File, { message: 'Arquivo DOCX é obrigatório' })
+    .instanceof(File, { message: 'validation.fileDocxRequired' })
     .refine((file) => {
       if (!file) return false;
       return file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     }, {
-      message: 'O arquivo deve ser um DOCX',
+      message: 'validation.fileMustBeDocx',
     })
     .optional()
     .or(z.undefined()),

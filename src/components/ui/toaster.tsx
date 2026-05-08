@@ -29,12 +29,14 @@ const positionClasses: Record<ToastPosition, string> = {
 export function Toaster() {
   const { toasts } = useToast();
 
+  type ToastItem = (typeof toasts)[number] & { position?: ToastPosition };
+
   // Agrupar por posição
   const groupedToasts = toasts.reduce<
     Record<ToastPosition, typeof toasts>
   >(
-    (acc, toast: any) => {
-      const pos: ToastPosition = toast.position || "bottom-right";
+    (acc, toast) => {
+      const pos: ToastPosition = (toast as ToastItem).position || "bottom-right";
       acc[pos].push(toast);
       return acc;
     },

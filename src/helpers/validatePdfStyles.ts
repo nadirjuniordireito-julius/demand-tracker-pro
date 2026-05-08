@@ -3,14 +3,14 @@ import type { ReactElement } from "react";
 
 const INVALID = ["auto", undefined, null, NaN];
 
-function isInvalid(v: any) {
-  return INVALID.includes(v) || (typeof v === "number" && !isFinite(v));
+function isInvalid(v: unknown) {
+  return INVALID.includes(v as never) || (typeof v === "number" && !isFinite(v));
 }
 
 export function validatePdfTree(el: ReactElement, path = "root") {
   if (!el || typeof el !== "object") return;
 
-  const props: any = el.props || {};
+  const props = (el.props ?? {}) as { style?: Record<string, unknown>; children?: unknown };
 
   if (props.style) {
     Object.entries(props.style).forEach(([key, value]) => {
@@ -29,9 +29,9 @@ export function validatePdfTree(el: ReactElement, path = "root") {
   const children = props.children;
   if (Array.isArray(children)) {
     children.forEach((c, i) =>
-      validatePdfTree(c, `${path}.children[${i}]`)
+      validatePdfTree(c as ReactElement, `${path}.children[${i}]`)
     );
   } else if (children) {
-    validatePdfTree(children, `${path}.children`);
+    validatePdfTree(children as ReactElement, `${path}.children`);
   }
 }

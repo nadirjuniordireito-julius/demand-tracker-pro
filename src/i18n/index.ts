@@ -26,7 +26,8 @@ i18n
     lng: savedLanguage,
     fallbackLng: 'pt',
     interpolation: {
-      escapeValue: true,
+      // React já escapa texto em JSX (recomendado pelo react-i18next).
+      escapeValue: false,
     },
   });
 

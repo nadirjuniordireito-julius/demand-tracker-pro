@@ -4,12 +4,14 @@
 // =====================================================
 
 import api from './api';
+import { z } from 'zod';
 import { demandaTecnicaSchema, paginatedDemandaTecnicaSchema } from '@/lib/schemas';
 import type { 
   DemandaTecnica, 
   DemandaTecnicaCreateDTO, 
   DemandaTecnicaUpdateDTO, 
   DemandaTimelineEventoDTO,
+  DemandaProdutoViewDTO,
   PaginatedResponse,
   DemandStatus
 } from '@/types';
@@ -19,12 +21,23 @@ const ENDPOINTS = {
   byId: (id: number) => `/demandas/${id}`,
   cancel: (id: number) => `/demandas/${id}/cancelar`,
   timeline: (id: number) => `/demandas/${id}/timeline`,
+  byProdutoView: (idProduto: number) => `/demandas/produto/${idProduto}/view`,
 };
+
+const demandaProdutoViewSchema = z.object({
+  codigo: z.string(),
+  dataInicioExecucao: z.string().nullable(),
+  nome: z.string(),
+  status: z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Z']),
+  totalPrevisto: z.number(),
+  totalExecutado: z.number(),
+});
 
 export interface DemandaFilters {
   codigo?: string;
   nome?: string;
   projetoId?: number;
+  metaProdutoId?: number;
   status?: DemandStatus;
   page?: number;
   size?: number;
@@ -41,6 +54,7 @@ export const demandaService = {
     if (filters.codigo) params.append('codigo', filters.codigo);
     if (filters.nome) params.append('nome', filters.nome);
     if (filters.projetoId) params.append('projetoId', String(filters.projetoId));
+    if (filters.metaProdutoId) params.append('metaProdutoId', String(filters.metaProdutoId));
     if (filters.status) params.append('status', filters.status);
     if (filters.page !== undefined) params.append('page', String(filters.page));
     if (filters.size !== undefined) params.append('size', String(filters.size));
@@ -92,6 +106,12 @@ export const demandaService = {
    */
   async getTimeline(id: number): Promise<DemandaTimelineEventoDTO[]> {
     return api.get<DemandaTimelineEventoDTO[]>(ENDPOINTS.timeline(id));
+  },
+
+  async listByProdutoView(idProduto: number): Promise<DemandaProdutoViewDTO[]> {
+    const raw = await api.get<unknown>(ENDPOINTS.byProdutoView(idProduto));
+    const parsed = z.array(demandaProdutoViewSchema).parse(raw);
+    return parsed as DemandaProdutoViewDTO[];
   },
 };
 

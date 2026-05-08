@@ -30,6 +30,15 @@ export interface DemandaTecnicaDTO {
   dataAbertura: string;
 }
 
+export interface DemandaProdutoViewDTO {
+  codigo: string;
+  dataInicioExecucao: string | null;
+  nome: string;
+  status: DemandStatus;
+  totalPrevisto: number;
+  totalExecutado: number;
+}
+
 /** Usuário resumido na timeline da demanda (GET /api/demandas/{id}/timeline). */
 export interface UsuarioTimelineDTO {
   id: number;
@@ -257,6 +266,7 @@ export interface Profissional {
   documento: string;
   funcao?: string | null;
   valorHora: number;
+  custoTotalMensal: number;
   dataInicioAtividade: string; // YYYY-MM-DD
   projetoId: number;
   projeto?: Projeto;
@@ -269,6 +279,7 @@ export interface ProfissionalCreateDTO {
   documento: string;
   funcao?: string | null;
   valorHora: number;
+  custoTotalMensal: number;
   dataInicioAtividade: string; // YYYY-MM-DD
   projetoId: number;
   perfilId: number;
@@ -280,6 +291,7 @@ export interface ProfissionalUpdateDTO {
   documento?: string;
   funcao?: string | null;
   valorHora?: number;
+  custoTotalMensal?: number;
   dataInicioAtividade?: string;
   projetoId?: number;
   perfilId?: number;
@@ -748,6 +760,7 @@ export interface ProdutoResumoDTO {
   nomeProduto: string;
   situacao: string | null;
   inicioPrevisaoExecucao: string | null;
+  inicioRealExecucao: string | null;
   fimPrevisaoExecucao: string | null;
   mesesPrevistosExecucao: number | null;
   valorTotalOrcamento: number | null;
@@ -775,6 +788,167 @@ export interface ProdutoEvolucaoTrimestralDTO {
   totalPrevistoProduto: number;
   totalExecutadoProduto: number;
   trimestres: ProdutoEvolucaoTrimestralItemDTO[];
+}
+
+// =====================================================
+// Snapshot mensal de produto (gerencial mês)
+// =====================================================
+export type StatusProdutoMes = 'V' | 'A' | 'R';
+export type TipoAcaoProduto = 'PREVENTIVA' | 'CORRETIVA' | 'CONTINGENCIA';
+export type ImpactoAcaoProduto = 'B' | 'M' | 'A';
+export type StatusAcaoProduto = 'ABERTA' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA';
+
+export interface ProdutoSnapshotMensalDTO {
+  id: number;
+  metaProdutoId: number;
+  metaProduto?: MetaProduto | null;
+  ano: number;
+  mes: number;
+  statusProdutoMes: StatusProdutoMes;
+  situacao?: string | null;
+  valorTotalOrcamento?: number | null;
+  valorTotalEmExecucao?: number | null;
+  valorTotalExecutado?: number | null;
+  percentualExecucao?: number | null;
+  valorMediaEntregaPrevistaMensal?: number | null;
+  valorMediaEntregaRealMensal?: number | null;
+  resumoAnalitico?: string | null;
+  fechado: boolean;
+  dataFechamento?: string | null;
+  usuarioFechamentoId?: number | null;
+  usuarioFechamentoNome?: string | null;
+  dataRegistro: string;
+  dataUpdate: string;
+}
+
+export interface ProdutoSnapshotMensalCreateDTO {
+  metaProdutoId: number;
+  ano: number;
+  mes: number;
+  statusProdutoMes: StatusProdutoMes;
+  situacao?: string;
+  valorTotalOrcamento?: number;
+  valorTotalEmExecucao?: number;
+  valorTotalExecutado?: number;
+  percentualExecucao?: number;
+  valorMediaEntregaPrevistaMensal?: number;
+  valorMediaEntregaRealMensal?: number;
+  resumoAnalitico?: string;
+}
+
+export interface ProdutoSnapshotMensalUpdateDTO {
+  statusProdutoMes?: StatusProdutoMes;
+  situacao?: string | null;
+  valorTotalOrcamento?: number | null;
+  valorTotalEmExecucao?: number | null;
+  valorTotalExecutado?: number | null;
+  percentualExecucao?: number | null;
+  valorMediaEntregaPrevistaMensal?: number | null;
+  valorMediaEntregaRealMensal?: number | null;
+  resumoAnalitico?: string | null;
+}
+
+export interface ProdutoSnapshotAcaoDTO {
+  id: number;
+  snapshotId: number;
+  tipoAcao: TipoAcaoProduto;
+  descricao: string;
+  responsavelId?: number | null;
+  responsavelNome?: string | null;
+  prazo: string;
+  impacto: ImpactoAcaoProduto;
+  statusAcao: StatusAcaoProduto;
+  dataStatus: string;
+  observacaoStatus?: string | null;
+  dataCriacao: string;
+  dataUpdate: string;
+}
+
+export interface ProdutoSnapshotAcaoCreateDTO {
+  tipoAcao: TipoAcaoProduto;
+  descricao: string;
+  responsavelId?: number | null;
+  responsavelNome?: string | null;
+  prazo: string;
+  impacto: ImpactoAcaoProduto;
+  statusAcao?: StatusAcaoProduto;
+  observacaoStatus?: string;
+}
+
+export interface ProdutoSnapshotAcaoUpdateDTO {
+  tipoAcao?: TipoAcaoProduto;
+  descricao?: string;
+  responsavelId?: number | null;
+  responsavelNome?: string | null;
+  prazo?: string;
+  impacto?: ImpactoAcaoProduto;
+  observacaoStatus?: string | null;
+}
+
+export interface ProdutoSnapshotAcaoUpdateStatusDTO {
+  statusAcao: StatusAcaoProduto;
+  observacaoStatus?: string | null;
+}
+
+export interface ProdutoSnapshotRelatorioGestorResumoDTO {
+  totalProdutos: number;
+  produtosVerde: number;
+  produtosAmarelo: number;
+  produtosVermelho: number;
+  snapshotsFechados: number;
+  snapshotsAbertos: number;
+  totalAcoes: number;
+  acoesAbertas: number;
+  acoesEmAndamento: number;
+  acoesConcluidas: number;
+  acoesCanceladas: number;
+  acoesVencidas: number;
+  acoesImpactoAlto: number;
+  somaValorTotalExecutado: number;
+  somaValorTotalOrcamento: number;
+  percentualExecucaoConsolidado: number;
+}
+
+export interface ProdutoSnapshotRelatorioGestorItemDTO {
+  snapshotId: number;
+  metaProdutoId: number;
+  codigoProduto: string;
+  nomeProduto: string;
+  projetoMetaId: number;
+  codigoMeta: string;
+  nomeMeta: string;
+  projetoId: number;
+  nomeProjeto: string;
+  ano: number;
+  mes: number;
+  statusProdutoMes: StatusProdutoMes;
+  fechado: boolean;
+  percentualExecucao?: number | null;
+  valorTotalOrcamento?: number | null;
+  valorTotalEmExecucao?: number | null;
+  valorTotalExecutado?: number | null;
+  totalAcoes: number;
+  acoesAbertas: number;
+  acoesEmAndamento: number;
+  acoesConcluidas: number;
+  acoesCanceladas: number;
+  acoesVencidas: number;
+  acoesImpactoAlto: number;
+}
+
+export interface ProdutoSnapshotRelatorioGestorDTO {
+  ano: number;
+  mes: number;
+  projetoId?: number | null;
+  resumo: ProdutoSnapshotRelatorioGestorResumoDTO;
+  produtos: ProdutoSnapshotRelatorioGestorItemDTO[];
+  acoesVencidas: ProdutoSnapshotAcaoDTO[];
+  produtosCriticos: ProdutoSnapshotRelatorioGestorItemDTO[];
+}
+
+/** State opcional ao navegar a partir do DashboardMap. */
+export interface GerencialMesProdutoLocationState {
+  resumo?: ProdutoResumoDTO;
 }
 
 // =====================================================

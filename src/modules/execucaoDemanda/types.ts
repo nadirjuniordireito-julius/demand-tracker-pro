@@ -35,6 +35,16 @@ export interface DemandaExecucaoPerfilCheckDTO {
   horasPlanejadasExecucao: number;
 }
 
+export interface ExecucaoProfissionalDTO {
+  id: number;
+  mes: number;
+  ano: number;
+  horasPrevistas: number;
+  horasExecutadas: number;
+  valorMensalRemuneracao: number;
+  valorTotalExecucao: number;
+}
+
 export interface DemandaExecucaoCreateDTO {
   demandaTecnicaId: number;
   usuarioId?: number;

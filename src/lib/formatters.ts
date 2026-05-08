@@ -129,18 +129,40 @@ const ES_TWENTIES: Record<number, string> = {
 
 /** Converte um número inteiro 0..99 para sua forma por extenso em pt/en/es. Fallback: numeral. */
 export const numberToWords = (n: number, langInput: string): string => {
-  if (!Number.isInteger(n) || n < 0 || n > 99) return String(n);
+  if (!Number.isInteger(n) || n < 0 || n > 99) {
+    const fallback = String(n);
+    return fallback;
+  }
+
   const langKey = langInput.split('-')[0] as NumberWordsLang;
   const dict = NUMBER_WORDS[langKey] ?? NUMBER_WORDS.pt;
+  const fallbackLanguageUsed = !NUMBER_WORDS[langKey];
 
-  if (n < 10) return dict.units[n];
-  if (n < 20) return dict.teens[n - 10];
+  if (n < 10) {
+    const output = dict.units[n];
+    return output;
+  }
+  if (n < 20) {
+    const output = dict.teens[n - 10];
+    
+    return output;
+  }
 
   const tens = Math.floor(n / 10);
   const units = n % 10;
-  if (units === 0) return dict.tens[tens];
-  if (langKey === 'es' && tens === 2) return ES_TWENTIES[units];
-  return `${dict.tens[tens]}${dict.join}${dict.units[units]}`;
+  if (units === 0) {
+    const output = dict.tens[tens];
+    
+    return output;
+  }
+  if (langKey === 'es' && tens === 2) {
+    const output = ES_TWENTIES[units];
+   
+    return output;
+  }
+  const output = `${dict.tens[tens]}${dict.join}${dict.units[units]}`;
+  
+  return output;
 };
 
 /** Calcula os meses transcorridos (inclusivo) entre uma data inicial e a data atual, mês a mês. */

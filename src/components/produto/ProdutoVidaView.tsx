@@ -4,6 +4,7 @@ import {
   CalendarRange,
   Coins,
   Gauge,
+  Info,
   Package,
   Sparkles,
   Target,
@@ -26,6 +27,7 @@ import type { ProdutoResumoDTO } from '@/types';
 
 interface ProdutoVidaViewProps {
   produto: ProdutoResumoDTO;
+  stickyHero?: boolean;
 }
 
 /**
@@ -91,7 +93,7 @@ function MetricCard({
  *
  * Reutilizável: pode ser embutida em modal, tela autônoma ou drawer.
  */
-export function ProdutoVidaView({ produto }: ProdutoVidaViewProps) {
+export function ProdutoVidaView({ produto, stickyHero = false }: ProdutoVidaViewProps) {
   const { t, i18n } = useTranslation();
 
   const percentual = useMemo(() => {
@@ -135,7 +137,10 @@ export function ProdutoVidaView({ produto }: ProdutoVidaViewProps) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/5 p-6 shadow-sm"
+        className={cn(
+          'relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/5 p-6 shadow-sm',
+          stickyHero && 'sticky top-0 z-20',
+        )}
       >
         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -312,6 +317,16 @@ export function ProdutoVidaView({ produto }: ProdutoVidaViewProps) {
                   <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">
                     {formatCurrency(realMensal)}
                   </p>
+                  {produto.inicioRealExecucao && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-orange-600">
+                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600" aria-hidden />
+                      <span className="italic">
+                        {t('produto.vida.inicioRealExecucaoRitmo', {
+                          date: formatMonthYear(produto.inicioRealExecucao),
+                        })}
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
 

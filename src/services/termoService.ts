@@ -242,8 +242,8 @@ export const termoPlanejamentoService = {
 
     const CUSTOS_DETALHADOS = (termo.custos ?? []).map((c) => ({
       perfil: c.perfil?.nome ?? '-',
-      horas: Number(c.qtdeHora) ?? 0,
-      valorHora: Number(c.valorHora) ?? 0,
+      horas: Number(c.qtdeHora) || 0,
+      valorHora: Number(c.valorHora) || 0,
     }));
     const totalGeral = CUSTOS_DETALHADOS.reduce(
       (acc, item) => acc + item.horas * item.valorHora,

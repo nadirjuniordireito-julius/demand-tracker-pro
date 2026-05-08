@@ -43,10 +43,6 @@ export default function EditUsuarioPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (user && user.perfil !== 'A') {
-    return <Navigate to="/" replace />;
-  }
-
   const form = useForm<UsuarioFormData>({
     resolver: zodResolver(isCreate ? usuarioCreateSchema : usuarioSchema),
     defaultValues: {
@@ -130,6 +126,10 @@ export default function EditUsuarioPage() {
       setIsSaving(false);
     }
   };
+
+  if (user && user.perfil !== 'A') {
+    return <Navigate to="/" replace />;
+  }
 
   if (error && !isCreate) {
     return (

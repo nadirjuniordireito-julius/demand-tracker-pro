@@ -75,11 +75,6 @@ export default function UsuariosPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
-  // Se o usuário logado não for administrador, bloqueia acesso à página
-  if (user && user.perfil !== 'A') {
-    return <Navigate to="/" replace />;
-  }
-
   // API states
   const { isLoading, error, execute } = useApi<PaginatedResponse<Usuario>>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -317,6 +312,11 @@ export default function UsuariosPage() {
   };
 
 
+
+  // Se o usuário logado não for administrador, bloqueia acesso à página
+  if (user && user.perfil !== 'A') {
+    return <Navigate to="/" replace />;
+  }
 
   // Estado de erro
   if (error) {

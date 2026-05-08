@@ -5,6 +5,7 @@ import type {
   DemandaExecucaoUpdateDTO,
   DemandaExecucaoGanttDTO,
   DemandaExecucaoPerfilCheckDTO,
+  ExecucaoProfissionalDTO,
 } from '../types';
 
 const BASE = '/demandas-execucao';
@@ -83,5 +84,13 @@ export const demandaExecucaoService = {
    */
   async getPerfilCheckByDemandaId(demandaTecnicaId: number) {
     return api.get<DemandaExecucaoPerfilCheckDTO[]>(`${BASE}/check/perfis/${demandaTecnicaId}`);
+  },
+
+  /**
+   * GET /api/demandas-execucao/analytics/profissional/{profissionalId}
+   * Retorna execução mensal analítica do profissional.
+   */
+  async getAnalyticsByProfissional(profissionalId: number): Promise<ExecucaoProfissionalDTO[]> {
+    return api.get<ExecucaoProfissionalDTO[]>(`${BASE}/analytics/profissional/${profissionalId}`);
   },
 };

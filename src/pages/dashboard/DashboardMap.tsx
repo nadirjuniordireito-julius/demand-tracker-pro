@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   BarChart3,
   CalendarDays,
+  Camera,
   Check,
   CheckCircle2,
   ChevronUp,
@@ -80,7 +81,7 @@ function ProductDescriptionTooltipBody({
     return (
       <div
         className="max-h-[min(40vh,280px)] overflow-y-auto text-left font-normal text-popover-foreground [&_*]:font-normal [&_p]:mb-2 [&_p:last-child]:mb-0 [&_br]:block [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_a]:break-all [&_a]:underline [&_a]:text-primary [&_strong]:font-semibold [&_em]:italic [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/40 [&_blockquote]:pl-2 [&_blockquote]:italic"
-        // eslint-disable-next-line react/no-danger -- conteúdo já vem do editor rico no backend (mesmo padrão de DemandaTimelineModal)
+        // conteúdo já vem do editor rico no backend (mesmo padrão de DemandaTimelineModal)
         dangerouslySetInnerHTML={{ __html: sanitizeTooltipHtml(s) }}
       />
     );
@@ -128,6 +129,7 @@ export default function DashboardMap() {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
+      console.log(`SemaforoDTO obtido (projectId=${projectId}):`, semaforo);
       return semaforo;
     });
   }, [projectId, execute]);
@@ -403,6 +405,11 @@ export default function DashboardMap() {
     return monthsElapsedInclusive(minStart, new Date());
   }, [produtosResumoData]);
 
+  const mesesExecucaoMetaPorExtenso = useMemo(() => {
+    if (mesesExecucaoMeta == null) return null;
+    return numberToWords(mesesExecucaoMeta, i18n.language);
+  }, [mesesExecucaoMeta, i18n.language]);
+
   // Soma `valorTotalEmExecucao` dos produtos do resumo (regra E + F do backend,
   // via custos do termo de planejamento).
   const valorEmExecucaoMeta = useMemo(() => {
@@ -643,7 +650,7 @@ export default function DashboardMap() {
                           <p className="-mt-0.5 text-xs italic text-orange-600">
                             {t('dashboard.map.executionMonths', {
                               count: mesesExecucaoMeta,
-                              countWord: numberToWords(mesesExecucaoMeta, i18n.language),
+                              countWord: mesesExecucaoMetaPorExtenso ?? '',
                             })}
                           </p>
                         )}
@@ -818,6 +825,38 @@ export default function DashboardMap() {
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs text-xs">
                                 {t('dashboard.map.quarterlyEvolutionTooltip')}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-sky-600 transition hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                                  aria-label={t('dashboard.map.viewMonthlySnapshotTooltip')}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    const resumo = (produtosResumoData ?? []).find((r) => r.idProduto === produto.id);
+                                    const contextToRestore: DashboardMapReturnContext = {
+                                      selectedMetaId,
+                                      selectedProdutoId: produto.id,
+                                      scrollY: getScrollContainer()?.scrollTop ?? window.scrollY,
+                                    };
+                                    sessionStorage.setItem(
+                                      DASHBOARD_MAP_RETURN_CONTEXT_KEY,
+                                      JSON.stringify(contextToRestore),
+                                    );
+                                    const returnTo = `${location.pathname}${location.search}`;
+                                    navigate(
+                                      `/gerencial-mes/produto/${produto.id}?returnTo=${encodeURIComponent(returnTo)}`,
+                                      { state: resumo ? { resumo } : undefined },
+                                    );
+                                  }}
+                                >
+                                  <Camera className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                {t('dashboard.map.viewMonthlySnapshotTooltip')}
                               </TooltipContent>
                             </Tooltip>
                           </div>

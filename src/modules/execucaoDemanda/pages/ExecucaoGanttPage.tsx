@@ -52,7 +52,7 @@ function parseEndDateForGanttBar(dateStr: string): Date {
 }
 
 function percentualOfGanttTarefa(t: DemandaExecucaoGanttTarefaDTO): number {
-  return Math.min(100, Math.max(0, Number(t.percentualProgresso) ?? 0));
+  return Math.min(100, Math.max(0, Number(t.percentualProgresso) || 0));
 }
 
 /** Fim do dia atual (local), quando a execução ainda não tem data fim informada. */
@@ -562,7 +562,7 @@ function ganttTarefaToTask(t: DemandaExecucaoGanttTarefaDTO): Task {
     type: 'task',
     start,
     end,
-    progress: Math.min(100, Math.max(0, Number(t.percentualProgresso) ?? 0)),
+    progress: Math.min(100, Math.max(0, Number(t.percentualProgresso) || 0)),
     dependencies: (t.predecessorIds ?? []).map(String),
     isDisabled: true,
     styles: {

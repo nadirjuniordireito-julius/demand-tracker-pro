@@ -15,7 +15,7 @@ function toSemaforoStatus(v: unknown): BubbleSemaforoStatus | undefined {
   return SEMAFORO_STATUS_VALUES.includes(s as BubbleSemaforoStatus) ? (s as BubbleSemaforoStatus) : undefined;
 }
 
-type ApiNode = Record<string, unknown> & {
+export type ApiNode = Record<string, unknown> & {
   id?: string | number;
   name?: string;
   codigo?: string;

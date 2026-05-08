@@ -168,7 +168,7 @@ export function PdfSignaturePositionDialog({
       screenX: e.clientX,
       screenY: e.clientY,
     };
-console.log(nextRect)
+
     setSignatureRect(nextRect);
   };
 
@@ -374,7 +374,11 @@ console.log(nextRect)
         if (!next && showSuccessOverlay) {
           return;
         }
-        next ? onOpenChange(true) : handleClose();
+        if (next) {
+          onOpenChange(true);
+        } else {
+          handleClose();
+        }
       }}
     >
       <DialogContent className="sm:max-w-[90vw] max-w-[90vw] h-[90vh] flex flex-col p-0">

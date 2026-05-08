@@ -33,7 +33,7 @@ export function useTedHealthMapApi(tedId: string | number | null): UseTedHealthM
 
     try {
       const result = await fetchTedHealth(tedId);
-      const normalized = normalizeBubbleNode(result as Record<string, unknown>);
+      const normalized = normalizeBubbleNode(result);
       setData(normalized);
     } catch (err) {
       setData(null);

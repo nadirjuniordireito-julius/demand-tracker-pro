@@ -20,3 +20,18 @@ export {
   desembolsoSchema,
   paginatedDesembolsoSchema,
 } from './entitySchemas';
+export {
+  statusProdutoMesSchema,
+  tipoAcaoProdutoSchema,
+  impactoAcaoSchema,
+  statusAcaoProdutoSchema,
+  produtoSnapshotMensalSchema,
+  produtoSnapshotAcaoSchema,
+  paginatedProdutoSnapshotMensalSchema,
+  produtoSnapshotRelatorioGestorSchema,
+} from './produtoSnapshotSchemas';
+export type {
+  ProdutoSnapshotMensalFromSchema,
+  ProdutoSnapshotAcaoFromSchema,
+  ProdutoSnapshotRelatorioGestorFromSchema,
+} from './produtoSnapshotSchemas';
