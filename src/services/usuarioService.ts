@@ -25,6 +25,34 @@ export interface UsuarioFilters {
   sort?: string;
 }
 
+type UsuarioWritePayload = {
+  email?: string | null;
+  username?: string | null;
+};
+
+/**
+ * O backend usa `username` no login (/auth/login) e pode manter `email` desatualizado
+ * se o PUT enviar só um dos campos. Sincroniza ambos com o valor informado no formulário.
+ */
+function normalizeUsuarioWritePayload<T extends UsuarioWritePayload>(data: T): T {
+  if (!Object.prototype.hasOwnProperty.call(data, 'email')) {
+    return data;
+  }
+
+  const raw = data.email;
+  const trimmed = typeof raw === 'string' ? raw.trim() : raw;
+
+  if (trimmed) {
+    return { ...data, email: trimmed, username: trimmed };
+  }
+
+  if (raw === '' || raw === null) {
+    return { ...data, email: null, username: null };
+  }
+
+  return data;
+}
+
 export const usuarioService = {
   /**
    * Lista todos os usuários com paginação e filtros
@@ -54,7 +82,7 @@ export const usuarioService = {
    * Cria um novo usuário
    */
   async create(data: UsuarioCreateDTO): Promise<Usuario> {
-    return api.post<Usuario>(ENDPOINTS.base, data);
+    return api.post<Usuario>(ENDPOINTS.base, normalizeUsuarioWritePayload(data));
   },
 
   /**

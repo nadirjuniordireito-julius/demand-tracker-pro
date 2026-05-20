@@ -22,7 +22,7 @@ function parseLocalDate(str: string): Date | undefined {
   return new Date(y, m - 1, d);
 }
 
-const STATUS_OPTIONS = ['PLANEJADA', 'EM_ANDAMENTO', 'BLOQUEADA', 'CONCLUIDA'];
+const STATUS_OPTIONS = ['PLANEJADA', 'EM_ANDAMENTO', 'BLOQUEADA'];
 
 interface ExecucaoFormModalProps {
   open: boolean;

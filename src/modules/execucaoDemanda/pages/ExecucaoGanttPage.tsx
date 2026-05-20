@@ -15,6 +15,7 @@ import type {
   DemandaExecucaoTarefaApontamentoProgressoDTO,
 } from '../types';
 import { generateExecucaoGanttPdfBlob } from '@/reports/ExecucaoGantt/ExecucaoGanttReport';
+import { sortGanttTarefas } from '../utils/sortGanttTarefas';
 import { LoadingSpinner } from '@/components/common/LoadingStates';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,6 +34,10 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
+function isValidGanttDate(date: Date): boolean {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
 /**
  * Início do dia (00:00) para a barra do Gantt começar na borda esquerda da coluna do dia.
  */
@@ -42,6 +47,12 @@ function parseDateForGanttBar(dateStr: string): Date {
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
+function parseDateForGanttBarSafe(dateStr?: string | null): Date | null {
+  if (!dateStr?.trim()) return null;
+  const date = parseDateForGanttBar(dateStr);
+  return isValidGanttDate(date) ? date : null;
+}
+
 /**
  * Data fim da barra: fim do dia (23:59:59.999) para a barra cobrir o dia inteiro na grade.
  */
@@ -49,6 +60,22 @@ function parseEndDateForGanttBar(dateStr: string): Date {
   const part = String(dateStr).split('T')[0];
   const [y, m, d] = part.split('-').map(Number);
   return new Date(y, m - 1, d, 23, 59, 59, 999);
+}
+
+function parseEndDateForGanttBarSafe(dateStr?: string | null): Date | null {
+  if (!dateStr?.trim()) return null;
+  const date = parseEndDateForGanttBar(dateStr);
+  return isValidGanttDate(date) ? date : null;
+}
+
+function endOfGanttDayFromStart(start: Date): Date {
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
+}
+
+function startOfTodayForGantt(): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 }
 
 function percentualOfGanttTarefa(t: DemandaExecucaoGanttTarefaDTO): number {
@@ -552,18 +579,36 @@ function WeekdayDayOverlay({
   );
 }
 
-function ganttTarefaToTask(t: DemandaExecucaoGanttTarefaDTO): Task {
-  const start = parseDateForGanttBar(t.dataInicioPlanejada);
-  const end = parseEndDateForGanttBar(t.dataFimPlanejada);
+function ganttTarefaToTask(t: DemandaExecucaoGanttTarefaDTO, knownTaskIds: Set<string>): Task | null {
+  let start = parseDateForGanttBarSafe(t.dataInicioPlanejada);
+  let end = parseEndDateForGanttBarSafe(t.dataFimPlanejada);
+
+  if (!start && !end) return null;
+
+  if (!start) {
+    start = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0, 0) : startOfTodayForGantt();
+  }
+  if (!end) {
+    end = endOfGanttDayFromStart(start);
+  }
+  if (end.getTime() < start.getTime()) {
+    end = endOfGanttDayFromStart(start);
+  }
+
+  const taskId = String(t.id);
+  const dependencies = (t.predecessorIds ?? [])
+    .map(String)
+    .filter((depId) => depId !== taskId && knownTaskIds.has(depId));
+
   const taskName = typeof t.sequencia === 'number' ? `${t.sequencia} - ${t.titulo}` : t.titulo;
   return {
-    id: String(t.id),
+    id: taskId,
     name: taskName,
     type: 'task',
     start,
     end,
     progress: Math.min(100, Math.max(0, Number(t.percentualProgresso) || 0)),
-    dependencies: (t.predecessorIds ?? []).map(String),
+    dependencies,
     isDisabled: true,
     styles: {
       backgroundColor: BAR_PLANNED_COLOR,
@@ -722,44 +767,56 @@ export default function ExecucaoGanttPage({
     loadGantt();
   }, [loadGantt]);
 
+  const sortedTarefas = useMemo(
+    () => sortGanttTarefas(data?.tarefas ?? []),
+    [data?.tarefas],
+  );
+
   const tarefaById = useMemo(() => {
     const map = new Map<string, DemandaExecucaoGanttTarefaDTO>();
-    if (data?.tarefas) {
-      for (const t of data.tarefas) {
-        map.set(String(t.id), t);
-      }
+    for (const t of sortedTarefas) {
+      map.set(String(t.id), t);
     }
     return map;
-  }, [data]);
+  }, [sortedTarefas]);
 
-  /** Uma tarefa por demanda (só barra planejada); barra real é desenhada em overlay na mesma linha. */
-  const tasks: Task[] = useMemo(
-    () => (data?.tarefas ?? []).map(ganttTarefaToTask),
-    [data?.tarefas]
-  );
+  /** Tarefas válidas para o Gantt (datas + dependências resolvidas); alinhadas com `tarefasForGantt`. */
+  const { tasks, tarefasForGantt } = useMemo(() => {
+    const knownTaskIds = new Set(sortedTarefas.map((t) => String(t.id)));
+    const paired: { task: Task; tarefa: DemandaExecucaoGanttTarefaDTO }[] = [];
+    for (const tarefa of sortedTarefas) {
+      const task = ganttTarefaToTask(tarefa, knownTaskIds);
+      if (task) paired.push({ task, tarefa });
+    }
+    return {
+      tasks: paired.map((p) => p.task),
+      tarefasForGantt: paired.map((p) => p.tarefa),
+    };
+  }, [sortedTarefas]);
 
   /**
    * Mesmo intervalo lógico do gráfico: menor início e maior fim entre planejado e real (para a grade
    * e as barras coincidirem com `chartRangeBounds` na lib).
    */
   const chartRangeBounds = useMemo(() => {
-    if (!data?.tarefas?.length) return undefined;
+    if (!tasks.length) return undefined;
     let minMs = Infinity;
     let maxMs = -Infinity;
-    for (const tf of data.tarefas) {
-      minMs = Math.min(minMs, parseDateForGanttBar(tf.dataInicioPlanejada).getTime());
-      maxMs = Math.max(maxMs, parseEndDateForGanttBar(tf.dataFimPlanejada).getTime());
+    for (const task of tasks) {
+      minMs = Math.min(minMs, task.start.getTime());
+      maxMs = Math.max(maxMs, task.end.getTime());
+    }
+    for (const tf of tarefasForGantt) {
       if (tf.dataInicioReal) {
-        minMs = Math.min(minMs, parseDateForGanttBar(tf.dataInicioReal).getTime());
+        const realStart = parseDateForGanttBarSafe(tf.dataInicioReal);
+        if (realStart) minMs = Math.min(minMs, realStart.getTime());
         const realEnd = resolveRealExecutionEndForGanttBar(tf);
-        if (realEnd) {
-          maxMs = Math.max(maxMs, realEnd.getTime());
-        }
+        if (realEnd) maxMs = Math.max(maxMs, realEnd.getTime());
       }
     }
     if (!Number.isFinite(minMs) || !Number.isFinite(maxMs)) return undefined;
     return { min: new Date(minMs), max: new Date(maxMs) };
-  }, [data?.tarefas]);
+  }, [tasks, tarefasForGantt]);
 
   /** Colunas do gráfico (calendário dia a dia), alinhadas à grade interna do Gantt. */
   const ganttDisplayDates = useMemo(() => {
@@ -769,7 +826,7 @@ export default function ExecucaoGanttPage({
 
   // Injeta overlay das barras reais na área do grid (mesma linha, segunda “faixa”).
   useEffect(() => {
-    if (!data?.tarefas?.length || tasks.length === 0) {
+    if (!tarefasForGantt.length || tasks.length === 0) {
       overlayContainerRef.current?.remove();
       overlayContainerRef.current = null;
       setOverlayContainer(null);
@@ -882,7 +939,7 @@ export default function ExecucaoGanttPage({
         setMonthHeaderWidth(null);
       }
     };
-  }, [data?.tarefas, tasks.length]);
+  }, [tarefasForGantt, tasks.length]);
 
   useEffect(() => {
     const viewport = chartViewportElement;
@@ -1269,6 +1326,15 @@ export default function ExecucaoGanttPage({
       </div>
 
       <div ref={ganttWrapperRef} className="gantt-container overflow-x-auto border rounded-lg bg-card relative">
+        {tasks.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            {t(
+              'execucao.gantt.noValidTasks',
+              'Nenhuma tarefa com datas de planejamento válidas para exibir no Gantt.',
+            )}
+          </p>
+        ) : (
+          <>
         <style>{`
           /* Remove o label (nome da tarefa) da barra teal */
           .gantt-container g.bar text { display: none; }
@@ -1316,7 +1382,7 @@ export default function ExecucaoGanttPage({
                 width={overlayDimensions.width}
                 height={overlayDimensions.height}
                 tasks={tasks}
-                tarefas={data?.tarefas ?? []}
+                tarefas={tarefasForGantt}
                 displayDates={ganttDisplayDates}
                 columnWidth={COLUMN_WIDTH}
                 rowHeight={ROW_HEIGHT}
@@ -1331,7 +1397,7 @@ export default function ExecucaoGanttPage({
               <WeekendBedIconsOverlay
                 width={overlayDimensions.width}
                 height={overlayDimensions.height}
-                tarefas={data?.tarefas ?? []}
+                tarefas={tarefasForGantt}
                 displayDates={ganttDisplayDates}
                 columnWidth={COLUMN_WIDTH}
                 rowHeight={ROW_HEIGHT}
@@ -1357,6 +1423,8 @@ export default function ExecucaoGanttPage({
             </Fragment>,
             monthHeaderContainer
           )}
+          </>
+        )}
       </div>
     </div>
   );

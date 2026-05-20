@@ -28,9 +28,10 @@ import {
 
 interface DependenciasTabProps {
   demandaExecucaoId: number;
+  readOnly?: boolean;
 }
 
-export function DependenciasTab({ demandaExecucaoId }: DependenciasTabProps) {
+export function DependenciasTab({ demandaExecucaoId, readOnly = false }: DependenciasTabProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [tarefas, setTarefas] = useState<DemandaExecucaoTarefaDTO[]>([]);
@@ -183,7 +184,7 @@ export function DependenciasTab({ demandaExecucaoId }: DependenciasTabProps) {
         </div>
         <Button
           onClick={() => setAddOpen(true)}
-          disabled={!selectedTarefaId || tarefasParaOrigem.length === 0}
+          disabled={readOnly || !selectedTarefaId || tarefasParaOrigem.length === 0}
           className="gap-2"
         >
           <Plus className="h-4 w-4" />
@@ -208,7 +209,14 @@ export function DependenciasTab({ demandaExecucaoId }: DependenciasTabProps) {
                 {dependenciasDestino.map((dep) => (
                   <li key={dep.id} className="flex items-center justify-between px-3 py-2">
                     <span>{getTitulo(dep.tarefaOrigemId)}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(dep)} aria-label={t('common.delete')}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDelete(dep)}
+                      disabled={readOnly}
+                      aria-label={t('common.delete')}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </li>

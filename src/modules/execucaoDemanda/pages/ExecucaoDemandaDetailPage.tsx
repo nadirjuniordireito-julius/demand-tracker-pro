@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, Pencil, Trash2, BarChart3, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, BarChart3, ClipboardCheck, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -19,6 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoadingSpinner } from '@/components/common/LoadingStates';
 import { demandaExecucaoService } from '../services/demandaExecucaoService';
 import { demandaService } from '@/services/demandaService';
+import { canCreateDemandaExecucao } from '@/lib/demandaStatus';
+import { getErrorMessage } from '@/lib/apiErrorHandler';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { DemandaExecucaoDTO } from '../types';
@@ -28,6 +30,11 @@ import { RecursosTab } from '@/modules/execucaoDemanda/components/RecursosTab';
 import { ApontamentosTab } from '@/modules/execucaoDemanda/components/ApontamentosTab';
 import { DependenciasTab } from '@/modules/execucaoDemanda/components/DependenciasTab';
 import { ExecucaoFormModal } from '../components/ExecucaoFormModal';
+import { loadExecucaoReportData } from '../services/execucaoDemandaReportService';
+import {
+  generateExecucaoDemandaReportPdfBlob,
+  type ExecucaoDemandaReportLabels,
+} from '@/reports/ExecucaoDemanda/ExecucaoDemandaReport';
 
 function toDateOnly(isoOrDate: string): string {
   const part = String(isoOrDate).split('T')[0];
@@ -57,7 +64,88 @@ export default function ExecucaoDemandaDetailPage() {
   const [savingExecucao, setSavingExecucao] = useState(false);
   const [deleteExecucaoOpen, setDeleteExecucaoOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [exportingReport, setExportingReport] = useState(false);
   const { toast } = useToast();
+
+  const reportLabels = useMemo((): ExecucaoDemandaReportLabels => {
+    return {
+      documentTitle: t('execucao.report.documentTitle'),
+      demandSection: t('execucao.report.demandSection'),
+      executionSection: t('execucao.report.executionSection'),
+      demandCodeName: t('execucao.report.demandCodeName'),
+      demandId: t('execucao.report.demandId'),
+      executionId: t('execucao.report.executionId'),
+      status: t('execucao.status'),
+      situacao: t('execucao.report.situacao'),
+      progress: t('execucao.percentualProgresso'),
+      plannedStart: t('execucao.dataInicioPlanejada'),
+      plannedEnd: t('execucao.dataFimPlanejada'),
+      realStart: t('execucao.dataInicioReal'),
+      realEnd: t('execucao.dataFimReal'),
+      createdAt: t('execucao.report.createdAt'),
+      responsible: t('execucao.report.responsible'),
+      sectionTasks: t('execucao.report.sectionTasks'),
+      sectionDependencies: t('execucao.report.sectionDependencies'),
+      sectionResources: t('execucao.report.sectionResources'),
+      sectionProfissionalMes: t('execucao.report.sectionProfissionalMes'),
+      sectionApontamentos: t('execucao.report.sectionApontamentos'),
+      sectionGantt: t('execucao.report.sectionGantt'),
+      emptySection: t('execucao.report.emptySection'),
+      colSeq: t('execucao.report.colSeq'),
+      colTitle: t('execucao.report.colTitle'),
+      colDescription: t('execucao.report.colDescription'),
+      colStatus: t('execucao.taskStatus'),
+      colPriority: t('execucao.priority'),
+      colProgress: t('execucao.percentualProgresso'),
+      colEstimateHours: t('execucao.estimativaHoras'),
+      colPlannedStart: t('execucao.dataInicioPlanejada'),
+      colPlannedEnd: t('execucao.dataFimPlanejada'),
+      colRealStart: t('execucao.dataInicioReal'),
+      colRealEnd: t('execucao.dataFimReal'),
+      colTaskDest: t('execucao.report.colTaskDest'),
+      colTaskOrig: t('execucao.report.colTaskOrig'),
+      colTask: t('execucao.report.colTask'),
+      colProfessional: t('execucao.professional'),
+      colProfile: t('common.profile', 'Perfil'),
+      colHoursPlanned: t('execucao.report.colHoursPlanned'),
+      colHoursExecuted: t('execucao.report.colHoursExecuted'),
+      colMonthYear: t('execucao.report.colMonthYear'),
+      colDate: t('execucao.report.colDate'),
+      colComment: t('execucao.comment'),
+      ganttEmpty: t('execucao.report.ganttEmpty'),
+      appName: t('common.appName'),
+      appNameDesc: t('common.appNameDesc'),
+      generatedBy: (userName, at) =>
+        t('execucao.report.generatedBy', { user: userName, at }),
+      pageOf: (page, total) => t('execucao.report.pageOf', { page, total }),
+      gantt: {
+        title: t('execucao.gantt.reportTitle'),
+        subtitle: t('execucao.gantt.reportSubtitle'),
+        generatedAt: t('execucao.gantt.generatedAt'),
+        summaryTitle: t('execucao.gantt.reportSummaryTitle'),
+        summaryTotalTasks: t('execucao.gantt.reportSummaryTotalTasks'),
+        summaryAverageProgress: t('execucao.gantt.reportSummaryAverageProgress'),
+        summaryTotalEstimateHours: t('execucao.gantt.reportSummaryTotalEstimateHours'),
+        summaryPlannedRange: t('execucao.gantt.reportSummaryPlannedRange'),
+        summaryRealRange: t('execucao.gantt.reportSummaryRealRange'),
+        sequence: t('execucao.taskSequence'),
+        task: t('execucao.gantt.task'),
+        status: t('execucao.taskStatus'),
+        priority: t('execucao.priority'),
+        progress: t('execucao.percentualProgresso'),
+        estimateHours: t('execucao.estimativaHoras'),
+        plannedPeriod: t('execucao.gantt.planning'),
+        realPeriod: t('execucao.gantt.execution'),
+        resources: t('execucao.professional'),
+        gantt: t('execucao.gantt.reportGantt'),
+        plannedLegend: t('execucao.gantt.reportLegendPlanned'),
+        realLegend: t('execucao.gantt.reportLegendReal'),
+        notStartedLegend: t('execucao.gantt.reportLegendNotStarted'),
+        noResources: t('execucao.noResourcesInTask'),
+        pageOf: (page, total) => t('execucao.gantt.reportPageOf', { page, total }),
+      },
+    };
+  }, [t]);
 
   const loadExecucao = useCallback(async () => {
     if (!id || Number.isNaN(id)) {
@@ -68,8 +156,16 @@ export default function ExecucaoDemandaDetailPage() {
     setLoading(true);
     setError(null);
     try {
+      const dem = await demandaService.findById(id);
+      setDemanda(dem);
+
       let ex = await demandaExecucaoService.getByDemandaId(id);
       if (!ex) {
+        if (!canCreateDemandaExecucao(dem.status ?? dem.situacao)) {
+          setError(t('execucao.requiresStatusE'));
+          setExecucao(null);
+          return;
+        }
         const today = format(new Date(), 'yyyy-MM-dd');
         ex = await demandaExecucaoService.create({
           demandaTecnicaId: id,
@@ -81,10 +177,8 @@ export default function ExecucaoDemandaDetailPage() {
         });
       }
       setExecucao(ex);
-      const dem = await demandaService.findById(id);
-      setDemanda(dem);
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || t('common.errorMessage');
+      const msg = getErrorMessage(e, t('common.errorMessage'));
       setError(msg);
       setExecucao(null);
       setDemanda(null);
@@ -149,6 +243,43 @@ export default function ExecucaoDemandaDetailPage() {
     navigate(`/execucao-demandas/${id}/checklist`);
   };
 
+  const handleExportReport = useCallback(async () => {
+    if (!id || Number.isNaN(id)) return;
+
+    const pdfWindow = window.open('', '_blank');
+    if (!pdfWindow) {
+      window.alert(t('execucao.report.exportPdfPopupBlocked'));
+      return;
+    }
+
+    pdfWindow.document.title = t('execucao.report.exportingPdf');
+    pdfWindow.document.body.innerHTML = `<div style="font-family: Arial, sans-serif; padding: 16px;">${t(
+      'execucao.report.exportingPdf',
+    )}</div>`;
+
+    setExportingReport(true);
+    try {
+      const reportData = await loadExecucaoReportData(id, {
+        nome: user?.nome ?? t('common.unknown', 'Desconhecido'),
+        email: user?.email,
+      });
+      const blob = await generateExecucaoDemandaReportPdfBlob(reportData, reportLabels);
+      const url = URL.createObjectURL(blob);
+      pdfWindow.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      pdfWindow.close();
+      console.error('Erro ao exportar relatório da execução:', e);
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(e, t('execucao.report.exportPdfError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setExportingReport(false);
+    }
+  }, [id, user, t, reportLabels, toast]);
+
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -170,6 +301,7 @@ export default function ExecucaoDemandaDetailPage() {
   }
 
   const hasTarefas = Array.isArray(execucao.tarefas) && execucao.tarefas.length > 0;
+  const isExecucaoConcluida = execucao.status === 'CONCLUIDA';
 
   return (
     <div className="space-y-4">
@@ -180,6 +312,16 @@ export default function ExecucaoDemandaDetailPage() {
           {t('common.back')}
         </Button>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportReport}
+            className="gap-2"
+            disabled={exportingReport}
+          >
+            <FileDown className="h-4 w-4" />
+            {exportingReport ? t('execucao.report.exportingPdf') : t('execucao.report.exportPdf')}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -195,17 +337,29 @@ export default function ExecucaoDemandaDetailPage() {
             size="sm"
             onClick={handleOpenChecklist}
             className="gap-2"
-            disabled={!user?.id}
+            disabled={!user?.id || isExecucaoConcluida}
             title={t('execucao.openChecklistTitle', 'Abrir checklist de encerramento')}
           >
             <ClipboardCheck className="h-4 w-4" />
             {t('execucao.encerrar', 'Encerrar')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setEditExecucaoOpen(true)} className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditExecucaoOpen(true)}
+            className="gap-2"
+            disabled={isExecucaoConcluida}
+          >
             <Pencil className="h-4 w-4" />
             {t('common.edit')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setDeleteExecucaoOpen(true)} className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteExecucaoOpen(true)}
+            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={isExecucaoConcluida}
+          >
             <Trash2 className="h-4 w-4" />
             {t('common.delete')}
           </Button>
@@ -277,16 +431,16 @@ export default function ExecucaoDemandaDetailPage() {
           <TabsTrigger value="apontamentos">{t('execucao.tabProgress', 'Apontamentos')}</TabsTrigger>
         </TabsList>
         <TabsContent value="tarefas">
-          <TarefasTab demandaExecucaoId={execucao.id} onRefresh={loadExecucao} />
+          <TarefasTab demandaExecucaoId={execucao.id} onRefresh={loadExecucao} readOnly={isExecucaoConcluida} />
         </TabsContent>
         <TabsContent value="dependencias">
-          <DependenciasTab demandaExecucaoId={execucao.id} />
+          <DependenciasTab demandaExecucaoId={execucao.id} readOnly={isExecucaoConcluida} />
         </TabsContent>
         <TabsContent value="recursos">
-          <RecursosTab demandaExecucaoId={execucao.id} demandaTecnicaId={id} />
+          <RecursosTab demandaExecucaoId={execucao.id} demandaTecnicaId={id} readOnly={isExecucaoConcluida} />
         </TabsContent>
         <TabsContent value="apontamentos">
-          <ApontamentosTab demandaExecucaoId={execucao.id} />
+          <ApontamentosTab demandaExecucaoId={execucao.id} readOnly={isExecucaoConcluida} />
         </TabsContent>
       </Tabs>
 

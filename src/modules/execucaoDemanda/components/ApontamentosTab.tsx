@@ -42,9 +42,10 @@ function parseLocalDate(dateStr: string): Date {
 
 interface ApontamentosTabProps {
   demandaExecucaoId: number;
+  readOnly?: boolean;
 }
 
-export function ApontamentosTab({ demandaExecucaoId }: ApontamentosTabProps) {
+export function ApontamentosTab({ demandaExecucaoId, readOnly = false }: ApontamentosTabProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [tarefas, setTarefas] = useState<DemandaExecucaoTarefaDTO[]>([]);
@@ -199,16 +200,18 @@ export function ApontamentosTab({ demandaExecucaoId }: ApontamentosTabProps) {
     },
   ];
 
-  const actions: Action<DemandaExecucaoTarefaApontamentoProgressoDTO>[] = [
-    { label: t('common.edit'), icon: <Edit className="h-4 w-4" />, onClick: handleEdit },
-    {
-      label: t('common.delete'),
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: handleDelete,
-      variant: 'destructive',
-      separator: true,
-    },
-  ];
+  const actions: Action<DemandaExecucaoTarefaApontamentoProgressoDTO>[] = readOnly
+    ? []
+    : [
+        { label: t('common.edit'), icon: <Edit className="h-4 w-4" />, onClick: handleEdit },
+        {
+          label: t('common.delete'),
+          icon: <Trash2 className="h-4 w-4" />,
+          onClick: handleDelete,
+          variant: 'destructive',
+          separator: true,
+        },
+      ];
 
   return (
     <div className="space-y-4">
@@ -232,7 +235,7 @@ export function ApontamentosTab({ demandaExecucaoId }: ApontamentosTabProps) {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleAdd} disabled={!selectedTarefaId} className="gap-2">
+        <Button onClick={handleAdd} disabled={readOnly || !selectedTarefaId} className="gap-2">
           <Plus className="h-4 w-4" />
           {t('execucao.newApontamento', 'Novo apontamento')}
         </Button>

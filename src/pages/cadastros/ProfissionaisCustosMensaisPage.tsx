@@ -11,6 +11,7 @@ import { TableSkeleton } from '@/components/common/LoadingStates';
 import { ErrorState } from '@/components/common/LoadingStates';
 import { useProject } from '@/contexts/ProjectContext';
 import { profissionalService } from '@/services/profissionalService';
+import { perfilService } from '@/services/perfilService';
 import { profissionalCustoMensalService } from '@/services/profissionalCustoMensalService';
 import { useToast } from '@/hooks/use-toast';
 import type { Profissional, ProfissionalCustoMensalDTO } from '@/types';
@@ -18,7 +19,7 @@ import type { Profissional, ProfissionalCustoMensalDTO } from '@/types';
 type CustoRow = {
   profissionalId: number;
   profissionalNome: string;
-  funcao: string;
+  perfilNome: string;
   custoMensalId: number | null;
   initialCustoTotal: number | null;
   custoTotalInput: string;
@@ -49,6 +50,7 @@ async function fetchAllCustosByAnoMes(ano: number, mes: number): Promise<Profiss
     size: 500,
     sort: 'profissionalId,asc',
   });
+  console.log('profissionalCustoMensalService.findAll', { ano, mes, page: 0 }, first);
   const all = [...first.content];
   for (let p = 1; p < first.totalPages; p++) {
     const page = await profissionalCustoMensalService.findAll({
@@ -58,6 +60,7 @@ async function fetchAllCustosByAnoMes(ano: number, mes: number): Promise<Profiss
       size: 500,
       sort: 'profissionalId,asc',
     });
+    console.log('profissionalCustoMensalService.findAll', { ano, mes, page: p }, page);
     all.push(...page.content);
   }
   return all;
@@ -111,7 +114,7 @@ export default function ProfissionaisCustosMensaisPage() {
     setLoading(true);
     setError(null);
     try {
-      const [profissionaisPage, custos] = await Promise.all([
+      const [profissionaisPage, custos, perfisPage] = await Promise.all([
         profissionalService.findAll({
           projetoId: selectedProject.id,
           page: 0,
@@ -119,7 +122,14 @@ export default function ProfissionaisCustosMensaisPage() {
           sort: 'nome,asc',
         }),
         fetchAllCustosByAnoMes(ano, mes),
+        perfilService.findAll({
+          projetoId: selectedProject.id,
+          size: 1000,
+          sort: 'nome,asc',
+        }),
       ]);
+
+      const perfilById = new Map(perfisPage.content.map((perfil) => [perfil.id, perfil.nome]));
 
       const custosStrictAnoMes = custos.filter((custo) => custo.ano === ano && custo.mes === mes);
       const custoByProfissionalId = new Map<number, ProfissionalCustoMensalDTO>();
@@ -132,7 +142,7 @@ export default function ProfissionaisCustosMensaisPage() {
         return {
           profissionalId: profissional.id,
           profissionalNome: profissional.nome,
-          funcao: profissional.funcao ?? '—',
+          perfilNome: perfilById.get(profissional.perfilId) ?? '—',
           custoMensalId: custo?.id ?? null,
           initialCustoTotal: custo?.custoTotal ?? null,
           custoTotalInput:
@@ -316,7 +326,7 @@ export default function ProfissionaisCustosMensaisPage() {
                   <thead>
                     <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                       <th className="px-3 py-2">{t('professionals.name', 'Nome')}</th>
-                      <th className="px-3 py-2">{t('professionals.funcao', 'Função')}</th>
+                      <th className="px-3 py-2">{t('professionals.perfil', 'Perfil')}</th>
                       <th className="px-3 py-2">{t('professionalMonthlyCost.monthlyCost', 'Custo mensal')}</th>
                     </tr>
                   </thead>
@@ -324,7 +334,7 @@ export default function ProfissionaisCustosMensaisPage() {
                     {rows.map((row) => (
                       <tr key={row.profissionalId} className="border-b last:border-0">
                         <td className="px-3 py-2 font-medium">{row.profissionalNome}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{row.funcao}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{row.perfilNome}</td>
                         <td className="px-3 py-2">
                           <Input
                             type="text"

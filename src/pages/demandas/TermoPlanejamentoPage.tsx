@@ -65,8 +65,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ErrorState, LoadingButton } from '@/components/common/LoadingStates';
-import { termoPlanejamentoService } from '@/services/termoService';
-import { termoPlanejamentoDocService } from '@/services/termoDocService';
+import { termoPlanejamentoService, termoAberturaService } from '@/services/termoService';
+import { termoPlanejamentoDocService, termoAberturaDocService } from '@/services/termoDocService';
 import { demandaService } from '@/services/demandaService';
 import { perfilService } from '@/services/perfilService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,7 +74,16 @@ import { useProject } from '@/contexts/ProjectContext';
 import { termoPlanejamentoSchema, type TermoPlanejamentoFormData } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/apiErrorHandler';
-import { canCreateTermoPlanejamento, canUploadTermoPlanejamento, canDeleteTermoPlanejamento, canSaveTermoPlanejamento, canDeleteDocTermoPlanejamento, normalizeDemandaStatus } from '@/lib/demandaStatus';
+import {
+  canCreateTermoPlanejamento,
+  canUploadTermoPlanejamento,
+  canDeleteTermoPlanejamento,
+  canSaveTermoPlanejamento,
+  canDeleteDocTermoPlanejamento,
+  canEditTermoPlanejamento,
+  canAssinarTermoPlanejamentoDoc,
+  normalizeDemandaStatus,
+} from '@/lib/demandaStatus';
 import type { TermoPlanejamento, TermoPlanejamentoCusto, DemandaTecnica, Perfil, TermoPlanejamentoDocResponseDTO } from '@/types';
 
 interface CustoForm {
@@ -110,7 +119,54 @@ export default function TermoPlanejamentoPage() {
   const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
   const [isViewDocOpen, setIsViewDocOpen] = useState(false);
   const [isViewGeneratedPdfOpen, setIsViewGeneratedPdfOpen] = useState(false);
+  const [aberturaAssinada, setAberturaAssinada] = useState(false);
   const { toast } = useToast();
+
+  const demandaStatus = demanda?.status ?? demanda?.situacao;
+  const canEdit = canEditTermoPlanejamento(demandaStatus);
+  const hasCustosValidos = custos.some(
+    (c) =>
+      c.perfilId &&
+      c.qtdeHora &&
+      c.valorHora &&
+      Number(c.qtdeHora) > 0 &&
+      Number(c.valorHora) > 0
+  );
+  const canAssinar = canAssinarTermoPlanejamentoDoc(demandaStatus, {
+    hasCustos: hasCustosValidos,
+    aberturaAssinada,
+    doc: documento,
+  });
+
+  const getRestrictionTooltip = (
+    action: 'save' | 'create' | 'upload' | 'delete' | 'deleteDoc' | 'sign'
+  ): string | undefined => {
+    if (action === 'sign') {
+      if (canAssinar) return undefined;
+      const code = normalizeDemandaStatus(demandaStatus);
+      if (code !== 'C' && code !== 'D') return t('planningTerm.statusRestrictionSign');
+      if (!hasCustosValidos) return t('planningTerm.statusRestrictionSignNoCustos');
+      if (!aberturaAssinada) return t('planningTerm.statusRestrictionSignAbertura');
+      if (!documento) return t('planningTerm.statusRestrictionUpload');
+      return t('planningTerm.statusRestrictionSign');
+    }
+    if (action === 'create' && !canCreateTermoPlanejamento(demandaStatus)) {
+      return t('planningTerm.statusRestrictionCreate');
+    }
+    if (action === 'save' && !canSaveTermoPlanejamento(demandaStatus)) {
+      return t('planningTerm.statusRestrictionSave');
+    }
+    if (action === 'upload' && !canUploadTermoPlanejamento(demandaStatus)) {
+      return t('planningTerm.statusRestrictionUpload');
+    }
+    if (action === 'delete' && !canDeleteTermoPlanejamento(demandaStatus)) {
+      return t('planningTerm.statusRestrictionDelete');
+    }
+    if (action === 'deleteDoc' && !canDeleteDocTermoPlanejamento(demandaStatus)) {
+      return t('planningTerm.statusRestrictionUpload');
+    }
+    return undefined;
+  };
   const isSafeInternalPath = (value: string | null): value is string =>
     !!value && value.startsWith('/') && !value.startsWith('//');
   const returnTo = (() => {
@@ -177,6 +233,18 @@ export default function TermoPlanejamentoPage() {
       // Carrega a demanda
       const demandaData = await demandaService.findById(Number(demandaId));
       setDemanda(demandaData);
+
+      let aberturaSigned = false;
+      try {
+        const termoAbertura = await termoAberturaService.findByDemandaId(Number(demandaId));
+        if (termoAbertura) {
+          const docAbertura = await termoAberturaDocService.findByTermoAberturaId(termoAbertura.id);
+          aberturaSigned = !!docAbertura?.dataAssinatura;
+        }
+      } catch {
+        aberturaSigned = false;
+      }
+      setAberturaAssinada(aberturaSigned);
       
       // Pré-preenche o campo de demanda no formulário
       form.setValue('demandaTecnicaId', String(demandaId));
@@ -362,17 +430,20 @@ export default function TermoPlanejamentoPage() {
           usuarioId: user.id,
           custos: custosFormatted,
         });
-        // Regra: ao criar Termo de Planejamento, demanda passa para status D
-        await demandaService.update(Number(data.demandaTecnicaId), { status: 'D' });
       }
       
       // Atualiza o termo selecionado
       setSelectedTermo(termoSalvo);
       
-      // Recarrega demanda para obter status atualizado
-      if (demanda) {
-        const demandaAtualizada = await demandaService.findById(demanda.id);
-        setDemanda(demandaAtualizada);
+      // Recarrega demanda para obter status atualizado (backend deve promover para D)
+      const demandaId = Number(data.demandaTecnicaId);
+      const demandaAtualizada = await demandaService.findById(demandaId);
+      setDemanda(demandaAtualizada);
+      if (normalizeDemandaStatus(demandaAtualizada.status ?? demandaAtualizada.situacao) !== 'D') {
+        toast({
+          title: t('common.warning', 'Atenção'),
+          description: t('planningTerm.statusAfterSaveExpectedD'),
+        });
       }
       
       // Busca documento se existir
@@ -393,8 +464,12 @@ export default function TermoPlanejamentoPage() {
           ? t('planningTerm.updatedSuccess')
           : t('planningTerm.createdSuccess'),
       });
-    } catch (error) {
-      // Erro já é tratado automaticamente pela API (toast será exibido)
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('common.errorMessage')),
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -420,14 +495,14 @@ export default function TermoPlanejamentoPage() {
     setIsDeleting(true);
     try {
       await termoPlanejamentoService.delete(selectedTermo.id);
-      // Regra: ao excluir Termo de Planejamento, demanda volta para status C
-      if (demanda) {
-        await demandaService.update(demanda.id, { status: 'C' });
-      }
       setIsDeleteOpen(false);
       handleClose();
-    } catch (error) {
-      // Erro já é tratado automaticamente pela API (toast será exibido)
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('common.errorMessage')),
+        variant: 'destructive',
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -491,13 +566,6 @@ export default function TermoPlanejamentoPage() {
       setDocumento(docResponse);
       setIsUploadOpen(false);
       setSelectedFile(null);
-      
-      // Regra: ao fazer upload do documento assinado, demanda passa para status E
-      if (demanda) {
-        await demandaService.update(demanda.id, { status: 'E' });
-        const demandaAtualizada = await demandaService.findById(demanda.id);
-        setDemanda(demandaAtualizada);
-      }
       
       // Recarrega o termo para atualizar a data de assinatura se houver
       if (selectedTermo) {
@@ -1006,9 +1074,9 @@ export default function TermoPlanejamentoPage() {
                       variant="ghost"
                       size="icon"
                       onClick={handleDeleteDocument}
-                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoPlanejamento(demanda?.status ?? demanda?.situacao)}
+                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoPlanejamento(demandaStatus)}
                       className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title={t('planningTerm.deleteDocument')}
+                      title={getRestrictionTooltip('deleteDoc') ?? t('planningTerm.deleteDocument')}
                       aria-label={t('planningTerm.deleteDocument')}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1037,14 +1105,16 @@ export default function TermoPlanejamentoPage() {
                       <DropdownMenuContent align="start" className="min-w-[220px]">
                         <DropdownMenuItem
                           onClick={handleGeneratePdf}
-                          disabled={!selectedProject || !canUploadTermoPlanejamento(demanda?.status)}
+                          disabled={!selectedProject || !canUploadTermoPlanejamento(demandaStatus)}
+                          title={getRestrictionTooltip('upload')}
                         >
                           <FileDown className="h-4 w-4 mr-2" />
                           {t('planningTerm.generatePdf')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={handleOpenUpload}
-                          disabled={!canUploadTermoPlanejamento(demanda?.status)}
+                          disabled={!canUploadTermoPlanejamento(demandaStatus)}
+                          title={getRestrictionTooltip('upload')}
                         >
                           <Upload className="h-4 w-4 mr-2" />
                           {documento ? t('planningTerm.replaceDocument') : t('planningTerm.uploadDocument')}
@@ -1052,14 +1122,15 @@ export default function TermoPlanejamentoPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  {selectedTermo && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                  {selectedTermo && canEdit && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={handleDelete}
-                      disabled={isSaving || isDeleting || !canDeleteTermoPlanejamento(demanda?.status)}
+                      disabled={isSaving || isDeleting || !canDeleteTermoPlanejamento(demandaStatus)}
+                      title={getRestrictionTooltip('delete')}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       {t('common.delete')}
@@ -1070,12 +1141,13 @@ export default function TermoPlanejamentoPage() {
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                  {canEdit && (
                     <LoadingButton
                       type="submit"
                       isLoading={isSaving}
                       loadingText={t('common.saving')}
-                      disabled={isDeleting || !canSaveTermoPlanejamento(demanda?.status ?? demanda?.situacao)}
+                      disabled={isDeleting || !canSaveTermoPlanejamento(demandaStatus)}
+                      title={getRestrictionTooltip('save')}
                     >
                       {t('common.save')}
                     </LoadingButton>
@@ -1217,6 +1289,34 @@ export default function TermoPlanejamentoPage() {
             description: getErrorMessage(err, t('planningTerm.documentViewError')),
             variant: 'destructive',
           })
+        }
+        assinarEletronica={
+          documento && user && canAssinar
+            ? { tipo: 'planejamento', docId: documento.id, userId: user.id }
+            : undefined
+        }
+        onAssinaturaConcluida={async () => {
+          setIsViewDocOpen(false);
+          toast({
+            title: t('common.success'),
+            description: t('planningTerm.signedSuccess'),
+          });
+          await loadData();
+        }}
+        renderSignButton={({ pdfBlob, openSignatureDialog }) =>
+          documento && !documento.dataAssinatura ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="ml-3"
+              disabled={!pdfBlob || !canAssinar}
+              title={getRestrictionTooltip('sign')}
+              onClick={openSignatureDialog}
+            >
+              {t('planningTerm.sign')}
+            </Button>
+          ) : null
         }
       />
 

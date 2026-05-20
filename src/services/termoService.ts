@@ -183,14 +183,10 @@ export const termoPlanejamentoService = {
   },
 
   async findByDemandaId(demandaId: number): Promise<TermoPlanejamento | null> {
-    try {
-      return await api.get<TermoPlanejamento>(PLANEJAMENTO_ENDPOINTS.byDemanda(demandaId), {
-        allow404: false,
-        silent: true, // 404/500 = termo ainda não existe (usuário vai preencher); evita log e toast
-      });
-    } catch {
-      return null;
-    }
+    return api.get<TermoPlanejamento>(PLANEJAMENTO_ENDPOINTS.byDemanda(demandaId), {
+      allow404: true,
+      silent: true,
+    });
   },
 
   async create(data: TermoPlanejamentoCreateDTO): Promise<TermoPlanejamento> {

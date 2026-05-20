@@ -98,25 +98,30 @@ export const canDeleteDemanda = (status: string | undefined): boolean =>
 export const canEditDemanda = (status: string | undefined): boolean =>
   normalizeDemandaStatus(status) === 'A';
 
-/** Termo de Abertura: salvar e excluir documento só se status A ou B */
+/** Termo de Abertura: salvar formulário em A ou B */
 export const canSaveTermoAbertura = (status: string | undefined): boolean => {
   const code = normalizeDemandaStatus(status);
   return code === 'A' || code === 'B';
 };
+
+/** Excluir apenas o PDF anexado em A, B ou D */
 export const canDeleteDocTermoAbertura = (status: string | undefined): boolean => {
   const code = normalizeDemandaStatus(status);
-  return code === 'A' || code === 'B';
+  return code === 'A' || code === 'B' || code === 'D';
 };
 
-/** Termo de Planejamento: salvar e excluir documento só se status C ou D */
-export const canSaveTermoPlanejamento = (status: string | undefined): boolean => {
+/** Termo de Planejamento: edição (POST/PUT termo + CRUD doc) em B, C ou D */
+const PLANEJAMENTO_EDIT_STATUSES = new Set(['B', 'C', 'D']);
+const PLANEJAMENTO_SIGN_STATUSES = new Set(['C', 'D']);
+
+export const canEditTermoPlanejamento = (status: string | undefined): boolean => {
   const code = normalizeDemandaStatus(status);
-  return code === 'C' || code === 'D';
+  return code != null && PLANEJAMENTO_EDIT_STATUSES.has(code);
 };
-export const canDeleteDocTermoPlanejamento = (status: string | undefined): boolean => {
-  const code = normalizeDemandaStatus(status);
-  return code === 'C' || code === 'D';
-};
+
+export const canSaveTermoPlanejamento = canEditTermoPlanejamento;
+
+export const canDeleteDocTermoPlanejamento = canEditTermoPlanejamento;
 
 /** Termo de Encerramento: salvar e excluir documento só se status E ou F */
 export const canSaveTermoEncerramento = (status: string | undefined): boolean => {
@@ -128,21 +133,47 @@ export const canDeleteDocTermoEncerramento = (status: string | undefined): boole
   return code === 'E' || code === 'F';
 };
 
-/** Termo de Abertura: pode criar se status A; upload se B; excluir termo se B */
+/** Termo de Abertura: pode criar se status A */
 export const canCreateTermoAbertura = (status: string | undefined): boolean =>
   normalizeDemandaStatus(status) === 'A';
-export const canUploadTermoAbertura = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'B';
-export const canDeleteTermoAbertura = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'B';
 
-/** Termo de Planejamento: pode criar se C; upload se D; excluir termo se D */
-export const canCreateTermoPlanejamento = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'C';
-export const canUploadTermoPlanejamento = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'D';
-export const canDeleteTermoPlanejamento = (status: string | undefined): boolean =>
-  normalizeDemandaStatus(status) === 'D';
+/** Documento do termo (gerar PDF, upload assinado, excluir termo/doc) em B ou D */
+const ABERTURA_DOC_MANAGE_STATUSES = new Set(['B', 'D']);
+
+const canManageDocTermoAbertura = (status: string | undefined): boolean => {
+  const code = normalizeDemandaStatus(status);
+  return code != null && ABERTURA_DOC_MANAGE_STATUSES.has(code);
+};
+
+export const canUploadTermoAbertura = canManageDocTermoAbertura;
+export const canDeleteTermoAbertura = canManageDocTermoAbertura;
+export const canGenerateTermoAbertura = canManageDocTermoAbertura;
+
+export const canCreateTermoPlanejamento = canEditTermoPlanejamento;
+export const canUploadTermoPlanejamento = canEditTermoPlanejamento;
+export const canDeleteTermoPlanejamento = canEditTermoPlanejamento;
+
+export interface CanAssinarTermoPlanejamentoDocOpts {
+  hasCustos: boolean;
+  aberturaAssinada: boolean;
+  doc?: { dataAssinatura?: string | null } | null;
+}
+
+/** Assinar PDF: status C ou D, com custos, abertura assinada e documento não assinado */
+export function canAssinarTermoPlanejamentoDoc(
+  status: string | undefined,
+  opts: CanAssinarTermoPlanejamentoDocOpts
+): boolean {
+  const code = normalizeDemandaStatus(status);
+  if (code == null || !PLANEJAMENTO_SIGN_STATUSES.has(code)) return false;
+  if (!opts.hasCustos || !opts.aberturaAssinada) return false;
+  if (!opts.doc || opts.doc.dataAssinatura) return false;
+  return true;
+}
+
+/** POST /api/demandas-execucao somente com demanda em E */
+export const canCreateDemandaExecucao = (status: string | undefined): boolean =>
+  normalizeDemandaStatus(status) === 'E';
 
 /** Termo de Encerramento: pode criar se E; upload e excluir termo se E ou F (em E pode tudo nesta tela) */
 export const canCreateTermoEncerramento = (status: string | undefined): boolean =>

@@ -84,7 +84,7 @@ export default function EditUsuarioPage() {
       setUsuario(data);
       form.reset({
         nome: data.nome,
-        email: data.email ?? '',
+        email: data.email,
         password: '',
         perfil: data.perfil,
         status: data.status,
@@ -104,10 +104,12 @@ export default function EditUsuarioPage() {
   const onSubmit = async (data: UsuarioFormData) => {
     setIsSaving(true);
     try {
+      const email = data.email?.trim() ?? '';
+
       if (isCreate) {
         await usuarioService.create({
           nome: data.nome,
-          email: data.email || undefined,
+          email: email,
           password: data.password,
           perfil: data.perfil,
           status: data.status,
@@ -115,7 +117,7 @@ export default function EditUsuarioPage() {
       } else if (usuario) {
         await usuarioService.update(usuario.id, {
           nome: data.nome,
-          email: data.email || undefined,
+          email: email,
           perfil: data.perfil,
           status: data.status,
           ...(data.password && { password: data.password }),

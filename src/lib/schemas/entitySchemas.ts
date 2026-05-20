@@ -215,6 +215,7 @@ export const profissionalSchema = z.object({
   custoTotalMensal: z.number(),
   dataInicioAtividade: z.string(),
   projetoId: z.number(),
+  perfilId: z.number(),
   projeto: z.unknown().optional(),
 });
 

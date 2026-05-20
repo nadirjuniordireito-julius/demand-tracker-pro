@@ -70,7 +70,8 @@ export interface Usuario {
 
 export interface UsuarioCreateDTO {
   nome: string;
-  email?: string;
+  email?: string | null;
+  username?: string | null;
   password: string;
   perfil: UserProfile;
   status: UserStatus;
@@ -81,7 +82,8 @@ export interface UsuarioUpdateDTO {
   password?: string;
   perfil?: UserProfile;
   status?: UserStatus;
-  email?: string;
+  email?: string | null;
+  username?: string | null;
 }
 
 // =====================================================

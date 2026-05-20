@@ -11,8 +11,15 @@ import {
   pdf,
 } from '@react-pdf/renderer';
 import type { DemandaExecucaoGanttDTO, DemandaExecucaoGanttTarefaDTO } from '@/modules/execucaoDemanda/types';
+import { sortGanttTarefas } from '@/modules/execucaoDemanda/utils/sortGanttTarefas';
+import {
+  diffDaysInclusive,
+  formatDateBr,
+  formatDateBrFromDate,
+  parseDate,
+} from '@/reports/shared/pdfDateUtils';
 
-type ExecucaoGanttReportLabels = {
+export type ExecucaoGanttReportLabels = {
   title: string;
   subtitle: string;
   generatedAt: string;
@@ -36,6 +43,14 @@ type ExecucaoGanttReportLabels = {
   realLegend: string;
   notStartedLegend: string;
   noResources: string;
+  pageOf: (page: number, total: number) => string;
+};
+
+/** Rodapé unificado (relatório completo da execução). */
+export type ExecucaoReportFooterConfig = {
+  appName: string;
+  appNameDesc: string;
+  generatedBy: string;
   pageOf: (page: number, total: number) => string;
 };
 
@@ -119,7 +134,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#94a3b8',
   },
   ganttDayText: { fontSize: 6, color: '#334155' },
-  footer: {
+  footerSimple: {
     position: 'absolute',
     bottom: 10,
     left: 20,
@@ -128,38 +143,17 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: '#64748b',
   },
+  footerUnified: {
+    position: 'absolute',
+    bottom: 8,
+    left: 20,
+    right: 20,
+    fontSize: 7,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  footerUnifiedLine: { marginBottom: 2 },
 });
-
-function toDateOnly(value?: string | null): string | null {
-  if (!value) return null;
-  return String(value).split('T')[0] || null;
-}
-
-function parseDate(value?: string | null): Date | null {
-  const part = toDateOnly(value);
-  if (!part) return null;
-  const [y, m, d] = part.split('-').map(Number);
-  if ([y, m, d].some(Number.isNaN)) return null;
-  return new Date(y, m - 1, d);
-}
-
-function formatDateBr(value?: string | null): string {
-  const d = parseDate(value);
-  if (!d) return '—';
-  return formatDateBrFromDate(d);
-}
-
-function formatDateBrFromDate(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-function diffDaysInclusive(start: Date, end: Date): number {
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.floor(ms / 86_400_000) + 1);
-}
 
 function chunks<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -285,19 +279,6 @@ function GanttHeaderCell({ timelineDays }: { timelineDays: Date[] }) {
     });
   }
 
-  /*
-  let debugStartX = 0;
-  monthChunks.forEach((chunk, idx) => {
-    console.log('[ExecucaoGanttReport][HeaderMonth]', {
-      index: idx,
-      monthYear: chunk.label,
-      startX: Number(debugStartX.toFixed(2)),
-      width: Number(chunk.w.toFixed(2)),
-      endX: Number((debugStartX + chunk.w).toFixed(2)),
-    });
-    debugStartX += chunk.w;
-  });
-*/
   return (
     <View style={styles.ganttHeaderWrap}>
       <View style={styles.ganttMonthsRow}>
@@ -333,19 +314,54 @@ function GanttHeaderCell({ timelineDays }: { timelineDays: Date[] }) {
   );
 }
 
-function ExecucaoGanttReportDocument({
-  data,
+function GanttPageFooter({
   labels,
+  footerConfig,
 }: {
-  data: DemandaExecucaoGanttDTO;
   labels: ExecucaoGanttReportLabels;
+  footerConfig?: ExecucaoReportFooterConfig;
 }) {
-  const orderedTasks = [...(data.tarefas ?? [])].sort((a, b) => (a.sequencia ?? 0) - (b.sequencia ?? 0));
+  if (footerConfig) {
+    return (
+      <View style={styles.footerUnified} fixed>
+        <Text style={styles.footerUnifiedLine}>
+          {footerConfig.appName} — {footerConfig.appNameDesc}
+        </Text>
+        <Text style={styles.footerUnifiedLine}>{footerConfig.generatedBy}</Text>
+        <Text
+          render={({ pageNumber, totalPages }) =>
+            footerConfig.pageOf(pageNumber, totalPages)
+          }
+        />
+      </View>
+    );
+  }
+  return (
+    <Text
+      style={styles.footerSimple}
+      render={({ pageNumber, totalPages }) => labels.pageOf(pageNumber, totalPages)}
+      fixed
+    />
+  );
+}
+
+export function buildExecucaoGanttReportPages(
+  data: DemandaExecucaoGanttDTO,
+  labels: ExecucaoGanttReportLabels,
+  options?: {
+    footerConfig?: ExecucaoReportFooterConfig;
+    generatedAtDisplay?: string;
+    sectionTitle?: string;
+  },
+): React.ReactElement[] {
+  const orderedTasks = sortGanttTarefas(data.tarefas ?? []);
+  if (orderedTasks.length === 0) return [];
+
   const pages = chunks(orderedTasks, PAGE_ROWS);
   const { min, max } = resolveChartBounds(orderedTasks);
   const timelineDays = buildTimelineDays(min, max);
   const chartTotalDays = diffDaysInclusive(min, max);
-  const generatedAt = new Date().toLocaleString('pt-BR');
+  const generatedAt = options?.generatedAtDisplay ?? new Date().toLocaleString('pt-BR');
   const totalTasks = orderedTasks.length;
   const averageProgress =
     totalTasks > 0
@@ -369,117 +385,123 @@ function ExecucaoGanttReportDocument({
         )} - ${formatDateBrFromDate(new Date(Math.max(...realEnds.map((d) => d.getTime()))))}`
       : '—';
 
-  return (
-    <Document>
-      {pages.map((pageTasks, pageIndex) => (
-        <Page key={pageIndex} size="A4" orientation="landscape" style={styles.page}>
-          <Text style={styles.title}>{labels.title}</Text>
-          <Text style={styles.subtitle}>
-            {labels.subtitle}: {data.demandaTecnicaCodigo} - {data.demandaTecnicaNome}
+  return pages.map((pageTasks, pageIndex) => (
+    <Page key={`gantt-${pageIndex}`} size="A4" orientation="landscape" style={styles.page}>
+      {options?.sectionTitle ? (
+        <Text style={[styles.title, { fontSize: 11 }]}>{options.sectionTitle}</Text>
+      ) : null}
+      <Text style={styles.title}>{labels.title}</Text>
+      <Text style={styles.subtitle}>
+        {labels.subtitle}: {data.demandaTecnicaCodigo} - {data.demandaTecnicaNome}
+      </Text>
+      <Text style={styles.generatedAt}>
+        {labels.generatedAt}: {generatedAt}
+      </Text>
+      <View style={styles.summaryBox}>
+        <Text style={styles.summaryTitle}>{labels.summaryTitle}</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryItem}>
+            {labels.summaryTotalTasks}: {totalTasks}
           </Text>
-          <Text style={styles.generatedAt}>
-            {labels.generatedAt}: {generatedAt}
+          <Text style={styles.summaryItem}>
+            {labels.summaryAverageProgress}: {averageProgress.toFixed(1)}%
           </Text>
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryTitle}>{labels.summaryTitle}</Text>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryItem}>
-                {labels.summaryTotalTasks}: {totalTasks}
+          <Text style={styles.summaryItem}>
+            {labels.summaryTotalEstimateHours}: {totalEstimateHours.toFixed(1)}h
+          </Text>
+          <Text style={styles.summaryItem}>
+            {labels.summaryPlannedRange}: {plannedRange}
+          </Text>
+          <Text style={styles.summaryItem}>
+            {labels.summaryRealRange}: {realRange}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.legendRow}>
+        <View style={styles.legendItem}>
+          <View style={styles.legendSwatchPlanned} />
+          <Text>{labels.plannedLegend}</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={styles.legendSwatchReal} />
+          <Text>{labels.realLegend}</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={styles.legendSwatchNotStarted} />
+          <Text>{labels.notStartedLegend}</Text>
+        </View>
+      </View>
+
+      <View style={styles.tableHeader}>
+        <Text style={styles.colSeq}>{labels.sequence}</Text>
+        <Text style={styles.colTask}>{labels.task}</Text>
+        <Text style={styles.colStatus}>{labels.status}</Text>
+        <Text style={styles.colPriority}>{labels.priority}</Text>
+        <Text style={styles.colProgress}>{labels.progress}</Text>
+        <Text style={styles.colEstimate}>{labels.estimateHours}</Text>
+        <Text style={styles.colPlanned}>{labels.plannedPeriod}</Text>
+        <Text style={styles.colReal}>{labels.realPeriod}</Text>
+        <Text style={styles.colResources}>{labels.resources}</Text>
+        <View style={styles.colGanttNoPadding}>
+          <GanttHeaderCell timelineDays={timelineDays} />
+        </View>
+      </View>
+
+      {pageTasks.map((task) => {
+        const resourceText =
+          task.recursos && task.recursos.length > 0
+            ? task.recursos.map((r) => `${r.nome} (${Number(r.horasPlanejadas).toFixed(1)}h)`).join(', ')
+            : labels.noResources;
+        return (
+          <View key={task.id} style={styles.row}>
+            <Text style={styles.colSeq}>{String(task.sequencia ?? '—')}</Text>
+            <Text style={styles.colTask}>{task.titulo}</Text>
+            <Text style={styles.colStatus}>{task.status}</Text>
+            <Text style={styles.colPriority}>{task.prioridade}</Text>
+            <Text style={styles.colProgress}>{`${Number(task.percentualProgresso).toFixed(0)}%`}</Text>
+            <Text style={styles.colEstimate}>{Number(task.estimativaHoras).toFixed(1)}</Text>
+            <Text style={styles.colPlanned}>
+              <Text style={styles.dateStack}>
+                {formatDateBr(task.dataInicioPlanejada)}
+                {'\n'}
+                {formatDateBr(task.dataFimPlanejada)}
               </Text>
-              <Text style={styles.summaryItem}>
-                {labels.summaryAverageProgress}: {averageProgress.toFixed(1)}%
+            </Text>
+            <Text style={styles.colReal}>
+              <Text style={styles.dateStack}>
+                {formatDateBr(task.dataInicioReal)}
+                {'\n'}
+                {formatDateBr(task.dataFimReal)}
               </Text>
-              <Text style={styles.summaryItem}>
-                {labels.summaryTotalEstimateHours}: {totalEstimateHours.toFixed(1)}h
-              </Text>
-              <Text style={styles.summaryItem}>
-                {labels.summaryPlannedRange}: {plannedRange}
-              </Text>
-              <Text style={styles.summaryItem}>
-                {labels.summaryRealRange}: {realRange}
-              </Text>
+            </Text>
+            <Text style={[styles.colResources, styles.cellMuted]}>{resourceText}</Text>
+            <View style={styles.colGantt}>
+              <GanttCell
+                tarefa={task}
+                chartMin={min}
+                chartTotalDays={chartTotalDays}
+                timelineDays={timelineDays}
+              />
             </View>
           </View>
+        );
+      })}
 
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View style={styles.legendSwatchPlanned} />
-              <Text>{labels.plannedLegend}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={styles.legendSwatchReal} />
-              <Text>{labels.realLegend}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={styles.legendSwatchNotStarted} />
-              <Text>{labels.notStartedLegend}</Text>
-            </View>
-          </View>
+      <GanttPageFooter labels={labels} footerConfig={options?.footerConfig} />
+    </Page>
+  ));
+}
 
-          <View style={styles.tableHeader}>
-            <Text style={styles.colSeq}>{labels.sequence}</Text>
-            <Text style={styles.colTask}>{labels.task}</Text>
-            <Text style={styles.colStatus}>{labels.status}</Text>
-            <Text style={styles.colPriority}>{labels.priority}</Text>
-            <Text style={styles.colProgress}>{labels.progress}</Text>
-            <Text style={styles.colEstimate}>{labels.estimateHours}</Text>
-            <Text style={styles.colPlanned}>{labels.plannedPeriod}</Text>
-            <Text style={styles.colReal}>{labels.realPeriod}</Text>
-            <Text style={styles.colResources}>{labels.resources}</Text>
-            <View style={styles.colGanttNoPadding}>
-              <GanttHeaderCell timelineDays={timelineDays} />
-            </View>
-          </View>
-
-          {pageTasks.map((task) => {
-            const resourceText =
-              task.recursos && task.recursos.length > 0
-                ? task.recursos.map((r) => `${r.nome} (${Number(r.horasPlanejadas).toFixed(1)}h)`).join(', ')
-                : labels.noResources;
-            return (
-              <View key={task.id} style={styles.row}>
-                <Text style={styles.colSeq}>{String(task.sequencia ?? '—')}</Text>
-                <Text style={styles.colTask}>{task.titulo}</Text>
-                <Text style={styles.colStatus}>{task.status}</Text>
-                <Text style={styles.colPriority}>{task.prioridade}</Text>
-                <Text style={styles.colProgress}>{`${Number(task.percentualProgresso).toFixed(0)}%`}</Text>
-                <Text style={styles.colEstimate}>{Number(task.estimativaHoras).toFixed(1)}</Text>
-                <Text style={styles.colPlanned}>
-                  <Text style={styles.dateStack}>
-                    {formatDateBr(task.dataInicioPlanejada)}
-                    {'\n'}
-                    {formatDateBr(task.dataFimPlanejada)}
-                  </Text>
-                </Text>
-                <Text style={styles.colReal}>
-                  <Text style={styles.dateStack}>
-                    {formatDateBr(task.dataInicioReal)}
-                    {'\n'}
-                    {formatDateBr(task.dataFimReal)}
-                  </Text>
-                </Text>
-                <Text style={[styles.colResources, styles.cellMuted]}>{resourceText}</Text>
-                <View style={styles.colGantt}>
-                  <GanttCell
-                    tarefa={task}
-                    chartMin={min}
-                    chartTotalDays={chartTotalDays}
-                    timelineDays={timelineDays}
-                  />
-                </View>
-              </View>
-            );
-          })}
-
-          <Text
-            style={styles.footer}
-            render={({ pageNumber, totalPages }) => labels.pageOf(pageNumber, totalPages)}
-            fixed
-          />
-        </Page>
-      ))}
-    </Document>
-  );
+function ExecucaoGanttReportDocument({
+  data,
+  labels,
+}: {
+  data: DemandaExecucaoGanttDTO;
+  labels: ExecucaoGanttReportLabels;
+}) {
+  const pages = buildExecucaoGanttReportPages(data, labels);
+  return <Document>{pages}</Document>;
 }
 
 export async function generateExecucaoGanttPdfBlob(
@@ -489,4 +511,3 @@ export async function generateExecucaoGanttPdfBlob(
   const doc = <ExecucaoGanttReportDocument data={data} labels={labels} />;
   return pdf(doc).toBlob();
 }
-

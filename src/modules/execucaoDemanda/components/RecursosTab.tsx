@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Edit, Trash2, Plus, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,10 @@ import type {
 } from '../types';
 import type { Perfil, Profissional } from '@/types';
 import { RecursoFormModal } from './RecursoFormModal';
+import {
+  getTarefaSelectTextValue,
+  TarefaSelectOptionContent,
+} from '../utils/tarefaSelectLabel';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -40,10 +44,11 @@ import {
 interface RecursosTabProps {
   demandaExecucaoId: number;
   demandaTecnicaId: number;
+  readOnly?: boolean;
 }
 
-export function RecursosTab({ demandaExecucaoId, demandaTecnicaId }: RecursosTabProps) {
-  const { t } = useTranslation();
+export function RecursosTab({ demandaExecucaoId, demandaTecnicaId, readOnly = false }: RecursosTabProps) {
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const { selectedProject } = useProject();
   const [tarefas, setTarefas] = useState<DemandaExecucaoTarefaDTO[]>([]);
@@ -262,16 +267,18 @@ export function RecursosTab({ demandaExecucaoId, demandaTecnicaId }: RecursosTab
     },
   ];
 
-  const actions: Action<DemandaExecucaoTarefaRecursoDTO>[] = [
-    { label: t('common.edit'), icon: <Edit className="h-4 w-4" />, onClick: handleEdit },
-    {
-      label: t('common.delete'),
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: handleDelete,
-      variant: 'destructive',
-      separator: true,
-    },
-  ];
+  const actions: Action<DemandaExecucaoTarefaRecursoDTO>[] = readOnly
+    ? []
+    : [
+        { label: t('common.edit'), icon: <Edit className="h-4 w-4" />, onClick: handleEdit },
+        {
+          label: t('common.delete'),
+          icon: <Trash2 className="h-4 w-4" />,
+          onClick: handleDelete,
+          variant: 'destructive',
+          separator: true,
+        },
+      ];
 
   const perfilCheckColumns: Column<DemandaExecucaoPerfilCheckDTO>[] = [
     {
@@ -305,6 +312,14 @@ export function RecursosTab({ demandaExecucaoId, demandaTecnicaId }: RecursosTab
 
   const selectedTarefa = tarefas.find((t) => t.id === selectedTarefaId);
 
+  const tarefasOrdenadas = useMemo(
+    () =>
+      [...tarefas].sort(
+        (a, b) => (Number(a.sequencia) || 0) - (Number(b.sequencia) || 0),
+      ),
+    [tarefas],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -315,13 +330,24 @@ export function RecursosTab({ demandaExecucaoId, demandaTecnicaId }: RecursosTab
             onValueChange={(v) => setSelectedTarefaId(v ? Number(v) : null)}
             disabled={loadingTarefas || tarefas.length === 0}
           >
-            <SelectTrigger className="w-full sm:w-[280px]">
-              <SelectValue placeholder={t('execucao.selectTaskPlaceholder', 'Selecione uma tarefa')} />
+            <SelectTrigger className="w-full sm:min-w-[320px] sm:max-w-[min(100%,36rem)]">
+              <SelectValue placeholder={t('execucao.selectTaskPlaceholder', 'Selecione uma tarefa')}>
+                {selectedTarefa ? getTarefaSelectTextValue(selectedTarefa) : null}
+              </SelectValue>
             </SelectTrigger>
-            <SelectContent>
-              {tarefas.map((t) => (
-                <SelectItem key={t.id} value={String(t.id)}>
-                  {t.titulo}
+            <SelectContent className="max-w-[min(100vw-2rem,36rem)]">
+              {tarefasOrdenadas.map((tarefa) => (
+                <SelectItem
+                  key={tarefa.id}
+                  value={String(tarefa.id)}
+                  textValue={getTarefaSelectTextValue(tarefa)}
+                  className="items-start py-2"
+                >
+                  <TarefaSelectOptionContent
+                    tarefa={tarefa}
+                    t={t}
+                    language={i18n.language}
+                  />
                 </SelectItem>
               ))}
             </SelectContent>
@@ -332,7 +358,7 @@ export function RecursosTab({ demandaExecucaoId, demandaTecnicaId }: RecursosTab
             <ClipboardList className="h-4 w-4" />
             {t('execucao.plannedProfiles', 'Perfis previstos')}
           </Button>
-          <Button onClick={handleAdd} disabled={!selectedTarefaId} className="gap-2">
+          <Button onClick={handleAdd} disabled={readOnly || !selectedTarefaId} className="gap-2">
             <Plus className="h-4 w-4" />
             {t('execucao.addProfessional', 'Adicionar profissional')}
           </Button>

@@ -17,10 +17,11 @@ interface PageHeaderProps {
   description?: string;
   onAdd?: () => void;
   addLabel?: string;
+  addDisabled?: boolean;
   children?: ReactNode;
 }
 
-export function PageHeader({ title, description, onAdd, addLabel, children }: PageHeaderProps) {
+export function PageHeader({ title, description, onAdd, addLabel, addDisabled, children }: PageHeaderProps) {
   const { t } = useTranslation();
   
   return (
@@ -34,7 +35,7 @@ export function PageHeader({ title, description, onAdd, addLabel, children }: Pa
       <div className="flex items-center gap-2">
         {children}
         {onAdd && (
-          <Button onClick={onAdd} className="gap-2">
+          <Button onClick={onAdd} disabled={addDisabled} className="gap-2">
             <Plus className="h-4 w-4" />
             {addLabel || t('common.create')}
           </Button>

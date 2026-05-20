@@ -304,7 +304,11 @@ async function request<T>(
       const apiError = await extractErrorFromResponse(response);
       // if (credentials && response.status === 404) apiError.allow404 = true;
 
-      if (response.status === 404 && !options.allow404 && options.silent) {
+      if (response.status === 404 && options.allow404) {
+        return null as T;
+      }
+
+      if (response.status === 404 && options.silent) {
         return null as T;
       }
 

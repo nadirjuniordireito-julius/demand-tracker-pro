@@ -6,17 +6,19 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Edit, Trash2, Briefcase, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { PageHeader, SearchFilterBar, EmptyState, TablePagination } from '@/components/common/PageComponents';
+import { PageHeader, SearchFilterBar, EmptyState, FilterSelect, TablePagination } from '@/components/common/PageComponents';
 import { TableSkeleton, ErrorState, LoadingButton } from '@/components/common/LoadingStates';
 import { DataTable, type Column, type Action } from '@/components/common/DataTable';
 import { useApi } from '@/hooks/useApi';
 import { profissionalService } from '@/services/profissionalService';
+import { perfilService } from '@/services/perfilService';
 import { useProject } from '@/contexts/ProjectContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Profissional, PaginatedResponse } from '@/types';
+import type { Perfil, Profissional, PaginatedResponse } from '@/types';
 
 type ProfissionaisListMemory = {
   search: string;
+  perfilFilter: string;
   currentPage: number;
   pageSize: number;
 };
@@ -38,25 +40,42 @@ export default function ProfissionaisPage() {
   const { toast } = useToast();
   const initialListState = profissionaisListMemory ?? {
     search: '',
+    perfilFilter: 'all',
     currentPage: 0,
     pageSize: 10,
   };
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [search, setSearch] = useState(initialListState.search);
+  const [perfilFilter, setPerfilFilter] = useState(initialListState.perfilFilter ?? 'all');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedProfissional, setSelectedProfissional] = useState<Profissional | null>(null);
   const [currentPage, setCurrentPage] = useState(initialListState.currentPage);
   const [pageSize, setPageSize] = useState(initialListState.pageSize);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
   const requestSeqRef = useRef(0);
 
   const { isLoading, error, execute } = useApi<PaginatedResponse<Profissional>>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const perfilById = useMemo(() => {
+    const map = new Map<number, string>();
+    perfis.forEach((perfil) => map.set(perfil.id, perfil.nome));
+    return map;
+  }, [perfis]);
+
+  const filteredProfissionais = useMemo(() => {
+    if (perfilFilter === 'all' || !perfilFilter) return profissionais;
+    const perfilId = Number(perfilFilter);
+    return profissionais.filter((p) => p.perfilId === perfilId);
+  }, [profissionais, perfilFilter]);
+
+  const totalElements = filteredProfissionais.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+
   const paginatedProfissionais = useMemo(() => {
     const start = currentPage * pageSize;
-    return profissionais.slice(start, start + pageSize);
-  }, [profissionais, currentPage, pageSize]);
+    return filteredProfissionais.slice(start, start + pageSize);
+  }, [filteredProfissionais, currentPage, pageSize]);
 
   const loadData = useCallback(async () => {
     if (!selectedProject) return;
@@ -76,34 +95,57 @@ export default function ProfissionaisPage() {
         onSuccess: (data) => {
           // Evita race condition: ignora respostas antigas que chegam depois.
           if (requestId !== requestSeqRef.current) return;
-          const total = data.totalElements || data.content.length;
           setProfissionais(data.content);
-          setTotalElements(total);
-          setTotalPages(Math.max(1, Math.ceil(total / pageSize)));
         },
       }
     );
-  }, [execute, search, selectedProject, pageSize]);
+  }, [execute, search, selectedProject]);
+
+  const loadPerfis = useCallback(async () => {
+    if (!selectedProject) {
+      setPerfis([]);
+      return;
+    }
+    try {
+      const response = await perfilService.findAll({
+        projetoId: selectedProject.id,
+        size: 1000,
+        sort: 'nome,asc',
+      });
+      setPerfis(response.content);
+    } catch (err) {
+      console.warn('Erro ao carregar perfis para filtro de profissionais:', err);
+      setPerfis([]);
+    }
+  }, [selectedProject]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
-    const computedTotalPages = Math.max(1, Math.ceil(totalElements / pageSize));
-    setTotalPages(computedTotalPages);
-    if (currentPage > computedTotalPages - 1) {
-      setCurrentPage(computedTotalPages - 1);
+    void loadPerfis();
+  }, [loadPerfis]);
+
+  useEffect(() => {
+    if (currentPage > totalPages - 1) {
+      setCurrentPage(Math.max(0, totalPages - 1));
     }
-  }, [totalElements, pageSize, currentPage]);
+  }, [totalElements, pageSize, currentPage, totalPages]);
+
+  useEffect(() => {
+    setPerfilFilter('all');
+    setCurrentPage(0);
+  }, [selectedProject?.id]);
 
   useEffect(() => {
     profissionaisListMemory = {
       search,
+      perfilFilter,
       currentPage,
       pageSize,
     };
-  }, [search, currentPage, pageSize]);
+  }, [search, perfilFilter, currentPage, pageSize]);
 
   const formatDate = (dateStr: string) =>
     format(parseDateOnly(dateStr) ?? new Date(dateStr), 'dd/MM/yyyy', { locale: ptBR });
@@ -142,9 +184,9 @@ export default function ProfissionaisPage() {
       },
       { key: 'documento', label: t('professionals.document'), hideOnMobile: true },
       {
-        key: 'funcao',
-        label: t('professionals.funcao'),
-        render: (p) => p.funcao ?? '—',
+        key: 'perfilId',
+        label: t('professionals.perfil'),
+        render: (p) => perfilById.get(p.perfilId) ?? '—',
         hideOnMobile: true,
       },
       {
@@ -160,7 +202,7 @@ export default function ProfissionaisPage() {
         hideOnMobile: true,
       },
     ],
-    [t]
+    [t, perfilById]
   );
 
   const actions: Action<Profissional>[] = useMemo(
@@ -231,12 +273,33 @@ export default function ProfissionaisPage() {
           setCurrentPage(0);
         }}
         searchPlaceholder={t('professionals.searchPlaceholder')}
-        onRefresh={loadData}
-      />
+        onRefresh={() => {
+          void loadPerfis();
+          void loadData();
+        }}
+      >
+        {perfis.length > 0 && (
+          <FilterSelect
+            value={perfilFilter}
+            onValueChange={(v) => {
+              setPerfilFilter(v);
+              setCurrentPage(0);
+            }}
+            placeholder={t('professionals.perfil')}
+            options={[
+              { value: 'all', label: t('common.all') },
+              ...perfis.map((perfil) => ({
+                value: String(perfil.id),
+                label: perfil.nome,
+              })),
+            ]}
+          />
+        )}
+      </SearchFilterBar>
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={6} />
-      ) : profissionais.length === 0 ? (
+      ) : filteredProfissionais.length === 0 ? (
         <EmptyState
           title={t('common.noResults')}
           description={t('professionals.noProfessionals')}

@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { projetoService } from '@/services/projetoService';
 import { metaProdutoService } from '@/services/metaProdutoService';
@@ -51,6 +52,21 @@ type DashboardMapReturnContext = {
   selectedMetaId: number | null;
   selectedProdutoId: number | null;
   scrollY: number;
+};
+
+const isInicioPrevisaoAfterToday = (dataInicio?: string | null): boolean => {
+  const start = parseDateOnly(dataInicio);
+  if (!start) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
+  return start.getTime() > today.getTime();
+};
+
+const produtoPeriodoFuturoStyle: React.CSSProperties = {
+  color: '#085b08',
+  fontStyle: 'italic',
+  fontWeight: 'bold',
 };
 
 const isRichTextEmpty = (raw?: string | null) => {
@@ -108,8 +124,12 @@ export default function DashboardMap() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { selectedProject } = useProject();
   const projectId = selectedProject?.id ?? null;
+  const hideTableActions = user?.perfil === 'V';
+  const produtosTableColSpan = hideTableActions ? 7 : 8;
+  const demandasTableColSpan = hideTableActions ? 6 : 7;
 
   const { data, isLoading, error, execute } = useApi<SemaforoNodeDTO | null>(null, {
     showErrorToast: true,
@@ -129,7 +149,6 @@ export default function DashboardMap() {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
-      console.log(`SemaforoDTO obtido (projectId=${projectId}):`, semaforo);
       return semaforo;
     });
   }, [projectId, execute]);
@@ -386,7 +405,7 @@ export default function DashboardMap() {
     const metaId = selectedMetaId;
     void executeProdutosResumo(async () => {
       const list = await metaProdutoService.getResumoByMeta(metaId);
-      console.log(`ProdutoResumoDTO[] obtido (idMeta=${metaId}):`, list);
+
       if (requestId !== produtosResumoSeqRef.current) {
         return null;
       }
@@ -426,6 +445,7 @@ export default function DashboardMap() {
     dataFim: string | null;
     valorTotalPrevisto: number | null;
     valorTotalExecutado: number | null;
+    valorTotalEmExecucao: number | null;
     percentualExecutado: number | null;
   };
 
@@ -446,6 +466,7 @@ export default function DashboardMap() {
         dataFim: r.fimPrevisaoExecucao ?? null,
         valorTotalPrevisto: r.valorTotalOrcamento ?? null,
         valorTotalExecutado: r.valorTotalExecutado ?? null,
+        valorTotalEmExecucao: r.valorTotalEmExecucao ?? null,
         percentualExecutado: r.percentualExecucao ?? null,
       }))
       .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
@@ -693,36 +714,39 @@ export default function DashboardMap() {
                 </div>
               </CardHeader>
               <CardContent className="overflow-auto">
-                <table className="w-full min-w-[760px] text-sm">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40 text-muted-foreground">
-                      <th className="px-3 py-2 text-left">{t('dashboard.map.code')}</th>
-                      <th className="px-3 py-2 text-left">{t('dashboard.map.name')}</th>
-                      <th className="px-3 py-2 text-left">{t('dashboard.map.period')}</th>
-                      <th className="px-3 py-2 text-right">{t('dashboard.map.budgeted')}</th>
-                      <th className="px-3 py-2 text-right">{t('dashboard.map.executed')}</th>
-                      <th className="px-3 py-2 text-left">{t('dashboard.map.progress')}</th>
-                      <th className="px-3 py-2 text-center">{t('common.actions')}</th>
+                      <th className="w-0 whitespace-nowrap px-1 py-2 text-left">{t('dashboard.map.productsTable.code')}</th>
+                      <th className="px-3 py-2 text-left">{t('dashboard.map.productsTable.name')}</th>
+                      <th className="px-3 py-2 text-left">{t('dashboard.map.productsTable.period')}</th>
+                      <th className="px-3 py-2 text-right">{t('dashboard.map.productsTable.budgeted')}</th>
+                      <th className="px-3 py-2 text-right">{t('dashboard.map.productsTable.executed')}</th>
+                      <th className="px-3 py-2 text-center">{t('dashboard.map.productsTable.inExecution')}</th>
+                      <th className="px-3 py-2 text-right">{t('dashboard.map.productsTable.percent')}</th>
+                      {!hideTableActions && (
+                        <th className="w-0 whitespace-nowrap px-1 py-2 text-center">{t('dashboard.map.productsTable.actions')}</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {isProdutosResumoLoading && (
                       <tr>
-                        <td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">
+                        <td colSpan={produtosTableColSpan} className="px-3 py-4 text-center text-muted-foreground">
                           {t('common.loadingData')}
                         </td>
                       </tr>
                     )}
                     {!isProdutosResumoLoading && produtosResumoError && (
                       <tr>
-                        <td colSpan={7} className="px-3 py-4 text-center text-destructive">
+                        <td colSpan={produtosTableColSpan} className="px-3 py-4 text-center text-destructive">
                           {produtosResumoError}
                         </td>
                       </tr>
                     )}
                     {!isProdutosResumoLoading && !produtosResumoError && produtos.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">
+                        <td colSpan={produtosTableColSpan} className="px-3 py-4 text-center text-muted-foreground">
                           {t('dashboard.map.noProducts')}
                         </td>
                       </tr>
@@ -736,24 +760,19 @@ export default function DashboardMap() {
                         onClick={() => handleProdutoRowClick(produto.id)}
                         aria-selected={produto.id === selectedProdutoId}
                       >
-                        <td className={`text-sm px-2 py-2 font-semibold ${produto.id === selectedProdutoId ? 'border-l-4 border-primary' : ''}`}>
-                          <div className="flex items-center gap-1.5">
-                            {produto.id === selectedProdutoId && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                            <span>{produto.codigo}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 max-w-[280px]">
-                          <div className="flex min-w-0 items-center gap-1.5">
+                        <td
+                          className={`w-0 whitespace-nowrap px-1 py-2 text-xs font-semibold ${produto.id === selectedProdutoId ? 'border-l-4 border-primary pl-0.5' : ''}`}
+                        >
+                          <div className="flex max-w-[6.5rem] items-center gap-0.5">
+                            {produto.id === selectedProdutoId && (
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+                            )}
+
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[navy] transition hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                                  aria-label={t('dashboard.map.productDescriptionInfo')}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Info className="h-4 w-4" strokeWidth={2.25} />
-                                </button>
+                                <span className="truncate" title={produto.codigo}>
+                                  {produto.codigo}
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[min(420px,80vw)] break-words text-sm">
                                 <ProductDescriptionTooltipBody
@@ -762,6 +781,11 @@ export default function DashboardMap() {
                                 />
                               </TooltipContent>
                             </Tooltip>
+
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 max-w-[280px]">
+                          <div className="flex min-w-0 items-center gap-1.5">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="min-w-0 flex-1 truncate">{produto.nome}</span>
@@ -770,9 +794,15 @@ export default function DashboardMap() {
                             </Tooltip>
                           </div>
                         </td>
-                        <td className="px-3 py-2">{formatMonthYearRange(produto.dataInicio, produto.dataFim, t('dashboard.map.dateRangeSeparator'))}</td>
+                        <td
+                          className="px-3 py-2"
+                          style={isInicioPrevisaoAfterToday(produto.dataInicio) ? produtoPeriodoFuturoStyle : undefined}
+                        >
+                          {formatMonthYearRange(produto.dataInicio, produto.dataFim, t('dashboard.map.dateRangeSeparator'))}
+                        </td>
                         <td className="px-3 py-2 text-right">{formatCurrencyWithoutSymbol(produto.valorTotalPrevisto)}</td>
                         <td className="px-3 py-2 text-right">{formatCurrencyWithoutSymbol(produto.valorTotalExecutado)}</td>
+                        <td className="px-3 py-2 text-right">{formatCurrencyWithoutSymbol(produto.valorTotalEmExecucao)}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
                             <span className="w-12 text-right text-primary font-semibold">
@@ -780,13 +810,14 @@ export default function DashboardMap() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="flex items-center justify-center gap-1">
+                        {!hideTableActions && (
+                        <td className="w-0 whitespace-nowrap px-1 py-2 text-center">
+                          <div className="flex items-center justify-center gap-0">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-rose-500 transition hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-rose-500 transition hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300"
                                   aria-label={t('dashboard.map.viewProductLifeTooltip')}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -810,7 +841,7 @@ export default function DashboardMap() {
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-muted-foreground transition hover:text-foreground"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-muted-foreground transition hover:text-foreground"
                                   aria-label={t('dashboard.map.quarterlyEvolutionTooltip')}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -831,7 +862,7 @@ export default function DashboardMap() {
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-sky-600 transition hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-sky-600 transition hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
                                   aria-label={t('dashboard.map.viewMonthlySnapshotTooltip')}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -861,6 +892,7 @@ export default function DashboardMap() {
                             </Tooltip>
                           </div>
                         </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -959,13 +991,15 @@ export default function DashboardMap() {
                         <th className="px-3 py-2 text-right">{t('dashboard.map.planned')}</th>
                         <th className="px-3 py-2 text-right">{t('dashboard.map.executed')}</th>
                         <th className="px-3 py-2 text-left">{t('dashboard.map.progress')}</th>
-                        <th className="px-3 py-2 text-center">{t('common.actions')}</th>
+                        {!hideTableActions && (
+                          <th className="px-3 py-2 text-center">{t('common.actions')}</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {demandas.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                          <td colSpan={demandasTableColSpan} className="px-3 py-8 text-center text-muted-foreground">
                             <div className="flex flex-col items-center justify-center gap-3">
                               <Frown className="h-14 w-14 text-red-500" />
                               <span>{selectedProdutoSemaforo ? t('dashboard.map.noDemands') : t('dashboard.map.selectProductToViewDemands')}</span>
@@ -1043,6 +1077,7 @@ export default function DashboardMap() {
                                 </span>
                               </div>
                             </td>
+                            {!hideTableActions && (
                             <td className="px-3 py-2 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <Tooltip>
@@ -1100,6 +1135,7 @@ export default function DashboardMap() {
                                 )}
                               </div>
                             </td>
+                            )}
                           </tr>
                         );
                       })}

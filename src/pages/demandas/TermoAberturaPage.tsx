@@ -56,7 +56,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { canCreateTermoAbertura, canUploadTermoAbertura, canDeleteTermoAbertura, canSaveTermoAbertura, canDeleteDocTermoAbertura } from '@/lib/demandaStatus';
+import {
+  canCreateTermoAbertura,
+  canUploadTermoAbertura,
+  canDeleteTermoAbertura,
+  canSaveTermoAbertura,
+  canDeleteDocTermoAbertura,
+  canGenerateTermoAbertura,
+} from '@/lib/demandaStatus';
 import type { TermoAbertura, DemandaTecnica, TermoAberturaDocResponseDTO } from '@/types';
 
 export default function TermoAberturaPage() {
@@ -268,7 +275,7 @@ export default function TermoAberturaPage() {
   };
 
   const handleDelete = () => {
-    if (selectedTermo && canDeleteTermoAbertura(demanda?.status)) {
+    if (selectedTermo && canDeleteTermoAbertura(demanda?.status ?? demanda?.situacao)) {
       setIsDeleteOpen(true);
     }
   };
@@ -301,7 +308,7 @@ export default function TermoAberturaPage() {
       });
       return;
     }
-    if (!canUploadTermoAbertura(demanda?.status)) {
+    if (!canUploadTermoAbertura(demanda?.status ?? demanda?.situacao)) {
       toast({
         title: t('common.error'),
         description: t('openingTerm.statusRestrictionUpload'),
@@ -613,14 +620,24 @@ export default function TermoAberturaPage() {
                       <DropdownMenuContent align="start" className="min-w-[220px]">
                         <DropdownMenuItem
                           onClick={handleGeneratePdf}
-                          disabled={!canUploadTermoAbertura(demanda?.status)}
+                          disabled={!canGenerateTermoAbertura(demanda?.status ?? demanda?.situacao)}
+                          title={
+                            !canGenerateTermoAbertura(demanda?.status ?? demanda?.situacao)
+                              ? t('openingTerm.statusRestrictionGenerate')
+                              : undefined
+                          }
                         >
                           <FileDown className="h-4 w-4 mr-2" />
                           {t('openingTerm.generatePdf')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={handleOpenUpload}
-                          disabled={!canUploadTermoAbertura(demanda?.status)}
+                          disabled={!canUploadTermoAbertura(demanda?.status ?? demanda?.situacao)}
+                          title={
+                            !canUploadTermoAbertura(demanda?.status ?? demanda?.situacao)
+                              ? t('openingTerm.statusRestrictionUpload')
+                              : undefined
+                          }
                         >
                           <Upload className="h-4 w-4 mr-2" />
                           {documento ? t('openingTerm.replaceDocument') : t('openingTerm.uploadDocument')}
@@ -628,14 +645,19 @@ export default function TermoAberturaPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  {selectedTermo && canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) && (
+                  {selectedTermo && canDeleteTermoAbertura(demanda?.status ?? demanda?.situacao) && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={handleDelete}
-                      disabled={isSaving || isDeleting || !canDeleteTermoAbertura(demanda?.status)}
+                      disabled={isSaving || isDeleting || !canDeleteTermoAbertura(demanda?.status ?? demanda?.situacao)}
+                      title={
+                        !canDeleteTermoAbertura(demanda?.status ?? demanda?.situacao)
+                          ? t('openingTerm.statusRestrictionDelete')
+                          : undefined
+                      }
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       {t('common.delete')}

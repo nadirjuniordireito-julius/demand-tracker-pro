@@ -38,9 +38,10 @@ function parseLocalDate(dateStr: string): Date {
 interface TarefasTabProps {
   demandaExecucaoId: number;
   onRefresh?: () => void;
+  readOnly?: boolean;
 }
 
-export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
+export function TarefasTab({ demandaExecucaoId, onRefresh, readOnly = false }: TarefasTabProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [tarefas, setTarefas] = useState<DemandaExecucaoTarefaDTO[]>([]);
@@ -206,16 +207,18 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
     },
   ];
 
-  const actions: Action<DemandaExecucaoTarefaDTO>[] = [
-    { label: t('common.edit'), icon: <Edit className="h-4 w-4" />, onClick: handleEdit },
-    {
-      label: t('common.delete'),
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: handleDelete,
-      variant: 'destructive',
-      separator: true,
-    },
-  ];
+  const actions: Action<DemandaExecucaoTarefaDTO>[] = readOnly
+    ? []
+    : [
+        { label: t('common.edit'), icon: <Edit className="h-4 w-4" />, onClick: handleEdit },
+        {
+          label: t('common.delete'),
+          icon: <Trash2 className="h-4 w-4" />,
+          onClick: handleDelete,
+          variant: 'destructive',
+          separator: true,
+        },
+      ];
 
   return (
     <div className="space-y-4">
@@ -223,6 +226,7 @@ export function TarefasTab({ demandaExecucaoId, onRefresh }: TarefasTabProps) {
         title={''}
         onAdd={handleAdd}
         addLabel={t('execucao.newTask', 'Nova tarefa')}
+        addDisabled={readOnly}
       />
       {loading ? (
         <TableSkeleton rows={5} columns={8} />

@@ -28,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useApi } from '@/hooks/useApi';
 import { demandaService } from '@/services/demandaService';
 import { projetoMetaService, metaProdutoService, termoEncerramentoService, termoPlanejamentoService } from '@/services';
+import { demandaExecucaoService } from '@/modules/execucaoDemanda/services/demandaExecucaoService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { demandaSchema, type DemandaFormData } from '@/lib/validations';
@@ -85,6 +86,7 @@ export default function DemandasPage() {
   const [encerramentosByDemanda, setEncerramentosByDemanda] = useState<Record<number, TermoEncerramento | null>>({});
   const [loadingPlanejamento, setLoadingPlanejamento] = useState<Record<number, boolean>>({});
   const [loadingEncerramento, setLoadingEncerramento] = useState<Record<number, boolean>>({});
+  const [execucaoExistsByDemandaId, setExecucaoExistsByDemandaId] = useState<Record<number, boolean>>({});
 
   // API states
   const { isLoading, error, execute } = useApi<PaginatedResponse<DemandaTecnica>>(null);
@@ -112,6 +114,20 @@ export default function DemandasPage() {
     defaultValues: { codigo: '', nome: '', projetoId: '', descricao: '' }
   });
 
+  const loadExecucaoExistsForDemandas = useCallback(async (demandaIds: number[]) => {
+    if (demandaIds.length === 0) {
+      setExecucaoExistsByDemandaId({});
+      return;
+    }
+    const entries = await Promise.all(
+      demandaIds.map(async (demandaId) => {
+        const execucao = await demandaExecucaoService.getByDemandaId(demandaId);
+        return [demandaId, execucao != null] as const;
+      })
+    );
+    setExecucaoExistsByDemandaId(Object.fromEntries(entries));
+  }, []);
+
   // Carrega dados iniciais - filtra apenas demandas do projeto selecionado
   const loadData = useCallback(async (context?: {
     search: string;
@@ -121,6 +137,8 @@ export default function DemandasPage() {
     pageSize: number;
   }) => {
     if (!selectedProjectId || !isListRoute) return;
+
+    setExecucaoExistsByDemandaId({});
 
     const effective = context ?? {
       search,
@@ -153,10 +171,11 @@ export default function DemandasPage() {
             setTotalPages(data.totalPages);
             setTotalElements(data.totalElements);
           }
+          void loadExecucaoExistsForDemandas(data.content.map((d) => d.id));
         },
       }
     );
-  }, [execute, search, statusFilter, currentPage, pageSize, selectedProjectId, selectedMetaId, isListRoute]);
+  }, [execute, search, statusFilter, currentPage, pageSize, selectedProjectId, selectedMetaId, isListRoute, loadExecucaoExistsForDemandas]);
 
   useEffect(() => {
     listContextRef.current = {
@@ -392,7 +411,7 @@ export default function DemandasPage() {
       label: t('execucao.manageExecution', 'Execução'),
       icon: <ClipboardList className="h-4 w-4" />,
       onClick: (demanda) => navigate(`/execucao-demandas/${demanda.id}`),
-      visible: (demanda) => normalizeDemandaStatus(demanda.status ?? demanda.situacao) === 'E',
+      visible: (demanda) => execucaoExistsByDemandaId[demanda.id] === true,
     },
     {
       label: t('demands.cancelDemand'),
@@ -409,7 +428,7 @@ export default function DemandasPage() {
       separator: true,
       visible: (demanda) => canDeleteDemanda(demanda.status ?? demanda.situacao),
     },
-  ], [t, navigate, handleEdit, handleDelete]);
+  ], [t, navigate, handleEdit, handleDelete, execucaoExistsByDemandaId]);
 
   const onSubmit = async (data: DemandaFormData) => {
     if (!user || !selectedProject) return;
