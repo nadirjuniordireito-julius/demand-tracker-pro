@@ -226,3 +226,28 @@ export const paginatedTermoAberturaSchema = paginatedSchema(termoAberturaSchema)
 export const paginatedTermoPlanejamentoSchema = paginatedSchema(termoPlanejamentoSchema);
 export const paginatedTermoEncerramentoSchema = paginatedSchema(termoEncerramentoSchema);
 export const paginatedDesembolsoSchema = paginatedSchema(desembolsoSchema);
+
+// --- Dia Não Útil ---
+export const diaNaoUtilSchema = z.object({
+  id: z.number(),
+  data: z.string(),
+  descricao: z.string(),
+});
+
+export const paginatedDiaNaoUtilSchema = paginatedSchema(diaNaoUtilSchema);
+
+export const profissionalAnaliseResumidaItemSchema = z.object({
+  profissional: z
+    .object({
+      id: z.number(),
+      nome: z.string(),
+    })
+    .passthrough(),
+  ano: z.number(),
+  mes: z.number(),
+  horasExecutadas: z.number(),
+  valorPerfilMes: z.number(),
+  valorCustoMes: z.number(),
+});
+
+export const profissionalAnaliseResumidaListSchema = z.array(profissionalAnaliseResumidaItemSchema);

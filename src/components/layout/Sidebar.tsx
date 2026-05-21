@@ -17,6 +17,7 @@ import {
   CircleDollarSign,
   Settings2,
   BarChart3,
+  CalendarOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -287,6 +288,12 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
               to="/cadastros/templates" 
               icon={<FileText className="h-4 w-4" />} 
               label={t('nav.templates')} 
+              isCollapsed={isCollapsed}
+            />
+            <NavItem
+              to="/cadastros/dias-nao-uteis"
+              icon={<CalendarOff className="h-4 w-4" />}
+              label={t('nav.diasNaoUteis')}
               isCollapsed={isCollapsed}
             />
           </NavGroup>

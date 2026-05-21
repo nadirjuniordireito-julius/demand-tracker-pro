@@ -45,6 +45,28 @@ export interface ExecucaoProfissionalDTO {
   valorTotalExecucao: number;
 }
 
+/** GET /api/profissionais/{id}/analise-resumida?demandaExecucaoId= */
+export interface ProfissionalAnaliseResumidaDTO {
+  profissional: {
+    id: number;
+    nome: string;
+    tipoPessoa?: string;
+    documento?: string;
+    valorHora?: number;
+    custoTotalMensal?: number;
+    dataInicioAtividade?: string;
+    funcao?: string;
+    projetoId?: number;
+    perfilId?: number;
+    perfilNome?: string;
+  };
+  ano: number;
+  mes: number;
+  horasExecutadas: number;
+  valorPerfilMes: number;
+  valorCustoMes: number;
+}
+
 export interface DemandaExecucaoCreateDTO {
   demandaTecnicaId: number;
   usuarioId?: number;

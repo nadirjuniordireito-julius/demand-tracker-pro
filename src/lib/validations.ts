@@ -404,3 +404,18 @@ export const termoEncerramentoSchema = z.object({
 });
 
 export type TermoEncerramentoFormData = z.infer<typeof termoEncerramentoSchema>;
+
+// ==================== Dia Não Útil ====================
+export const diaNaoUtilFormSchema = z.object({
+  data: z.date({
+    required_error: 'validation.dateInitialRequired',
+    invalid_type_error: 'validation.dateInitialInvalid',
+  }),
+  descricao: z
+    .string()
+    .trim()
+    .min(1, { message: 'validation.required' })
+    .max(500, { message: 'validation.nameMax500' }),
+});
+
+export type DiaNaoUtilFormData = z.infer<typeof diaNaoUtilFormSchema>;

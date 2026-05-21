@@ -667,6 +667,25 @@ export interface TermoEncerramentoCustoCreateDTO {
 }
 
 // =====================================================
+// Dia Não Útil
+// =====================================================
+export interface DiaNaoUtil {
+  id: number;
+  data: string;
+  descricao: string;
+}
+
+export interface DiaNaoUtilCreateDTO {
+  data: string;
+  descricao: string;
+}
+
+export interface DiaNaoUtilUpdateDTO {
+  data?: string;
+  descricao?: string;
+}
+
+// =====================================================
 // Tipos auxiliares para API
 // =====================================================
 export interface PaginatedResponse<T> {

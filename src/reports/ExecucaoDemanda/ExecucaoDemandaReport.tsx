@@ -51,6 +51,7 @@ export type ExecucaoDemandaReportLabels = {
   colHoursPlanned: string;
   colHoursExecuted: string;
   colMonthYear: string;
+  colTotal: string;
   colDate: string;
   colComment: string;
   ganttEmpty: string;
@@ -194,9 +195,16 @@ const styles = StyleSheet.create({
   aptColDate: { width: '14%' },
   aptColProgress: { width: '10%', textAlign: 'right' },
   aptColComment: { width: '48%' },
-  profMesColProf: { width: '42%' },
-  profMesColMes: { width: '22%' },
-  profMesColHours: { width: '36%', textAlign: 'right' },
+  profMesColProf: { width: '38%' },
+  profMesColMes: { width: '24%' },
+  profMesColHours: { width: '38%', textAlign: 'right' },
+  profMesTotalRow: {
+    fontFamily: 'Helvetica-Bold',
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 0.5,
+    borderTopColor: '#cbd5e1',
+  },
+  profMesGroupSpacer: { height: 4 },
 });
 
 function formatSeqTitulo(seq: number | null, titulo: string): string {
@@ -549,13 +557,31 @@ function ProfissionalMesSection({
           <View wrap={false}>
             <ProfissionalMesTableHeader labels={labels} />
           </View>
-          {data.profissionalMes.map((row, i) => (
-            <View key={i} style={styles.tableRow} wrap={false}>
-              <Text style={[styles.cellOneLine, styles.profMesColProf]}>{row.profissionalNome}</Text>
-              <Text style={[styles.cellOneLine, styles.profMesColMes]}>{row.mesAno}</Text>
-              <Text style={[styles.cellOneLine, styles.profMesColHours]}>
-                {row.horasExecutadas.toFixed(2)}
-              </Text>
+          {data.profissionalMes.map((group, groupIndex) => (
+            <View key={group.profissionalId}>
+              {groupIndex > 0 ? <View style={styles.profMesGroupSpacer} /> : null}
+              {group.meses.map((mesRow, mesIndex) => (
+                <View
+                  key={`${group.profissionalId}-${mesRow.ano}-${mesRow.mes}`}
+                  style={styles.tableRow}
+                  wrap={false}
+                >
+                  <Text style={[styles.cellOneLine, styles.profMesColProf]}>
+                    {mesIndex === 0 ? group.profissionalNome : ''}
+                  </Text>
+                  <Text style={[styles.cellOneLine, styles.profMesColMes]}>{mesRow.mesAno}</Text>
+                  <Text style={[styles.cellOneLine, styles.profMesColHours]}>
+                    {mesRow.horasExecutadas.toFixed(2)}
+                  </Text>
+                </View>
+              ))}
+              <View style={[styles.tableRow, styles.profMesTotalRow]} wrap={false}>
+                <Text style={[styles.cellOneLine, styles.profMesColProf]} />
+                <Text style={[styles.cellOneLine, styles.profMesColMes]}>{labels.colTotal}</Text>
+                <Text style={[styles.cellOneLine, styles.profMesColHours]}>
+                  {group.totalHoras.toFixed(2)}
+                </Text>
+              </View>
             </View>
           ))}
         </View>

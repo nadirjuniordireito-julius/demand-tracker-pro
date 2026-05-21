@@ -19,6 +19,9 @@ export {
   paginatedTermoEncerramentoSchema,
   desembolsoSchema,
   paginatedDesembolsoSchema,
+  diaNaoUtilSchema,
+  paginatedDiaNaoUtilSchema,
+  profissionalAnaliseResumidaListSchema,
 } from './entitySchemas';
 export {
   statusProdutoMesSchema,

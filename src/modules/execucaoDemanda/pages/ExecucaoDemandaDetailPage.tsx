@@ -110,6 +110,7 @@ export default function ExecucaoDemandaDetailPage() {
       colHoursPlanned: t('execucao.report.colHoursPlanned'),
       colHoursExecuted: t('execucao.report.colHoursExecuted'),
       colMonthYear: t('execucao.report.colMonthYear'),
+      colTotal: t('execucao.report.colTotal'),
       colDate: t('execucao.report.colDate'),
       colComment: t('execucao.comment'),
       ganttEmpty: t('execucao.report.ganttEmpty'),

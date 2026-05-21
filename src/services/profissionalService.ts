@@ -4,7 +4,12 @@
 // =====================================================
 
 import api from './api';
-import { profissionalSchema, paginatedProfissionalSchema } from '@/lib/schemas';
+import {
+  profissionalSchema,
+  paginatedProfissionalSchema,
+  profissionalAnaliseResumidaListSchema,
+} from '@/lib/schemas';
+import type { ProfissionalAnaliseResumidaDTO } from '@/modules/execucaoDemanda/types';
 import type {
   Profissional,
   ProfissionalCreateDTO,
@@ -56,6 +61,26 @@ export const profissionalService = {
 
   async delete(id: number): Promise<void> {
     return api.delete(ENDPOINTS.byId(id));
+  },
+
+  /** GET /api/profissionais/{id}/analise-resumida */
+  async getAnaliseResumida(profissionalId: number): Promise<ProfissionalAnaliseResumidaDTO[]> {
+    return api.get<ProfissionalAnaliseResumidaDTO[]>(
+      `${ENDPOINTS.byId(profissionalId)}/analise-resumida`,
+      { schema: profissionalAnaliseResumidaListSchema },
+    );
+  },
+
+  /** GET /api/profissionais/{id}/analise-resumida?demandaExecucaoId= */
+  async getAnaliseResumidaPorExecucao(
+    profissionalId: number,
+    demandaExecucaoId: number,
+  ): Promise<ProfissionalAnaliseResumidaDTO[]> {
+    const params = new URLSearchParams({ demandaExecucaoId: String(demandaExecucaoId) });
+    return api.get<ProfissionalAnaliseResumidaDTO[]>(
+      `${ENDPOINTS.byId(profissionalId)}/analise-resumida?${params}`,
+      { schema: profissionalAnaliseResumidaListSchema },
+    );
   },
 };
 

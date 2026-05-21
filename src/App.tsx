@@ -34,6 +34,7 @@ const EditProfissionalPage = lazy(() => import("./pages/cadastros/EditProfission
 const DesembolsosPage = lazy(() => import("./pages/cadastros/DesembolsosPage"));
 const EditDesembolsoPage = lazy(() => import("./pages/cadastros/EditDesembolsoPage"));
 const TemplatesPage = lazy(() => import("./pages/cadastros/TemplatesPage"));
+const DiasNaoUteisPage = lazy(() => import("./pages/cadastros/DiasNaoUteisPage"));
 const DemandasPage = lazy(() => import("./pages/demandas/DemandasPage"));
 const EditDemandaPage = lazy(() => import("./pages/demandas/EditDemandaPage"));
 const TermoAberturaPage = lazy(() => import("./pages/demandas/TermoAberturaPage"));
@@ -106,6 +107,7 @@ const App = () => {
                           <Route path="/cadastros/desembolsos/novo" element={<EditDesembolsoPage />} />
                           <Route path="/cadastros/desembolsos/:desembolsoId/editar" element={<EditDesembolsoPage />} />
                           <Route path="/cadastros/templates" element={<TemplatesPage />} />
+                          <Route path="/cadastros/dias-nao-uteis" element={<DiasNaoUteisPage />} />
                           <Route path="/projetos/:id/semaforo" element={<ProjetoSemaforoPage />} />
                           <Route path="/demandas" element={<DemandasPage />} />
                           <Route path="/demandas/:demandaId/editar" element={<EditDemandaPage />} />

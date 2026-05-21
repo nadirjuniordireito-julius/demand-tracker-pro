@@ -6,9 +6,9 @@ import { recursoService } from './recursoService';
 import { apontamentoService } from './apontamentoService';
 import { compareGanttTarefas } from '../utils/sortGanttTarefas';
 import {
-  buildProfissionalMesSummary,
-  type ProfissionalMesReportRow,
-} from '../utils/buildProfissionalMesSummary';
+  loadProfissionalMesReport,
+  type ProfissionalMesReportGroup,
+} from '../utils/loadProfissionalMesReport';
 import type {
   DemandaExecucaoDTO,
   DemandaExecucaoGanttDTO,
@@ -18,7 +18,7 @@ import type {
   DemandaExecucaoTarefaApontamentoProgressoDTO,
 } from '../types';
 
-export type { ProfissionalMesReportRow };
+export type { ProfissionalMesReportGroup };
 
 export interface DependenciaReportRow {
   id: number;
@@ -60,7 +60,7 @@ export interface ExecucaoDemandaReportData {
   tarefas: DemandaExecucaoTarefaDTO[];
   dependencias: DependenciaReportRow[];
   recursos: RecursoReportRow[];
-  profissionalMes: ProfissionalMesReportRow[];
+  profissionalMes: ProfissionalMesReportGroup[];
   apontamentos: ApontamentoReportRow[];
   meta: ExecucaoDemandaReportMeta;
 }
@@ -153,6 +153,9 @@ export async function loadExecucaoReportData(
     return a.tarefaTitulo.localeCompare(b.tarefaTitulo);
   });
 
+  const profissionalIds = [...new Set(recursos.map((r) => r.profissionalId))];
+  const profissionalMes = await loadProfissionalMesReport(execucao.id, profissionalIds);
+
   return {
     execucao,
     demanda,
@@ -160,7 +163,7 @@ export async function loadExecucaoReportData(
     tarefas,
     dependencias: Array.from(dependenciasMap.values()),
     recursos,
-    profissionalMes: buildProfissionalMesSummary(tarefas, recursos),
+    profissionalMes,
     apontamentos,
     meta: {
       generatedAt: new Date().toLocaleString('pt-BR'),

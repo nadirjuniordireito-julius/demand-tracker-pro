@@ -11,10 +11,9 @@ import { PageHeader } from '@/components/common/PageComponents';
 import { ErrorState, TableSkeleton } from '@/components/common/LoadingStates';
 import { useProject } from '@/contexts/ProjectContext';
 import { profissionalService } from '@/services/profissionalService';
-import { demandaExecucaoService } from '@/modules/execucaoDemanda/services/demandaExecucaoService';
 import { formatCurrency } from '@/lib/formatters';
 import type { Profissional } from '@/types';
-import type { ExecucaoProfissionalDTO } from '@/modules/execucaoDemanda/types';
+import type { ProfissionalAnaliseResumidaDTO } from '@/modules/execucaoDemanda/types';
 
 export default function AnaliseProfissionaisPage() {
   const { t, i18n } = useTranslation();
@@ -23,7 +22,7 @@ export default function AnaliseProfissionaisPage() {
 
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [profissionalId, setProfissionalId] = useState<string>('');
-  const [analytics, setAnalytics] = useState<ExecucaoProfissionalDTO[]>([]);
+  const [analytics, setAnalytics] = useState<ProfissionalAnaliseResumidaDTO[]>([]);
   const [loadingProfessionals, setLoadingProfessionals] = useState(true);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +65,10 @@ export default function AnaliseProfissionaisPage() {
     setLoadingAnalytics(true);
     setError(null);
     try {
-      const data = await demandaExecucaoService.getAnalyticsByProfissional(Number(profissionalId));
-      setAnalytics(data);
+      const data = await profissionalService.getAnaliseResumida(Number(profissionalId));
+      const filtered = data.filter((row) => (Number(row.horasExecutadas) || 0) > 0);
+      filtered.sort((a, b) => (a.ano !== b.ano ? a.ano - b.ano : a.mes - b.mes));
+      setAnalytics(filtered);
     } catch (err) {
       setAnalytics([]);
       setError(err instanceof Error ? err.message : t('common.errorMessage'));
@@ -105,7 +106,11 @@ export default function AnaliseProfissionaisPage() {
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="min-w-[260px] space-y-2">
             <Label>{t('nav.professionals')}</Label>
-            <Select value={profissionalId} onValueChange={setProfissionalId} disabled={loadingProfessionals || profissionais.length === 0}>
+            <Select
+              value={profissionalId}
+              onValueChange={setProfissionalId}
+              disabled={loadingProfessionals || profissionais.length === 0}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={t('professionalAnalysis.selectProfessional')} />
               </SelectTrigger>
@@ -118,16 +123,25 @@ export default function AnaliseProfissionaisPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="button" onClick={() => void handleConsultar()} disabled={!profissionalId || loadingAnalytics}>
+          <Button
+            type="button"
+            onClick={() => void handleConsultar()}
+            disabled={!profissionalId || loadingAnalytics}
+          >
             {t('common.search')}
           </Button>
         </CardContent>
       </Card>
 
       {loadingProfessionals ? (
-        <TableSkeleton rows={6} columns={6} />
+        <TableSkeleton rows={6} columns={5} />
       ) : error ? (
-        <ErrorState title={t('common.errorTitle')} message={error} onRetry={loadProfessionals} retryText={t('common.retry')} />
+        <ErrorState
+          title={t('common.errorTitle')}
+          message={error}
+          onRetry={loadProfessionals}
+          retryText={t('common.retry')}
+        />
       ) : (
         <Card>
           <CardHeader className="pb-3">
@@ -138,7 +152,7 @@ export default function AnaliseProfissionaisPage() {
           </CardHeader>
           <CardContent>
             {loadingAnalytics ? (
-              <TableSkeleton rows={6} columns={6} />
+              <TableSkeleton rows={6} columns={5} />
             ) : analytics.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('common.noRecordsFound')}</p>
             ) : (
@@ -148,10 +162,9 @@ export default function AnaliseProfissionaisPage() {
                     <TableRow>
                       <TableHead>{t('common.year')}</TableHead>
                       <TableHead>{t('common.month')}</TableHead>
-                      <TableHead>{t('professionalAnalysis.horasPrevistas')}</TableHead>
                       <TableHead>{t('professionalAnalysis.horasExecutadas')}</TableHead>
-                      <TableHead>{t('professionalAnalysis.valorMensalRemuneracao')}</TableHead>
-                      <TableHead>{t('professionalAnalysis.valorTotalExecucao')}</TableHead>
+                      <TableHead>{t('professionalAnalysis.valorPerfilMes')}</TableHead>
+                      <TableHead>{t('professionalAnalysis.valorCustoMes')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -159,10 +172,15 @@ export default function AnaliseProfissionaisPage() {
                       <TableRow key={`${row.ano}-${row.mes}-${idx}`}>
                         <TableCell className="text-xs">{row.ano}</TableCell>
                         <TableCell className="text-xs capitalize">{monthLabel(row.mes)}</TableCell>
-                        <TableCell className="text-xs tabular-nums">{row.horasPrevistas.toFixed(2)}</TableCell>
-                        <TableCell className="text-xs tabular-nums">{row.horasExecutadas.toFixed(2)}</TableCell>
-                        <TableCell className="text-xs tabular-nums">{formatCurrency(row.valorMensalRemuneracao)}</TableCell>
-                        <TableCell className="text-xs tabular-nums">{formatCurrency(row.valorTotalExecucao)}</TableCell>
+                        <TableCell className="text-xs tabular-nums">
+                          {Number(row.horasExecutadas).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-xs tabular-nums">
+                          {formatCurrency(Number(row.valorPerfilMes) || 0)}
+                        </TableCell>
+                        <TableCell className="text-xs tabular-nums">
+                          {formatCurrency(Number(row.valorCustoMes) || 0)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
