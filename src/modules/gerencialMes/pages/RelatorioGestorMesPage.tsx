@@ -37,6 +37,22 @@ const YEARS = (() => {
   return out;
 })();
 
+/** Ordena códigos hierárquicos (ex.: 1.2 antes de 1.10 e 2.1). */
+function compareCodigoProduto(a: string, b: string): number {
+  const toParts = (codigo: string) =>
+    codigo.trim().split('.').map((part) => {
+      const n = Number.parseInt(part, 10);
+      return Number.isFinite(n) ? n : 0;
+    });
+  const pa = toParts(a);
+  const pb = toParts(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i += 1) {
+    if (pa[i] !== pb[i]) return pa[i] - pb[i];
+  }
+  return a.localeCompare(b, undefined, { sensitivity: 'base' });
+}
+
 function KpiCard({
   label,
   value,
@@ -116,6 +132,13 @@ export default function RelatorioGestorMesPage() {
   }, [appliedAno, appliedMes, i18n.language]);
 
   const resumo = relatorio?.resumo;
+
+  const produtosOrdenadosPorCodigo = useMemo(() => {
+    if (!relatorio?.produtos.length) return [];
+    return [...relatorio.produtos].sort((a, b) =>
+      compareCodigoProduto(a.codigoProduto, b.codigoProduto),
+    );
+  }, [relatorio?.produtos]);
 
   const rowStatusClass = (s: string) =>
     s === 'V' ? 'text-emerald-700 dark:text-emerald-300' : s === 'A' ? 'text-amber-700 dark:text-amber-300' : 'text-rose-700 dark:text-rose-300';
@@ -269,7 +292,7 @@ export default function RelatorioGestorMesPage() {
                       <TableHead className="text-right">{t('gerencialMes.overdueShort')}</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>{relatorio?.produtos.map(renderProductRow)}</TableBody>
+                  <TableBody>{produtosOrdenadosPorCodigo.map(renderProductRow)}</TableBody>
                 </Table>
               )}
             </CardContent>
