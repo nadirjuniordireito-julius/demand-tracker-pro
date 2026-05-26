@@ -185,6 +185,7 @@ export const produtoResumoSchema = z.object({
   valorTotalEmExecucao: z.number().nullable().optional(),
   valorTotalExecutado: z.number().nullable().optional(),
   percentualExecucao: z.number().nullable().optional(),
+  percentualExecutado: z.number().nullable().optional(),
   valorMediaEntregaPrevistaMensal: z.number().nullable().optional(),
   valorMediaEntregaRealMensal: z.number().nullable().optional(),
 });

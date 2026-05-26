@@ -788,6 +788,7 @@ export interface ProdutoResumoDTO {
   valorTotalEmExecucao: number | null;
   valorTotalExecutado: number | null;
   percentualExecucao: number | null;
+  percentualExecutado: number | null;
   valorMediaEntregaPrevistaMensal: number | null;
   valorMediaEntregaRealMensal: number | null;
 }
@@ -831,6 +832,7 @@ export interface ProdutoSnapshotMensalDTO {
   valorTotalEmExecucao?: number | null;
   valorTotalExecutado?: number | null;
   percentualExecucao?: number | null;
+  percentualExecutado?: number | null;
   valorMediaEntregaPrevistaMensal?: number | null;
   valorMediaEntregaRealMensal?: number | null;
   resumoAnalitico?: string | null;
@@ -852,6 +854,7 @@ export interface ProdutoSnapshotMensalCreateDTO {
   valorTotalEmExecucao?: number;
   valorTotalExecutado?: number;
   percentualExecucao?: number;
+  percentualExecutado?: number | null;
   valorMediaEntregaPrevistaMensal?: number;
   valorMediaEntregaRealMensal?: number;
   resumoAnalitico?: string;
@@ -864,6 +867,7 @@ export interface ProdutoSnapshotMensalUpdateDTO {
   valorTotalEmExecucao?: number | null;
   valorTotalExecutado?: number | null;
   percentualExecucao?: number | null;
+  percentualExecutado?: number | null;
   valorMediaEntregaPrevistaMensal?: number | null;
   valorMediaEntregaRealMensal?: number | null;
   resumoAnalitico?: string | null;
@@ -945,6 +949,7 @@ export interface ProdutoSnapshotRelatorioGestorItemDTO {
   statusProdutoMes: StatusProdutoMes;
   fechado: boolean;
   percentualExecucao?: number | null;
+  percentualExecutado?: number | null;
   valorTotalOrcamento?: number | null;
   valorTotalEmExecucao?: number | null;
   valorTotalExecutado?: number | null;

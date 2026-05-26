@@ -467,7 +467,7 @@ export default function DashboardMap() {
         valorTotalPrevisto: r.valorTotalOrcamento ?? null,
         valorTotalExecutado: r.valorTotalExecutado ?? null,
         valorTotalEmExecucao: r.valorTotalEmExecucao ?? null,
-        percentualExecutado: r.percentualExecucao ?? null,
+        percentualExecutado: r.percentualExecutado ?? null,
       }))
       .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
   }, [produtosResumoData, produtosSemaforo]);
