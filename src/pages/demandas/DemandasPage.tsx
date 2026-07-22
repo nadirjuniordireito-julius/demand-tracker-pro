@@ -86,7 +86,9 @@ export default function DemandasPage() {
   const [encerramentosByDemanda, setEncerramentosByDemanda] = useState<Record<number, TermoEncerramento | null>>({});
   const [loadingPlanejamento, setLoadingPlanejamento] = useState<Record<number, boolean>>({});
   const [loadingEncerramento, setLoadingEncerramento] = useState<Record<number, boolean>>({});
-  const [execucaoExistsByDemandaId, setExecucaoExistsByDemandaId] = useState<Record<number, boolean>>({});
+  const [execucaoExistsByDemandaId, setExecucaoExistsByDemandaId] = useState<Record<number, boolean | undefined>>({});
+  const execucaoExistsRef = useRef<Record<number, boolean | undefined>>({});
+  const execucaoCheckPendingRef = useRef<Set<number>>(new Set());
 
   // API states
   const { isLoading, error, execute } = useApi<PaginatedResponse<DemandaTecnica>>(null);
@@ -114,19 +116,27 @@ export default function DemandasPage() {
     defaultValues: { codigo: '', nome: '', projetoId: '', descricao: '' }
   });
 
-  const loadExecucaoExistsForDemandas = useCallback(async (demandaIds: number[]) => {
-    if (demandaIds.length === 0) {
-      setExecucaoExistsByDemandaId({});
-      return;
+  const ensureExecucaoChecked = useCallback(async (demandaId: number) => {
+    if (execucaoExistsRef.current[demandaId] !== undefined) return;
+    if (execucaoCheckPendingRef.current.has(demandaId)) return;
+
+    execucaoCheckPendingRef.current.add(demandaId);
+    try {
+      const execucao = await demandaExecucaoService.getByDemandaId(demandaId);
+      const exists = execucao != null;
+      execucaoExistsRef.current[demandaId] = exists;
+      setExecucaoExistsByDemandaId((prev) => ({ ...prev, [demandaId]: exists }));
+    } finally {
+      execucaoCheckPendingRef.current.delete(demandaId);
     }
-    const entries = await Promise.all(
-      demandaIds.map(async (demandaId) => {
-        const execucao = await demandaExecucaoService.getByDemandaId(demandaId);
-        return [demandaId, execucao != null] as const;
-      })
-    );
-    setExecucaoExistsByDemandaId(Object.fromEntries(entries));
   }, []);
+
+  const handleActionsMenuOpen = useCallback(
+    (demanda: DemandaTecnica, open: boolean) => {
+      if (open) void ensureExecucaoChecked(demanda.id);
+    },
+    [ensureExecucaoChecked],
+  );
 
   // Carrega dados iniciais - filtra apenas demandas do projeto selecionado
   const loadData = useCallback(async (context?: {
@@ -138,6 +148,7 @@ export default function DemandasPage() {
   }) => {
     if (!selectedProjectId || !isListRoute) return;
 
+    execucaoExistsRef.current = {};
     setExecucaoExistsByDemandaId({});
 
     const effective = context ?? {
@@ -171,11 +182,10 @@ export default function DemandasPage() {
             setTotalPages(data.totalPages);
             setTotalElements(data.totalElements);
           }
-          void loadExecucaoExistsForDemandas(data.content.map((d) => d.id));
         },
       }
     );
-  }, [execute, search, statusFilter, currentPage, pageSize, selectedProjectId, selectedMetaId, isListRoute, loadExecucaoExistsForDemandas]);
+  }, [execute, search, statusFilter, currentPage, pageSize, selectedProjectId, selectedMetaId, isListRoute]);
 
   useEffect(() => {
     listContextRef.current = {
@@ -690,6 +700,7 @@ export default function DemandasPage() {
             columns={columns}
             actions={actions}
             actionsLabel={t('common.actions')}
+            onActionsMenuOpen={handleActionsMenuOpen}
             rowSuffixInActions={(demanda) => (
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -29,13 +29,10 @@ export const demandaExecucaoService = {
    * Retorna 404 se não existir execução para a demanda.
    */
   async getByDemandaId(demandaTecnicaId: number): Promise<DemandaExecucaoDTO | null> {
-    try {
-      return await api.get<DemandaExecucaoDTO>(`${BASE}/demanda/${demandaTecnicaId}`);
-    } catch (e: unknown) {
-      const status = (e as { status?: number })?.status;
-      if (status === 404) return null;
-      throw e;
-    }
+    return api.get<DemandaExecucaoDTO | null>(`${BASE}/demanda/${demandaTecnicaId}`, {
+      allow404: true,
+      silent: true,
+    });
   },
 
   async create(data: DemandaExecucaoCreateDTO): Promise<DemandaExecucaoDTO> {

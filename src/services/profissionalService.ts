@@ -8,8 +8,12 @@ import {
   profissionalSchema,
   paginatedProfissionalSchema,
   profissionalAnaliseResumidaListSchema,
+  profissionalDemandasTecnicasResponseSchema,
 } from '@/lib/schemas';
-import type { ProfissionalAnaliseResumidaDTO } from '@/modules/execucaoDemanda/types';
+import type {
+  ProfissionalAnaliseResumidaDTO,
+  ProfissionalDemandasTecnicasResponseDTO,
+} from '@/modules/execucaoDemanda/types';
 import type {
   Profissional,
   ProfissionalCreateDTO,
@@ -80,6 +84,14 @@ export const profissionalService = {
     return api.get<ProfissionalAnaliseResumidaDTO[]>(
       `${ENDPOINTS.byId(profissionalId)}/analise-resumida?${params}`,
       { schema: profissionalAnaliseResumidaListSchema },
+    );
+  },
+
+  /** GET /api/profissionais/{id}/demandas-tecnicas */
+  async getDemandasTecnicas(profissionalId: number): Promise<ProfissionalDemandasTecnicasResponseDTO> {
+    return api.get<ProfissionalDemandasTecnicasResponseDTO>(
+      `${ENDPOINTS.byId(profissionalId)}/demandas-tecnicas`,
+      { schema: profissionalDemandasTecnicasResponseSchema },
     );
   },
 };

@@ -22,6 +22,7 @@ export {
   diaNaoUtilSchema,
   paginatedDiaNaoUtilSchema,
   profissionalAnaliseResumidaListSchema,
+  profissionalDemandasTecnicasResponseSchema,
 } from './entitySchemas';
 export {
   statusProdutoMesSchema,

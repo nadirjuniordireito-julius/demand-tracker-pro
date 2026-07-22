@@ -61,6 +61,10 @@ export interface DataTableProps<T> {
    * Útil para botões de expandir/colapsar linha.
    */
   rowSuffixInActions?: (item: T) => React.ReactNode;
+  /**
+   * Disparado ao abrir/fechar o menu de ações da linha (lazy load de dados por demanda).
+   */
+  onActionsMenuOpen?: (item: T, open: boolean) => void;
 }
 
 const SortIcon = ({ 
@@ -92,6 +96,7 @@ export function DataTable<T>({
   rowDetail,
   expandedRowIds,
   rowSuffixInActions,
+  onActionsMenuOpen,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const defaultActionsLabel = actionsLabel || t('common.actions');
@@ -167,7 +172,9 @@ export function DataTable<T>({
                         style={{ minWidth: '80px' }}
                       >
                     <div className="flex items-center gap-1">
-                      <DropdownMenu>
+                      <DropdownMenu
+                        onOpenChange={(open) => onActionsMenuOpen?.(item, open)}
+                      >
                         <DropdownMenuTrigger asChild>
                           <Button 
                             variant="ghost" 

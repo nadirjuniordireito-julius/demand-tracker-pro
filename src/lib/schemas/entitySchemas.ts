@@ -252,3 +252,40 @@ export const profissionalAnaliseResumidaItemSchema = z.object({
 });
 
 export const profissionalAnaliseResumidaListSchema = z.array(profissionalAnaliseResumidaItemSchema);
+
+export const profissionalDemandaTecnicaItemSchema = z.object({
+  demandaTecnicaId: z.number(),
+  demandaCodigo: z.string(),
+  demandaNome: z.string(),
+  demandaStatus: z.string(),
+  totalHorasExecutadas: z.number(),
+  totalHorasPlanejadas: z.number(),
+  totalHorasUteisPeriodo: z.number(),
+  totaisMensais: z
+    .array(
+      z.object({
+        ano: z.number(),
+        mes: z.number(),
+        totalPlanejado: z.number(),
+        totalExecutado: z.number(),
+      }),
+    )
+    .optional()
+    .default([]),
+  dataInicioExecucao: z.string(),
+  dataFimExecucao: z.string(),
+});
+
+export const profissionalDemandaTecnicaResumoMensalSchema = z.object({
+  ano: z.number(),
+  mes: z.number(),
+  totalPlanejado: z.number(),
+  totalExecutado: z.number(),
+  valorCustoPerfil: z.number(),
+  valorCustoMensal: z.number(),
+});
+
+export const profissionalDemandasTecnicasResponseSchema = z.object({
+  demandasTecnicas: z.array(profissionalDemandaTecnicaItemSchema).default([]),
+  resumoMensal: z.array(profissionalDemandaTecnicaResumoMensalSchema).default([]),
+});

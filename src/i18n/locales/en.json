@@ -418,6 +418,8 @@
     "criticalProducts": "Critical products",
     "allProductsMonth": "All products in the month",
     "reportEmpty": "No products with snapshot for this filter.",
+    "noLastReport": "No management report found for this project. Use the year/month filter to query a period.",
+    "selectProject": "Select a project to view the management report.",
     "overdueActionsList": "Overdue actions (detail)",
     "columnProject": "Project",
     "snapshotState": "Snapshot",
@@ -783,7 +785,18 @@
     "tableTitle": "Monthly summary",
     "horasExecutadas": "Executed hours",
     "valorPerfilMes": "Profile value (month)",
-    "valorCustoMes": "Cost value (month)"
+    "valorCustoMes": "Cost value (month)",
+    "whereIsTableTitle": "Allocated technical demands",
+    "totalHorasExecutadas": "Total executed hours",
+    "totalHorasPlanejadas": "Total planned hours",
+    "totalHorasUteisPeriodo": "Business hours in period",
+    "executionPeriod": "Execution period",
+    "plannedHours": "Planned",
+    "executedHours": "Executed",
+    "noMonthlyBreakdown": "No monthly allocation",
+    "monthlySummaryTitle": "Consolidated monthly summary",
+    "profileCost": "Profile cost",
+    "monthlyCost": "Posted monthly cost"
   },
   "profiles": {
     "title": "Profiles",

@@ -34,6 +34,7 @@ const ENDPOINTS = {
   fechar: (id: number) => `${BASE}/${id}/fechar`,
   reabrir: (id: number) => `${BASE}/${id}/reabrir`,
   relatorioGestor: `${BASE}/relatorio-gestor`,
+  relatorioGestorUltimo: `${BASE}/relatorio-gestor/ultimo`,
   acoes: (snapshotId: number) => `${BASE}/${snapshotId}/acoes`,
   acaoById: (snapshotId: number, acaoId: number) => `${BASE}/${snapshotId}/acoes/${acaoId}`,
   acaoStatus: (snapshotId: number, acaoId: number) => `${BASE}/${snapshotId}/acoes/${acaoId}/status`,
@@ -180,6 +181,17 @@ export const produtoSnapshotMensalService = {
       sp.append('projetoId', String(params.projetoId));
     }
     const raw = await api.get<unknown>(`${ENDPOINTS.relatorioGestor}?${sp.toString()}`);
+    return produtoSnapshotRelatorioGestorSchema.parse(raw) as ProdutoSnapshotRelatorioGestorDTO;
+  },
+
+  async getUltimoRelatorioGestor(projetoId: number): Promise<ProdutoSnapshotRelatorioGestorDTO | null> {
+    const sp = new URLSearchParams();
+    sp.append('projetoId', String(projetoId));
+    const raw = await api.get<unknown>(`${ENDPOINTS.relatorioGestorUltimo}?${sp.toString()}`, {
+      allow404: true,
+      silent: true,
+    });
+    if (raw == null) return null;
     return produtoSnapshotRelatorioGestorSchema.parse(raw) as ProdutoSnapshotRelatorioGestorDTO;
   },
 

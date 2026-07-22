@@ -419,6 +419,8 @@
     "criticalProducts": "Produtos em destaque crítico",
     "allProductsMonth": "Todos os produtos no mês",
     "reportEmpty": "Nenhum produto com snapshot neste filtro.",
+    "noLastReport": "Nenhum relatório gerencial encontrado para este projeto. Use o filtro de ano/mês para consultar um período.",
+    "selectProject": "Selecione um projeto para visualizar o relatório gerencial.",
     "overdueActionsList": "Ações vencidas (detalhe)",
     "columnProject": "Projeto",
     "snapshotState": "Snapshot",
@@ -817,7 +819,18 @@
     "tableTitle": "Resumo mensal",
     "horasExecutadas": "Horas executadas",
     "valorPerfilMes": "Valor perfil (mês)",
-    "valorCustoMes": "Valor custo (mês)"
+    "valorCustoMes": "Valor custo (mês)",
+    "whereIsTableTitle": "Demandas técnicas alocadas",
+    "totalHorasExecutadas": "Total horas executadas",
+    "totalHorasPlanejadas": "Total horas planejadas",
+    "totalHorasUteisPeriodo": "Horas úteis no período",
+    "executionPeriod": "Período de execução",
+    "plannedHours": "Planejado",
+    "executedHours": "Executado",
+    "noMonthlyBreakdown": "Sem rateio mensal",
+    "monthlySummaryTitle": "Resumo mensal consolidado",
+    "profileCost": "Custo perfil",
+    "monthlyCost": "Custo mensal lançado"
   },
   "profiles": {
     "title": "Perfis",

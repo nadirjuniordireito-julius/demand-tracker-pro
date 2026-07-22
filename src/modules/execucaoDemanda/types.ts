@@ -67,6 +67,44 @@ export interface ProfissionalAnaliseResumidaDTO {
   valorCustoMes: number;
 }
 
+/** GET /api/profissionais/{id}/demandas-tecnicas — rateio mensal por DT */
+export interface ProfissionalDemandaTecnicaMensalDTO {
+  ano: number;
+  mes: number;
+  totalPlanejado: number;
+  totalExecutado: number;
+}
+
+/** GET /api/profissionais/{id}/demandas-tecnicas */
+export interface ProfissionalDemandaTecnicaDTO {
+  demandaTecnicaId: number;
+  demandaCodigo: string;
+  demandaNome: string;
+  demandaStatus: string;
+  totalHorasExecutadas: number;
+  totalHorasPlanejadas: number;
+  totalHorasUteisPeriodo: number;
+  totaisMensais: ProfissionalDemandaTecnicaMensalDTO[];
+  dataInicioExecucao: string;
+  dataFimExecucao: string;
+}
+
+/** Agregado mensal de todas as DTs do profissional (com custos). */
+export interface ProfissionalDemandaTecnicaResumoMensalDTO {
+  ano: number;
+  mes: number;
+  totalPlanejado: number;
+  totalExecutado: number;
+  valorCustoPerfil: number;
+  valorCustoMensal: number;
+}
+
+/** Wrapper do GET /api/profissionais/{id}/demandas-tecnicas */
+export interface ProfissionalDemandasTecnicasResponseDTO {
+  demandasTecnicas: ProfissionalDemandaTecnicaDTO[];
+  resumoMensal: ProfissionalDemandaTecnicaResumoMensalDTO[];
+}
+
 export interface DemandaExecucaoCreateDTO {
   demandaTecnicaId: number;
   usuarioId?: number;

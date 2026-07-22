@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { BarChart3, Calendar } from 'lucide-react';
+import { BarChart3, Calendar, Filter } from 'lucide-react';
 import { ApiError } from '@/services/api';
 import { setErrorHandledByHook } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils';
 import { produtoSnapshotMensalService } from '@/modules/gerencialMes/services/produtoSnapshotMensalService';
 import { useProject } from '@/contexts/ProjectContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -64,20 +65,24 @@ function KpiCard({
   sub?: string;
   tone?: 'default' | 'emerald' | 'amber' | 'rose';
 }) {
-  const ring =
+  const toneBorder =
     tone === 'emerald'
-      ? 'ring-emerald-500/20'
+      ? 'border-emerald-200/60 dark:border-emerald-900/40'
       : tone === 'amber'
-        ? 'ring-amber-500/20'
+        ? 'border-amber-200/60 dark:border-amber-900/40'
         : tone === 'rose'
-          ? 'ring-rose-500/20'
-          : 'ring-border/60';
+          ? 'border-rose-200/60 dark:border-rose-900/40'
+          : undefined;
   return (
-    <div className={cn('rounded-2xl border bg-card p-4 shadow-sm ring-1', ring)}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>}
-    </div>
+    <Card className={cn('hover:shadow-elevated transition-shadow duration-200', toneBorder)}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-normal text-primary">{label}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <p className="text-2xl font-semibold tabular-nums">{value}</p>
+        {sub && <CardDescription>{sub}</CardDescription>}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -92,17 +97,45 @@ export default function RelatorioGestorMesPage() {
   const [appliedMes, setAppliedMes] = useState(now.getMonth() + 1);
   const [relatorio, setRelatorio] = useState<ProdutoSnapshotRelatorioGestorDTO | null>(null);
   const [loadingRel, setLoadingRel] = useState(false);
+  const [filterApplied, setFilterApplied] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const projectIdRef = useRef(selectedProject?.id);
 
-  const loadRelatorio = useCallback(async () => {
+  const loadUltimoRelatorio = useCallback(async (projectId: number) => {
+    setLoadingRel(true);
+    setRelatorio(null);
+    try {
+      setErrorHandledByHook(true);
+      const data = await produtoSnapshotMensalService.getUltimoRelatorioGestor(projectId);
+      if (data) {
+        setDraftAno(data.ano);
+        setDraftMes(data.mes);
+        setAppliedAno(data.ano);
+        setAppliedMes(data.mes);
+        setRelatorio(data);
+      }
+    } catch (e) {
+      if (e instanceof ApiError) {
+        toast({ variant: 'destructive', title: t('common.error'), description: e.message });
+      }
+    } finally {
+      setErrorHandledByHook(false);
+      setLoadingRel(false);
+    }
+  }, [t, toast]);
+
+  const loadRelatorioFiltrado = useCallback(async (projectId: number, ano: number, mes: number) => {
     setLoadingRel(true);
     setRelatorio(null);
     try {
       setErrorHandledByHook(true);
       const data = await produtoSnapshotMensalService.getRelatorioGestor({
-        ano: appliedAno,
-        mes: appliedMes,
-        projetoId: selectedProject?.id,
+        ano,
+        mes,
+        projetoId: projectId,
       });
+      
+      console.log(data);
       setRelatorio(data);
     } catch (e) {
       if (e instanceof ApiError) {
@@ -112,15 +145,41 @@ export default function RelatorioGestorMesPage() {
       setErrorHandledByHook(false);
       setLoadingRel(false);
     }
-  }, [appliedAno, appliedMes, selectedProject?.id, t, toast]);
+  }, [t, toast]);
 
   useEffect(() => {
-    void loadRelatorio();
-  }, [loadRelatorio]);
+    const projectId = selectedProject?.id;
+    const projectChanged = projectIdRef.current !== projectId;
+    projectIdRef.current = projectId;
+
+    if (projectChanged) {
+      setFilterApplied(false);
+    }
+
+    if (!projectId) {
+      setRelatorio(null);
+      return;
+    }
+
+    const useFilteredLoad = filterApplied && !projectChanged;
+    if (useFilteredLoad) {
+      void loadRelatorioFiltrado(projectId, appliedAno, appliedMes);
+    } else {
+      void loadUltimoRelatorio(projectId);
+    }
+  }, [
+    selectedProject?.id,
+    filterApplied,
+    filterApplied ? appliedAno : null,
+    filterApplied ? appliedMes : null,
+    loadUltimoRelatorio,
+    loadRelatorioFiltrado,
+  ]);
 
   const apply = () => {
     setAppliedAno(draftAno);
     setAppliedMes(draftMes);
+    setFilterApplied(true);
   };
 
   const monthYear = useMemo(() => {
@@ -158,6 +217,7 @@ export default function RelatorioGestorMesPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 pb-12 md:p-6">
+ 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-primary">
@@ -166,70 +226,91 @@ export default function RelatorioGestorMesPage() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{t('gerencialMes.reportSubtitle')}</p>
         </div>
-        <Button variant="outline" asChild>
-          <Link to="/dashboard">{t('gerencialMes.backDashboard')}</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={filtersOpen}
+            aria-label={t('gerencialMes.filters')}
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            <Filter className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/dashboard">{t('gerencialMes.backDashboard')}</Link>
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Calendar className="h-4 w-4" />
-            {t('gerencialMes.filters')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="space-y-2">
-            <Label>{t('gerencialMes.year')}</Label>
-            <Select value={String(draftAno)} onValueChange={(v) => setDraftAno(Number(v))}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {YEARS.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>{t('gerencialMes.month')}</Label>
-            <Select value={String(draftMes)} onValueChange={(v) => setDraftMes(Number(v))}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <SelectItem key={m} value={String(m)}>
-                    {new Date(2000, m - 1, 1).toLocaleDateString(i18n.language, { month: 'long' })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="button" onClick={apply}>
-            {t('gerencialMes.applyFilter')}
-          </Button>
-        </CardContent>
-      </Card>
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+          <Card className="hover:shadow-elevated transition-shadow duration-200">
+            <CardHeader className="pb-2">
+              <Calendar className="h-10 w-10 text-foreground" strokeWidth={1.5} />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CardTitle className="text-base font-normal text-primary">{t('gerencialMes.filters')}</CardTitle>
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="space-y-2">
+                  <Label>{t('gerencialMes.year')}</Label>
+                  <Select value={String(draftAno)} onValueChange={(v) => setDraftAno(Number(v))}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YEARS.map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('gerencialMes.month')}</Label>
+                  <Select value={String(draftMes)} onValueChange={(v) => setDraftMes(Number(v))}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <SelectItem key={m} value={String(m)}>
+                          {new Date(2000, m - 1, 1).toLocaleDateString(i18n.language, { month: 'long' })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="button" onClick={apply}>
+                  {t('gerencialMes.applyFilter')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <p className="text-sm text-muted-foreground">
         <span className="font-medium capitalize text-foreground">{monthYear}</span>
       </p>
 
       {loadingRel ? (
-        <Card className="p-10 text-center text-muted-foreground">{t('common.loadingData')}</Card>
+        <Card className="hover:shadow-elevated transition-shadow duration-200">
+          <CardContent className="p-10 text-center text-muted-foreground">{t('common.loadingData')}</CardContent>
+        </Card>
+      ) : !selectedProject ? (
+        <Card className="hover:shadow-elevated transition-shadow duration-200">
+          <CardContent className="p-10 text-center text-muted-foreground">{t('gerencialMes.selectProject')}</CardContent>
+        </Card>
       ) : resumo ? (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard label={t('gerencialMes.kpi.totalProducts')} value={String(resumo.totalProdutos)} />
             <KpiCard label={t('gerencialMes.kpi.green')} value={String(resumo.produtosVerde)} tone="emerald" />
             <KpiCard label={t('gerencialMes.kpi.yellow')} value={String(resumo.produtosAmarelo)} tone="amber" />
             <KpiCard label={t('gerencialMes.kpi.red')} value={String(resumo.produtosVermelho)} tone="rose" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               label={t('gerencialMes.kpi.consolidatedExec')}
               value={formatPercent(resumo.percentualExecucaoConsolidado)}
@@ -243,7 +324,7 @@ export default function RelatorioGestorMesPage() {
               tone="rose"
             />
           </div>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <KpiCard label={t('gerencialMes.kpi.actionsTotal')} value={String(resumo.totalAcoes)} />
             <KpiCard label={t('gerencialMes.kpi.actionsOpen')} value={String(resumo.acoesAbertas)} />
             <KpiCard label={t('gerencialMes.kpi.actionsProgress')} value={String(resumo.acoesEmAndamento)} />
@@ -251,9 +332,11 @@ export default function RelatorioGestorMesPage() {
           </div>
 
           {relatorio && relatorio.produtosCriticos.length > 0 && (
-            <Card className="border-rose-200/60 dark:border-rose-900/40">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-rose-800 dark:text-rose-200">{t('gerencialMes.criticalProducts')}</CardTitle>
+            <Card className="border-rose-200/60 hover:shadow-elevated transition-shadow duration-200 dark:border-rose-900/40">
+              <CardHeader>
+                <CardTitle className="text-base font-normal text-rose-800 dark:text-rose-200">
+                  {t('gerencialMes.criticalProducts')}
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
@@ -273,9 +356,9 @@ export default function RelatorioGestorMesPage() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{t('gerencialMes.allProductsMonth')}</CardTitle>
+          <Card className="hover:shadow-elevated transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle className="text-base font-normal text-primary">{t('gerencialMes.allProductsMonth')}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               {relatorio && relatorio.produtos.length === 0 ? (
@@ -299,9 +382,9 @@ export default function RelatorioGestorMesPage() {
           </Card>
 
           {relatorio && relatorio.acoesVencidas.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{t('gerencialMes.overdueActionsList')}</CardTitle>
+            <Card className="hover:shadow-elevated transition-shadow duration-200">
+              <CardHeader>
+                <CardTitle className="text-base font-normal text-primary">{t('gerencialMes.overdueActionsList')}</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
@@ -328,7 +411,13 @@ export default function RelatorioGestorMesPage() {
             </Card>
           )}
         </motion.div>
-      ) : null}
+      ) : (
+        <Card className="hover:shadow-elevated transition-shadow duration-200">
+          <CardContent className="p-10 text-center text-muted-foreground">
+            {filterApplied ? t('gerencialMes.reportEmpty') : t('gerencialMes.noLastReport')}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
