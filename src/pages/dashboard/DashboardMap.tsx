@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   BarChart3,
-  CalendarDays,
   Camera,
   Check,
   CheckCircle2,
@@ -68,6 +67,13 @@ const produtoPeriodoFuturoStyle: React.CSSProperties = {
   fontStyle: 'italic',
   fontWeight: 'bold',
 };
+
+/**
+ * Card de detalhe da meta selecionada (coluna direita).
+ * Desabilitado após consolidar Previsto / Em execução / Executado / % nos cards da lista à esquerda.
+ * Mantido no código como histórico — alterar para `true` para reexibir.
+ */
+const SHOW_SELECTED_META_DETAIL_CARD = false;
 
 const isRichTextEmpty = (raw?: string | null) => {
   if (!raw?.trim()) return true;
@@ -149,6 +155,7 @@ export default function DashboardMap() {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
+      console.log(semaforo);
       return semaforo;
     });
   }, [projectId, execute]);
@@ -429,13 +436,6 @@ export default function DashboardMap() {
     return numberToWords(mesesExecucaoMeta, i18n.language);
   }, [mesesExecucaoMeta, i18n.language]);
 
-  // Soma `valorTotalEmExecucao` dos produtos do resumo (regra E + F do backend,
-  // via custos do termo de planejamento).
-  const valorEmExecucaoMeta = useMemo(() => {
-    const lista = produtosResumoData ?? [];
-    return lista.reduce((acc, p) => acc + (p.valorTotalEmExecucao ?? 0), 0);
-  }, [produtosResumoData]);
-
   type ProdutoView = {
     id: number;
     codigo: string;
@@ -450,27 +450,53 @@ export default function DashboardMap() {
   };
 
   // Tabela de produtos e donut de market share usam o resumo como fonte oficial.
-  // A `descricao` (apenas para o tooltip) é mesclada via lookup no semáforo por idProduto.
+  // Semáforo: "em execução" = valorTotalEmExecucao;
+  // "executado" = valorTotalEncerradas + valorTotalEmEncerramento.
   const produtos = useMemo<ProdutoView[]>(() => {
     const lista = produtosResumoData ?? [];
     if (lista.length === 0) return [];
-    const descricaoById = new Map<number, string | null | undefined>();
-    produtosSemaforo.forEach((p) => descricaoById.set(p.id, p.descricao));
+    const semaforoById = new Map(produtosSemaforo.map((p) => [p.id, p]));
     return lista
-      .map<ProdutoView>((r) => ({
-        id: r.idProduto,
-        codigo: r.codigoProduto ?? '',
-        nome: r.nomeProduto ?? '',
-        descricao: descricaoById.get(r.idProduto) ?? null,
-        dataInicio: r.inicioPrevisaoExecucao ?? null,
-        dataFim: r.fimPrevisaoExecucao ?? null,
-        valorTotalPrevisto: r.valorTotalOrcamento ?? null,
-        valorTotalExecutado: r.valorTotalExecutado ?? null,
-        valorTotalEmExecucao: r.valorTotalEmExecucao ?? null,
-        percentualExecutado: r.percentualExecutado ?? null,
-      }))
+      .map<ProdutoView>((r) => {
+        const node = semaforoById.get(r.idProduto);
+        const encerradas = node?.valorTotalEncerradas ?? null;
+        const emEncerramento = node?.valorTotalEmEncerramento ?? null;
+        const valorTotalExecutado =
+          encerradas == null && emEncerramento == null
+            ? (r.valorTotalExecutado ?? null)
+            : (encerradas ?? 0) + (emEncerramento ?? 0);
+        return {
+          id: r.idProduto,
+          codigo: r.codigoProduto ?? '',
+          nome: r.nomeProduto ?? '',
+          descricao: node?.descricao ?? null,
+          dataInicio: r.inicioPrevisaoExecucao ?? null,
+          dataFim: r.fimPrevisaoExecucao ?? null,
+          valorTotalPrevisto: r.valorTotalOrcamento ?? null,
+          valorTotalExecutado,
+          valorTotalEmExecucao: node?.valorTotalEmExecucao ?? r.valorTotalEmExecucao ?? null,
+          percentualExecutado: node?.percentualExecutado ?? r.percentualExecutado ?? null,
+        };
+      })
       .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
   }, [produtosResumoData, produtosSemaforo]);
+
+  // Card Meta: mesma lógica do card Produtos.
+  const valorEmExecucaoMeta = useMemo(() => {
+    if (selectedMeta?.valorTotalEmExecucao != null) {
+      return selectedMeta.valorTotalEmExecucao;
+    }
+    return produtos.reduce((acc, p) => acc + (p.valorTotalEmExecucao ?? 0), 0);
+  }, [selectedMeta, produtos]);
+
+  const valorExecutadoMeta = useMemo(() => {
+    const encerradas = selectedMeta?.valorTotalEncerradas ?? null;
+    const emEncerramento = selectedMeta?.valorTotalEmEncerramento ?? null;
+    if (encerradas != null || emEncerramento != null) {
+      return (encerradas ?? 0) + (emEncerramento ?? 0);
+    }
+    return produtos.reduce((acc, p) => acc + (p.valorTotalExecutado ?? 0), 0);
+  }, [selectedMeta, produtos]);
 
   useEffect(() => {
     if (pendingProdutoIdRef.current != null && produtos.some((p) => p.id === pendingProdutoIdRef.current)) {
@@ -550,8 +576,8 @@ export default function DashboardMap() {
   }
 
   return (
+
     <div ref={pageRootRef} className="space-y-6">
-     
 
       {isLoading && (
         <Card>
@@ -560,63 +586,183 @@ export default function DashboardMap() {
       )}
 
       {!isLoading && error && (
+
         <Card>
           <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
         </Card>
+
       )}
 
       {!isLoading && !error && (
+
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <Card className="xl:col-span-3">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t('dashboard.map.goals')}</CardTitle>
-              
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {metas.length === 0 && <p className="text-sm text-muted-foreground">{t('projectSemaphore.noData')}</p>}
-              {metas.map((meta) => {
-                const active = meta.id === selectedMetaId;
-                return (
-                  <button
-                    key={meta.id}
-                    type="button"
-                    onClick={() => handleMetaCardClick(meta.id)}
-                    className={`group w-full rounded-lg border p-3 text-left transition-[background-color,box-shadow] duration-200 hover:bg-muted/60 ${
-                      active
-                        ? 'border-primary bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]'
-                        : 'border-border'
-                    }`}
-                    aria-selected={active}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className={`inline-flex items-center gap-1.5 ${active ? 'border-l-4 border-primary pl-2 -ml-1' : ''}`}>
-                        {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                        <p className="text-base font-semibold">{meta.codigo}</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+          <div className="space-y-4 xl:col-span-3">
+            <Card className="rounded-sm border-[1.5px] border-[rgb(100_163_251)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  <span className="inline-flex items-center gap-2">
+                    <Package className="h-4 w-4 text-slate-500" />
+                    <span>{t('dashboard.map.projectSummary')}</span>
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div>
+                    <p className="text-[11px] leading-tight text-slate-500">{t('dashboard.map.plannedValue')}</p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                      {formatCurrencyWithoutSymbol(data?.valorTotalPrevisto)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] leading-tight text-slate-500">{t('dashboard.map.executedValue')}</p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                      {formatCurrencyWithoutSymbol(data?.valorTotalExecutado)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] leading-tight text-slate-500">{t('dashboard.map.executingValue')}</p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                      {formatCurrencyWithoutSymbol(data?.valorTotalEmExecucao)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] leading-tight text-slate-500">{t('dashboard.map.closingValue')}</p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                      {formatCurrencyWithoutSymbol(data?.valorTotalEmEncerramento)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] leading-tight text-slate-500">{t('dashboard.map.closedValue')}</p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                      {formatCurrencyWithoutSymbol(data?.valorTotalEncerradas)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] leading-tight text-slate-500">{t('dashboard.map.progress')}</p>
+                    <div className="flex items-center gap-1.5">
+                      <Progress value={data?.percentualExecutado ?? 0} className="h-1.5" />
+                      <span className="min-w-[40px] text-right text-xs font-semibold text-emerald-800">
+                        {formatPercent(data?.percentualExecutado)}
+                      </span>
                     </div>
-                    <div
-                      className={`space-y-2 transition-[filter] duration-200 ${
-                        active ? '' : 'blur-[0.65px] group-hover:blur-none'
+                    <div className="flex items-center gap-1.5">
+                      <Progress value={data?.percentualExecutadoAnalise ?? 0} className="h-1.5" />
+                      <span className="min-w-[40px] text-right text-xs font-semibold text-emerald-800">
+                        {formatPercent(data?.percentualExecutadoAnalise)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{t('dashboard.map.goals')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {metas.length === 0 && <p className="text-sm text-muted-foreground">{t('projectSemaphore.noData')}</p>}
+                {metas.map((meta) => {
+                  const active = meta.id === selectedMetaId;
+                  const encerradas = meta.valorTotalEncerradas ?? null;
+                  const emEncerramento = meta.valorTotalEmEncerramento ?? null;
+                  const valorExecutado =
+                    encerradas == null && emEncerramento == null
+                      ? (meta.valorTotalExecutado ?? null)
+                      : (encerradas ?? 0) + (emEncerramento ?? 0);
+                  return (
+                    <button
+                      key={meta.id}
+                      type="button"
+                      onClick={() => handleMetaCardClick(meta.id)}
+                      className={`group w-full rounded-lg border p-3 text-left transition-[background-color,box-shadow] duration-200 hover:bg-muted/60 ${
+                        active
+                          ? 'border-primary bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]'
+                          : 'border-border'
                       }`}
+                      aria-selected={active}
                     >
-                      <p className="line-clamp-2 text-sm font-medium">{meta.nome}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {formatMonthYearRange(meta.dataInicio, meta.dataFim, t('dashboard.map.dateRangeSeparator'))}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className={`inline-flex items-center gap-1.5 ${active ? 'border-l-4 border-primary pl-2 -ml-1' : ''}`}>
+                          {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                          <p className="text-base font-semibold">{meta.codigo}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <Progress value={meta.percentualExecutado ?? 0} className="h-2" />
-                        <span className="text-sm font-semibold text-primary min-w-[46px] text-right">
-                          {formatPercent(meta.percentualExecutado)}
-                        </span>
+                      <div
+                        className={`space-y-2 transition-[filter] duration-200 ${
+                          active ? '' : 'blur-[0.65px] group-hover:blur-none'
+                        }`}
+                      >
+                        <p className="line-clamp-2 text-sm font-medium">{meta.nome}</p>
+                        <div className="space-y-0.5 text-xs tabular-nums">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground">{t('dashboard.map.plannedValue')}</span>
+                            <span className="text-right font-medium">
+                              {formatCurrencyWithoutSymbol(meta.valorTotalPrevisto)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground">{t('dashboard.map.executingValue')}</span>
+                            <span className="text-right font-medium">
+                              {formatCurrencyWithoutSymbol(meta.valorTotalEmExecucao)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground">{t('dashboard.map.executedValue')}</span>
+                            <span className="text-right font-medium">
+                              {formatCurrencyWithoutSymbol(valorExecutado)}
+                            </span>
+                          </div>
+                        </div>
+                        <motion.div
+                          initial={false}
+                          animate={
+                            active
+                              ? { height: 'auto', opacity: 1 }
+                              : { height: 0, opacity: 0 }
+                          }
+                          transition={
+                            reduceMotion
+                              ? { duration: 0.01 }
+                              : { duration: 0.65, ease: [0.22, 1, 0.36, 1] }
+                          }
+                          className="overflow-hidden"
+                        >
+                          <div className="space-y-1.5 pt-1">
+                            <div>
+                              <p className="mb-0.5 text-[11px] text-muted-foreground">
+                                {t('dashboard.map.executionPercent')}
+                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <Progress value={meta.percentualExecutado ?? 0} className="h-2" />
+                                <span className="min-w-[46px] text-right text-sm font-semibold text-primary">
+                                  {formatPercent(meta.percentualExecutado)}
+                                </span>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="mb-0.5 text-[11px] text-muted-foreground">
+                                {t('dashboard.map.analysisExecutionPercent')}
+                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <Progress value={meta.percentualExecutadoAnalise ?? 0} className="h-2" />
+                                <span className="min-w-[46px] text-right text-sm font-semibold text-primary">
+                                  {formatPercent(meta.percentualExecutadoAnalise)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </CardContent>
-          </Card>
+                    </button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
 
           <motion.div
             ref={rightColumnRef}
@@ -626,6 +772,7 @@ export default function DashboardMap() {
             animate="visible"
             variants={mapColumnContainerVariants}
           >
+            {SHOW_SELECTED_META_DETAIL_CARD && (
             <motion.div variants={mapCardVariants} className="will-change-[filter,opacity]">
               <Card>
                 <CardHeader className="pb-2">
@@ -649,10 +796,17 @@ export default function DashboardMap() {
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.plannedValue')}</p>
                         <p className="text-2xl font-semibold">{formatCurrencyWithoutSymbol(selectedMeta.valorTotalPrevisto)}</p>
+                        <p className="text-lg italic text-muted-foreground tabular-nums">
+                          {formatCurrencyWithoutSymbol(selectedMeta.valorTotalPrevistoAnalise)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Progress value={selectedMeta.percentualExecutadoAnalise ?? 0} className="h-2" />
+                          <span className="text-sm font-semibold text-primary">{formatPercent(selectedMeta.percentualExecutadoAnalise)}</span>
+                        </div>                        
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.executedValue')}</p>
-                        <p className="text-2xl font-semibold">{formatCurrencyWithoutSymbol(selectedMeta.valorTotalExecutado)}</p>
+                        <p className="text-2xl font-semibold">{formatCurrencyWithoutSymbol(valorExecutadoMeta)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.executingValue')}</p>
@@ -678,10 +832,12 @@ export default function DashboardMap() {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('dashboard.map.progress')}</p>
+                      
                         <div className="flex items-center gap-2">
                           <Progress value={selectedMeta.percentualExecutado ?? 0} className="h-2" />
                           <span className="text-sm font-semibold text-primary">{formatPercent(selectedMeta.percentualExecutado)}</span>
                         </div>
+                        
                       </div>
                     </div>
                   </div>
@@ -691,6 +847,7 @@ export default function DashboardMap() {
               </CardContent>
               </Card>
             </motion.div>
+            )}
 
             <motion.div variants={mapCardVariants} className="will-change-[filter,opacity]">
               <Card>
@@ -701,6 +858,11 @@ export default function DashboardMap() {
                         <Package className="h-5 w-5 text-primary" />
                         <span>{t('dashboard.map.products')}</span>
                       </span>
+                      <p className="mt-1 text-sm font-medium text-orange-700">
+                        {selectedMeta
+                          ? `${selectedMeta.codigo} - ${selectedMeta.nome}`
+                          : t('dashboard.map.selectGoal')}
+                      </p>
                     </CardTitle>
                   <button
                     type="button"
@@ -1145,8 +1307,11 @@ export default function DashboardMap() {
               </Card>
             </motion.div>
           </motion.div>
+
         </div>
+
       )}
+
       {showGoToTop && (
         <button
           type="button"
@@ -1165,6 +1330,8 @@ export default function DashboardMap() {
           <ChevronUp className="h-5 w-5" />
         </button>
       )}
+
     </div>
+
   );
 }

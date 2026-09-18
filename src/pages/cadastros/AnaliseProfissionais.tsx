@@ -157,6 +157,19 @@ export default function AnaliseProfissionaisPage() {
     [profissionais, profissionalId],
   );
 
+  const resumoMensalTotais = useMemo(
+    () =>
+      resumoMensal.reduce(
+        (acc, row) => ({
+          horasPrevistas: acc.horasPrevistas + (Number(row.horasPrevistas) || 0),
+          totalPlanejado: acc.totalPlanejado + (Number(row.totalPlanejado) || 0),
+          totalExecutado: acc.totalExecutado + (Number(row.totalExecutado) || 0),
+        }),
+        { horasPrevistas: 0, totalPlanejado: 0, totalExecutado: 0 },
+      ),
+    [resumoMensal],
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -293,6 +306,7 @@ export default function AnaliseProfissionaisPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>{t('common.month')}</TableHead>
+                          <TableHead className="text-right">{t('professionalAnalysis.forecastHours')}</TableHead>
                           <TableHead className="text-right">{t('professionalAnalysis.plannedHours')}</TableHead>
                           <TableHead className="text-right">{t('professionalAnalysis.executedHours')}</TableHead>
                           <TableHead className="text-right">{t('professionalAnalysis.profileCost')}</TableHead>
@@ -304,6 +318,9 @@ export default function AnaliseProfissionaisPage() {
                           <TableRow key={`${row.ano}-${row.mes}`}>
                             <TableCell className="text-xs capitalize">
                               {formatMesAno(row.ano, row.mes, i18n.language)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs tabular-nums">
+                              {formatHoras(row.horasPrevistas, i18n.language)}
                             </TableCell>
                             <TableCell className="text-right text-xs tabular-nums">
                               {formatHoras(row.totalPlanejado, i18n.language)}
@@ -319,6 +336,20 @@ export default function AnaliseProfissionaisPage() {
                             </TableCell>
                           </TableRow>
                         ))}
+                        <TableRow className="border-t bg-muted/40 font-medium">
+                          <TableCell className="text-xs">{t('common.total')}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {formatHoras(resumoMensalTotais.horasPrevistas, i18n.language)}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {formatHoras(resumoMensalTotais.totalPlanejado, i18n.language)}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {formatHoras(resumoMensalTotais.totalExecutado, i18n.language)}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">—</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">—</TableCell>
+                        </TableRow>
                       </TableBody>
                     </Table>
                   </div>

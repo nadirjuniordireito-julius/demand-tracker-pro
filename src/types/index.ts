@@ -757,12 +757,23 @@ export interface SemaforoNodeDTO {
   dataInicio: string | null;
   dataFim: string | null;
   percentualExecutado: number | null;
+  percentualExecutadoAnalise: number | null;
   qtdDemandas: number | null;
   qtdDemandasEncerradas: number | null;
   /** Valor total previsto (Meta ou Produto). Preenchido pelo backend quando disponível. */
   valorTotalPrevisto?: number | null;
+  /** Preencher com o valor dos filhos mas levando em consideração apenas se o produto está disponível para início
+  * das atividades conforme previsto no mes/ano inicial em relação à data da consulta
+  */
+  valorTotalPrevistoAnalise?: number | null;
   /** Valor total já executado (Meta ou Produto). Preenchido pelo backend quando disponível. */
   valorTotalExecutado?: number | null;
+  /** Valor total em execução (status E/F). Preenchido pelo backend quando disponível. */
+  valorTotalEmExecucao?: number | null;
+  /** Valor total em encerramento. Preenchido pelo backend quando disponível. */
+  valorTotalEmEncerramento?: number | null;
+  /** Valor total de demandas encerradas. Preenchido pelo backend quando disponível. */
+  valorTotalEncerradas?: number | null;
   /** Status da demanda técnica (quando nivel === 'DEMANDA'). 'Z' = cancelada. Usado para não listar demandas canceladas no semáforo. */
   statusDemanda?: string | null;
   idTermoAbertura: number | null;

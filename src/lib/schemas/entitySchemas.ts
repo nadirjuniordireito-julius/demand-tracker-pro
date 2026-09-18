@@ -157,10 +157,15 @@ export const semaforoNodeSchema: z.ZodType<unknown> = z.lazy(() =>
     dataInicio: z.string().nullable().optional(),
     dataFim: z.string().nullable().optional(),
     percentualExecutado: z.number().nullable().optional(),
+    percentualExecutadoAnalise: z.number().nullable().optional(),
     qtdDemandas: z.number().nullable().optional(),
     qtdDemandasEncerradas: z.number().nullable().optional(),
     valorTotalPrevisto: z.number().nullable().optional(),
+    valorTotalPrevistoAnalise: z.number().nullable().optional(),
     valorTotalExecutado: z.number().nullable().optional(),
+    valorTotalEmExecucao: z.number().nullable().optional(),
+    valorTotalEmEncerramento: z.number().nullable().optional(),
+    valorTotalEncerradas: z.number().nullable().optional(),
     statusDemanda: z.string().nullable().optional(),
     status_demanda: z.string().nullable().optional(),
     situacao: z.string().nullable().optional(),
@@ -283,6 +288,7 @@ export const profissionalDemandaTecnicaResumoMensalSchema = z.object({
   totalExecutado: z.number(),
   valorCustoPerfil: z.number(),
   valorCustoMensal: z.number(),
+  horasPrevistas: z.number(),
 });
 
 export const profissionalDemandasTecnicasResponseSchema = z.object({

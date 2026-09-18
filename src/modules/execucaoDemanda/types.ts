@@ -97,6 +97,7 @@ export interface ProfissionalDemandaTecnicaResumoMensalDTO {
   totalExecutado: number;
   valorCustoPerfil: number;
   valorCustoMensal: number;
+  horasPrevistas: number;
 }
 
 /** Wrapper do GET /api/profissionais/{id}/demandas-tecnicas */

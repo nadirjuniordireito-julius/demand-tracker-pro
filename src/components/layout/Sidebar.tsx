@@ -27,6 +27,8 @@ import { useProject } from '@/contexts/ProjectContext';
 interface SidebarProps {
   isCollapsed: boolean;
   onToggleSidebar: () => void;
+  /** Recolhe o menu (sem toggle). Usado ao escolher Dashboard. */
+  onCollapseSidebar?: () => void;
 }
 
 interface NavItemProps {
@@ -35,6 +37,7 @@ interface NavItemProps {
   label: string;
   isCollapsed: boolean;
   end?: boolean;
+  onClick?: () => void;
 }
 
 interface NavGroupProps {
@@ -52,11 +55,12 @@ interface NavGroupProps {
   onToggle: () => void;
 }
 
-function NavItem({ to, icon, label, isCollapsed, end = false }: NavItemProps) {
+function NavItem({ to, icon, label, isCollapsed, end = false, onClick }: NavItemProps) {
   return (
     <NavLink
       to={to}
       end={end}
+      onClick={onClick}
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 text-sm font-light',
@@ -180,7 +184,7 @@ const CADASTROS_GROUP_ID = 'cadastros';
 const DEMANDAS_GROUP_ID = 'demandas';
 const GERENCIAL_GROUP_ID = 'gerencial';
 
-export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggleSidebar, onCollapseSidebar }: SidebarProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { selectedProject } = useProject();
@@ -228,6 +232,7 @@ export function Sidebar({ isCollapsed, onToggleSidebar }: SidebarProps) {
           icon={<LayoutDashboard className="h-5 w-5" />} 
           label={t('nav.dashboard')} 
           isCollapsed={isCollapsed}
+          onClick={onCollapseSidebar}
         />
 
         {/* Cadastros Group - apenas perfil Admin (A) */}

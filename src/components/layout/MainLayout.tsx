@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -11,10 +11,22 @@ import { cn } from '@/lib/utils';
 export function MainLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { selectedProject, isLoading, showSelectionModal } = useProject();
+  const location = useLocation();
 
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
   };
+
+  const handleCollapseSidebar = () => {
+    setIsSidebarCollapsed(true);
+  };
+
+  // Ao entrar no Dashboard, recolhe o menu principal para dar espaço à tela.
+  useEffect(() => {
+    if (location.pathname === '/dashboard') {
+      setIsSidebarCollapsed(true);
+    }
+  }, [location.pathname]);
 
   // Mostra loading enquanto carrega
   if (isLoading) {
@@ -41,14 +53,15 @@ export function MainLayout() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar 
           isCollapsed={isSidebarCollapsed} 
-          onToggleSidebar={handleToggleSidebar} 
+          onToggleSidebar={handleToggleSidebar}
+          onCollapseSidebar={handleCollapseSidebar}
         />
         
         <main className={cn(
           'flex-1 overflow-auto p-6',
           'transition-all duration-300'
         )}>
-          <div className="container mx-auto max-w-7xl animate-fade-in">
+          <div className="container mx-auto animate-fade-in">
             <Outlet />
           </div>
         </main>
