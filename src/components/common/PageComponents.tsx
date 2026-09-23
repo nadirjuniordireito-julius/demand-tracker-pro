@@ -50,6 +50,8 @@ interface SearchFilterBarProps {
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
   onRefresh?: () => void;
+  /** Rendered after the refresh button (e.g. download). */
+  afterActions?: ReactNode;
   children?: ReactNode;
 }
 
@@ -58,6 +60,7 @@ export function SearchFilterBar({
   onSearchChange, 
   searchPlaceholder,
   onRefresh,
+  afterActions,
   children 
 }: SearchFilterBarProps) {
   const { t } = useTranslation();
@@ -75,10 +78,11 @@ export function SearchFilterBar({
       </div>
       {children}
       {onRefresh && (
-        <Button variant="outline" size="icon" onClick={onRefresh} title={t('common.refresh')} aria-label={t('common.refresh')}>
+        <Button variant="outline" size="icon" onClick={() => onRefresh()} title={t('common.refresh')} aria-label={t('common.refresh')}>
           <RefreshCw className="h-4 w-4" />
         </Button>
       )}
+      {afterActions}
     </div>
   );
 }

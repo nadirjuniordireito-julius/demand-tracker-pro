@@ -3,7 +3,7 @@
 // Serviço de CRUD para entidade ProjetoMeta
 // =====================================================
 
-import api from './api';
+import api, { downloadBlob } from './api';
 import type { 
   ProjetoMeta, 
   ProjetoMetaCreateDTO, 
@@ -14,7 +14,14 @@ import type {
 const ENDPOINTS = {
   base: '/projeto-metas',
   byId: (id: number) => `/projeto-metas/${id}`,
+  termosDownload: (id: number) => `/projeto-metas/${id}/termos/download`,
 };
+
+export interface TermosDownloadFlags {
+  abertura?: boolean;
+  planejamento?: boolean;
+  encerramento?: boolean;
+}
 
 export interface ProjetoMetaFilters {
   nome?: string;
@@ -85,6 +92,20 @@ export const projetoMetaService = {
    */
   async delete(id: number): Promise<void> {
     return api.delete(ENDPOINTS.byId(id));
+  },
+
+  /**
+   * Baixa ZIP com termos (abertura, planejamento, encerramento) das demandas da meta
+   */
+  async downloadTermosZip(
+    id: number,
+    flags: TermosDownloadFlags = {},
+  ): Promise<Blob> {
+    const params = new URLSearchParams();
+    params.set('abertura', String(flags.abertura === true));
+    params.set('planejamento', String(flags.planejamento === true));
+    params.set('encerramento', String(flags.encerramento === true));
+    return downloadBlob(`${ENDPOINTS.termosDownload(id)}?${params.toString()}`);
   },
 };
 

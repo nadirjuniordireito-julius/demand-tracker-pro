@@ -5,12 +5,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Edit, Trash2, FileText, FilePlus, FileCheck, FileX, ChevronRight, ChevronDown, XCircle, ClipboardList } from 'lucide-react';
+import { Edit, Trash2, FileText, FilePlus, FileCheck, FileX, ChevronRight, ChevronDown, XCircle, ClipboardList, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogHeaderStandard } from '@/components/common/DialogHeaderStandard';
 import { getStatusBadge } from '@/components/common/statusBadge';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { PageHeader, SearchFilterBar, EmptyState, FilterSelect, TablePagination } from '@/components/common/PageComponents';
@@ -26,6 +27,8 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useApi } from '@/hooks/useApi';
+import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/apiErrorHandler';
 import { demandaService } from '@/services/demandaService';
 import { projetoMetaService, metaProdutoService, termoEncerramentoService, termoPlanejamentoService } from '@/services';
 import { demandaExecucaoService } from '@/modules/execucaoDemanda/services/demandaExecucaoService';
@@ -57,6 +60,7 @@ export default function DemandasPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const { user } = useAuth();
   const { selectedProject } = useProject();
   const selectedProjectId = selectedProject?.id;
@@ -74,6 +78,11 @@ export default function DemandasPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isDownloadTermsOpen, setIsDownloadTermsOpen] = useState(false);
+  const [downloadAbertura, setDownloadAbertura] = useState(true);
+  const [downloadPlanejamento, setDownloadPlanejamento] = useState(true);
+  const [downloadEncerramento, setDownloadEncerramento] = useState(true);
+  const [isDownloadingTerms, setIsDownloadingTerms] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaTecnica | null>(null);
   const [currentPage, setCurrentPage] = useState(initialListState.currentPage);
   const [pageSize, setPageSize] = useState(initialListState.pageSize);
@@ -463,6 +472,50 @@ export default function DemandasPage() {
     }
   };
 
+  const canDownloadTerms = selectedMetaId !== 'all' && !!selectedMetaId;
+
+  const handleOpenDownloadTerms = () => {
+    setDownloadAbertura(true);
+    setDownloadPlanejamento(true);
+    setDownloadEncerramento(true);
+    setIsDownloadTermsOpen(true);
+  };
+
+  const handleConfirmDownloadTerms = async () => {
+    if (!canDownloadTerms) return;
+    if (!downloadAbertura && !downloadPlanejamento && !downloadEncerramento) return;
+
+    const metaId = Number(selectedMetaId);
+    if (!Number.isFinite(metaId)) return;
+
+    const meta = metasFiltro.find((m) => m.id === metaId);
+    setIsDownloadingTerms(true);
+    try {
+      const blob = await projetoMetaService.downloadTermosZip(metaId, {
+        abertura: downloadAbertura,
+        planejamento: downloadPlanejamento,
+        encerramento: downloadEncerramento,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `termos-${meta?.codigo ?? metaId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setIsDownloadTermsOpen(false);
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('demands.downloadTermsError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloadingTerms(false);
+    }
+  };
+
   // Renderiza a caixa de custos (planejados ou finais) com mesma estrutura
   const renderCostsBox = (
     title: string,
@@ -638,7 +691,7 @@ export default function DemandasPage() {
         <ErrorState
           title={t('common.errorTitle')}
           message={error}
-          onRetry={loadData}
+          onRetry={() => void loadData()}
           retryText={t('common.retry')}
         />
       </div>
@@ -660,7 +713,19 @@ export default function DemandasPage() {
         searchValue={search} 
         onSearchChange={(v) => { setSearch(v); setCurrentPage(0); }} 
         searchPlaceholder={t('demands.searchByCode')} 
-        onRefresh={loadData}
+        onRefresh={() => void loadData()}
+        afterActions={
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={!canDownloadTerms}
+            onClick={handleOpenDownloadTerms}
+            title={t('demands.downloadTermsTooltip')}
+            aria-label={t('demands.downloadTermsTooltip')}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        }
       >
         <FilterSelect 
           value={statusFilter} 
@@ -856,6 +921,68 @@ export default function DemandasPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Download Terms Dialog */}
+      <Dialog open={isDownloadTermsOpen} onOpenChange={setIsDownloadTermsOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeaderStandard
+            title={t('demands.downloadTermsTitle')}
+            description={t('demands.downloadTermsDescription')}
+          />
+          <div className="grid gap-3 py-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="download-abertura"
+                checked={downloadAbertura}
+                onCheckedChange={(checked) => setDownloadAbertura(checked === true)}
+                disabled={isDownloadingTerms}
+              />
+              <label htmlFor="download-abertura" className="text-sm cursor-pointer">
+                {t('nav.openingTerm')}
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="download-planejamento"
+                checked={downloadPlanejamento}
+                onCheckedChange={(checked) => setDownloadPlanejamento(checked === true)}
+                disabled={isDownloadingTerms}
+              />
+              <label htmlFor="download-planejamento" className="text-sm cursor-pointer">
+                {t('nav.planningTerm')}
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="download-encerramento"
+                checked={downloadEncerramento}
+                onCheckedChange={(checked) => setDownloadEncerramento(checked === true)}
+                disabled={isDownloadingTerms}
+              />
+              <label htmlFor="download-encerramento" className="text-sm cursor-pointer">
+                {t('nav.closingTerm')}
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDownloadTermsOpen(false)}
+              disabled={isDownloadingTerms}
+            >
+              {t('common.cancel')}
+            </Button>
+            <LoadingButton
+              onClick={handleConfirmDownloadTerms}
+              isLoading={isDownloadingTerms}
+              loadingText={t('common.processing')}
+              disabled={!downloadAbertura && !downloadPlanejamento && !downloadEncerramento}
+            >
+              {t('common.download')}
+            </LoadingButton>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
