@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Search, Filter, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ interface SearchFilterBarProps {
   /** Rendered after the refresh button (e.g. download). */
   afterActions?: ReactNode;
   children?: ReactNode;
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 export function SearchFilterBar({ 
@@ -61,7 +62,8 @@ export function SearchFilterBar({
   searchPlaceholder,
   onRefresh,
   afterActions,
-  children 
+  children,
+  inputRef,
 }: SearchFilterBarProps) {
   const { t } = useTranslation();
   
@@ -70,6 +72,7 @@ export function SearchFilterBar({
       <div className="relative flex-1 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
+          ref={inputRef}
           placeholder={searchPlaceholder || t('common.search')}
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}

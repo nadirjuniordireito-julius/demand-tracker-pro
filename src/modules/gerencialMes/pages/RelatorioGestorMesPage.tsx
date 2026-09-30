@@ -135,7 +135,6 @@ export default function RelatorioGestorMesPage() {
         projetoId: projectId,
       });
       
-      console.log(data);
       setRelatorio(data);
     } catch (e) {
       if (e instanceof ApiError) {

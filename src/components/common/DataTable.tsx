@@ -24,8 +24,15 @@ export interface Column<T> {
   sortable?: boolean;
   className?: string;
   render?: (item: T) => React.ReactNode;
-  hideOnMobile?: boolean; // Oculta coluna em telas pequenas
+  /** `true` = esconde abaixo de `sm`; `'md'` = esconde abaixo de `md` */
+  hideOnMobile?: boolean | 'md';
   minWidth?: string; // Largura mínima da coluna
+}
+
+function hideOnMobileClass(hideOnMobile?: boolean | 'md'): string {
+  if (hideOnMobile === 'md') return 'hidden md:table-cell';
+  if (hideOnMobile) return 'hidden sm:table-cell';
+  return '';
 }
 
 export interface Action<T> {
@@ -120,7 +127,7 @@ export function DataTable<T>({
                 className={`
                   ${column.sortable ? 'cursor-pointer hover:bg-muted/50' : ''} 
                   ${column.className || ''}
-                  ${column.hideOnMobile ? 'hidden sm:table-cell' : ''}
+                  ${hideOnMobileClass(column.hideOnMobile)}
                   px-2 sm:px-4
                   whitespace-nowrap
                 `}
@@ -218,7 +225,7 @@ export function DataTable<T>({
                         className={`
                           py-2
                           ${column.key === columns[0]?.key ? 'font-normal' : ''}
-                          ${column.hideOnMobile ? 'hidden sm:table-cell' : ''}
+                          ${hideOnMobileClass(column.hideOnMobile)}
                           px-2 sm:px-4
                           text-xs sm:text-sm
                         `}

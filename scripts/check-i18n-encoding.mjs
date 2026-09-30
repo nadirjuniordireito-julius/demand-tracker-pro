@@ -52,4 +52,4 @@ if (hasError) {
   process.exit(1);
 }
 
-console.log('[i18n-check] OK: locale files sem sinais de corrupção.');
+

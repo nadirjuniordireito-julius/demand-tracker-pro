@@ -155,7 +155,7 @@ export default function DashboardMap() {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
-      console.log(semaforo);
+     
       return semaforo;
     });
   }, [projectId, execute]);

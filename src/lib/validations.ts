@@ -372,7 +372,7 @@ export const termoPlanejamentoSchema = z.object({
     .string()
     .trim()
     .min(10, { message: 'validation.scheduleMin10' })
-    .max(2000, { message: 'validation.scheduleMax2000' }),
+    .max(5000, { message: 'validation.specMax5000' }),
   dataInicioExecucao: z.date().optional().nullable(),
   dataFimExecucao: z.date().optional().nullable(),
   resultadoEsperado: z

@@ -50,7 +50,7 @@ async function fetchAllCustosByAnoMes(ano: number, mes: number): Promise<Profiss
     size: 500,
     sort: 'profissionalId,asc',
   });
-  console.log('profissionalCustoMensalService.findAll', { ano, mes, page: 0 }, first);
+  
   const all = [...first.content];
   for (let p = 1; p < first.totalPages; p++) {
     const page = await profissionalCustoMensalService.findAll({
@@ -60,7 +60,7 @@ async function fetchAllCustosByAnoMes(ano: number, mes: number): Promise<Profiss
       size: 500,
       sort: 'profissionalId,asc',
     });
-    console.log('profissionalCustoMensalService.findAll', { ano, mes, page: p }, page);
+    
     all.push(...page.content);
   }
   return all;
