@@ -610,6 +610,8 @@
       "welcome": "Bem vindo",
       "goals": "Metas",
       "projectSummary": "Valores totais do projeto",
+      "exportSpreadsheet": "Exportar planilha",
+      "exportSpreadsheetError": "Não foi possível exportar a planilha do projeto.",
       "plannedValue": "Previsto",
       "executedValue": "Executado",
       "executingValue": "Em Execução",

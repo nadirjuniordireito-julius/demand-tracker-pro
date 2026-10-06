@@ -9,11 +9,13 @@ import {
   ChevronUp,
   ChevronRight,
   Eye,
+  FileSpreadsheet,
   FileText,
   Files,
   Frown,
   HeartPulse,
   Info,
+  Loader2,
   Package,
   PieChart,
   Star,
@@ -23,12 +25,15 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { projetoService } from '@/services/projetoService';
 import { metaProdutoService } from '@/services/metaProdutoService';
 import { useApi } from '@/hooks/useApi';
+import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/apiErrorHandler';
 import type { ProdutoEvolucaoTrimestralDTO, ProdutoResumoDTO, SemaforoNodeDTO } from '@/types';
 import ProductMarketSharePieChart from '@/pages/charts/ProductMarketSharePieChart';
 import ProductBarChart3 from '@/pages/charts/ProductBarChart3';
@@ -130,12 +135,14 @@ export default function DashboardMap() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const { user } = useAuth();
   const { selectedProject } = useProject();
   const projectId = selectedProject?.id ?? null;
   const hideTableActions = user?.perfil === 'V';
   const produtosTableColSpan = hideTableActions ? 7 : 8;
   const demandasTableColSpan = hideTableActions ? 6 : 7;
+  const [isDownloadingPlanilha, setIsDownloadingPlanilha] = useState(false);
 
   const { data, isLoading, error, execute } = useApi<SemaforoNodeDTO | null>(null, {
     showErrorToast: true,
@@ -155,7 +162,7 @@ export default function DashboardMap() {
     if (!projectId) return;
     void execute(async () => {
       const semaforo = await projetoService.getSemaforo(projectId);
-     
+      console.log('here: ',semaforo);
       return semaforo;
     });
   }, [projectId, execute]);
@@ -319,6 +326,31 @@ export default function DashboardMap() {
     },
     [scrollRightColumnToTopIfNeeded],
   );
+
+  const handleDownloadPlanilha = useCallback(async () => {
+    if (!projectId || isDownloadingPlanilha) return;
+    setIsDownloadingPlanilha(true);
+    try {
+      const blob = await projetoService.downloadPlanilha(projectId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileSlug = selectedProject?.codTed?.replace(/[\\/:*?"<>|]/g, '-') || String(projectId);
+      a.download = `planilha-demandas-${fileSlug}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t('dashboard.map.exportSpreadsheetError')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloadingPlanilha(false);
+    }
+  }, [projectId, isDownloadingPlanilha, selectedProject?.codTed, toast, t]);
 
   useEffect(() => {
     try {
@@ -600,12 +632,34 @@ export default function DashboardMap() {
           <div className="space-y-4 xl:col-span-3">
             <Card className="rounded-sm border-[1.5px] border-[rgb(100_163_251)]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">
-                  <span className="inline-flex items-center gap-2">
-                    <Package className="h-4 w-4 text-slate-500" />
-                    <span>{t('dashboard.map.projectSummary')}</span>
-                  </span>
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">
+                    <span className="inline-flex items-center gap-2">
+                      <Package className="h-4 w-4 text-slate-500" />
+                      <span>{t('dashboard.map.projectSummary')}</span>
+                    </span>
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        disabled={!projectId || isDownloadingPlanilha}
+                        aria-label={t('dashboard.map.exportSpreadsheet')}
+                        onClick={() => void handleDownloadPlanilha()}
+                      >
+                        {isDownloadingPlanilha ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileSpreadsheet className="h-4 w-4 text-slate-500" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('dashboard.map.exportSpreadsheet')}</TooltipContent>
+                  </Tooltip>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2">

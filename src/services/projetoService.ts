@@ -3,7 +3,7 @@
 // Serviço de CRUD para entidade Projeto
 // =====================================================
 
-import api from './api';
+import api, { downloadBlob } from './api';
 import { projetoSchema, paginatedProjetoSchema, semaforoNodeSchema } from '@/lib/schemas';
 import type { 
   Projeto, 
@@ -18,6 +18,7 @@ const ENDPOINTS = {
   byId: (id: number) => `/projetos/${id}`,
   totais: (id: number) => `/projetos/${id}/totais`,
   semaforo: (id: number) => `/projetos/${id}/semaforo`,
+  planilha: (id: number) => `/projetos/${id}/planilha`,
 };
 
 /** Preenche statusDemanda em cada nó a partir de status_demanda ou situacao (resposta do backend em snake_case). */
@@ -85,6 +86,13 @@ export const projetoService = {
   async getSemaforo(id: number): Promise<SemaforoNodeDTO> {
     const raw = await api.get<SemaforoNodeDTO>(ENDPOINTS.semaforo(id), { schema: semaforoNodeSchema });
     return normalizeSemaforoStatusDemanda(raw);
+  },
+
+  /**
+   * Download da planilha de demandas do projeto (GET /projetos/{id}/planilha).
+   */
+  async downloadPlanilha(id: number): Promise<Blob> {
+    return downloadBlob(ENDPOINTS.planilha(id));
   },
 
   /**

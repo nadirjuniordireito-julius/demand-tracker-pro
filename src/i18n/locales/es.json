@@ -576,6 +576,8 @@
       "welcome": "Bienvenido",
       "goals": "Metas",
       "projectSummary": "Valores totales del proyecto",
+      "exportSpreadsheet": "Exportar hoja de cálculo",
+      "exportSpreadsheetError": "No se pudo exportar la hoja de cálculo del proyecto.",
       "plannedValue": "Planificado",
       "executedValue": "Ejecutado",
       "executingValue": "En Ejecución",

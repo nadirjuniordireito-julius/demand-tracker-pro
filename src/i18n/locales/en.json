@@ -576,6 +576,8 @@
       "welcome": "Welcome",
       "goals": "Goals",
       "projectSummary": "Project total values",
+      "exportSpreadsheet": "Export spreadsheet",
+      "exportSpreadsheetError": "Could not export the project spreadsheet.",
       "plannedValue": "Planned",
       "executedValue": "Executed",
       "executingValue": "In Execution",
