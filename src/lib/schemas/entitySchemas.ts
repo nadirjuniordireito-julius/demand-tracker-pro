@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 // --- Enums e reutilizáveis ---
 const userStatusSchema = z.enum(['A', 'I']);
-const userProfileSchema = z.enum(['A', 'O', 'V']);
+const userProfileSchema = z.enum(['A', 'O', 'V', 'D']);
 const demandStatusSchema = z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Z']);
 const semaforoNivelSchema = z.enum(['PROJETO', 'META', 'PRODUTO', 'DEMANDA']);
 const semaforoStatusSchema = z.enum(['VERDE', 'AMARELO', 'VERMELHO', 'CINZA']);

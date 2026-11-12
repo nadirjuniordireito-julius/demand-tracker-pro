@@ -14,6 +14,8 @@ export default function DashboardPage() {
       return <DashboardMap />;
     case 'V':
       return <DashboardMap />;
+    case 'D':
+      return <DashboardMap />;    
     default:
       return <DashboardPageVisualizador />;
   }

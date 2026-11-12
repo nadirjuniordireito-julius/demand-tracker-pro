@@ -12,7 +12,7 @@ export const COORDENADOR_UNID_DESCENTRALIZADORA = 'LAWRENCE NOBREGA DE OLIVEIRA'
 export type UserStatus = 'A' | 'I'; // A = Ativo, I = Inativo
 
 // Enum para perfil de usuário
-export type UserProfile = 'A' | 'O' | 'V'; // A = Admin, O = Operador, V = Visualizador
+export type UserProfile = 'A' | 'O' | 'V' | 'D'; // A = Admin, O = Operador, V = Visualizador, D = Documentador
 
 // Enum para status da demanda técnica (políticas de segurança)
 // A=Em elaboração, B=Em abertura, C=Aberta e assinada, D=Em planejamento,

@@ -27,7 +27,7 @@ export const usuarioSchema = z.object({
     .max(50, { message: 'validation.passwordMax50' })
     .optional()
     .or(z.literal('')),
-  perfil: z.enum(['A', 'O', 'V'], { 
+  perfil: z.enum(['A', 'O', 'V', 'D'], { 
     required_error: 'validation.profileRequired' 
   }),
   status: z.enum(['A', 'I'], { 

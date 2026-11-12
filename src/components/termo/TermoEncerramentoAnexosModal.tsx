@@ -71,7 +71,7 @@ export function TermoEncerramentoAnexosModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const statusCode = normalizeDemandaStatus(demandaStatus);
-  const canEdit = statusCode === 'E' || statusCode === 'F';
+  const canEdit = true; // statusCode === 'E' || statusCode === 'F';
 
   const loadAnexos = useCallback(async () => {
     if (termoEncerramentoId == null || !open) return;
@@ -186,8 +186,7 @@ export function TermoEncerramentoAnexosModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{t('closingTerm.attachments.title')}</DialogTitle>
-            <DialogDescription>{t('closingTerm.attachments.description')}</DialogDescription>
+            <DialogTitle>{t('closingTerm.attachments.title')}</DialogTitle>         
           </DialogHeader>
 
           {!canEdit && (

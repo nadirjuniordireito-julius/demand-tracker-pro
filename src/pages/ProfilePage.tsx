@@ -128,6 +128,7 @@ export default function ProfilePage() {
       A: t('users.administrator'),
       O: t('users.operator'),
       V: t('users.viewer'),
+      D: t('users.documentador'),
     };
     return profiles[user.perfil] || user.perfil;
   };

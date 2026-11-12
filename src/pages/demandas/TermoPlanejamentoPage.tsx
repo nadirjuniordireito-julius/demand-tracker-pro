@@ -97,6 +97,7 @@ export default function TermoPlanejamentoPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isDocumentador = user?.perfil === 'D';
   const { selectedProject } = useProject();
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
@@ -930,10 +931,12 @@ export default function TermoPlanejamentoPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">{t('planningTerm.costs')}</CardTitle>
-                        <Button type="button" variant="ghost" size="sm" onClick={handleAddCusto}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          {t('planningTerm.addCost')}
-                        </Button>
+                        {!isDocumentador && (
+                          <Button type="button" variant="ghost" size="sm" onClick={handleAddCusto}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            {t('planningTerm.addCost')}
+                          </Button>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-1.5">
@@ -1003,16 +1006,18 @@ export default function TermoPlanejamentoPage() {
                                       {totalLinha > 0 ? formatCurrency(totalLinha) : '—'}
                                     </div>
                                   </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                                    onClick={() => handleRemoveCusto(index)}
-                                    aria-label={t('common.remove')}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  {!isDocumentador && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                                      onClick={() => handleRemoveCusto(index)}
+                                      aria-label={t('common.remove')}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </div>
                                 {custoErrors[index] && (
                                   <p className="text-xs text-destructive">{custoErrors[index]}</p>
@@ -1069,18 +1074,20 @@ export default function TermoPlanejamentoPage() {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleDeleteDocument}
-                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoPlanejamento(demandaStatus)}
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title={getRestrictionTooltip('deleteDoc') ?? t('planningTerm.deleteDocument')}
-                      aria-label={t('planningTerm.deleteDocument')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!isDocumentador && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDeleteDocument}
+                        disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoPlanejamento(demandaStatus)}
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title={getRestrictionTooltip('deleteDoc') ?? t('planningTerm.deleteDocument')}
+                        aria-label={t('planningTerm.deleteDocument')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1103,14 +1110,16 @@ export default function TermoPlanejamentoPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="min-w-[220px]">
-                        <DropdownMenuItem
-                          onClick={handleGeneratePdf}
-                          disabled={!selectedProject || !canUploadTermoPlanejamento(demandaStatus)}
-                          title={getRestrictionTooltip('upload')}
-                        >
-                          <FileDown className="h-4 w-4 mr-2" />
-                          {t('planningTerm.generatePdf')}
-                        </DropdownMenuItem>
+                        {user?.perfil !== 'D' && (
+                          <DropdownMenuItem
+                            onClick={handleGeneratePdf}
+                            disabled={!selectedProject || !canUploadTermoPlanejamento(demandaStatus)}
+                            title={getRestrictionTooltip('upload')}
+                          >
+                            <FileDown className="h-4 w-4 mr-2" />
+                            {t('planningTerm.generatePdf')}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={handleOpenUpload}
                           disabled={!canUploadTermoPlanejamento(demandaStatus)}
@@ -1122,7 +1131,7 @@ export default function TermoPlanejamentoPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  {selectedTermo && canEdit && (
+                  {!isDocumentador && selectedTermo && canEdit && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -1141,7 +1150,7 @@ export default function TermoPlanejamentoPage() {
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  {canEdit && (
+                  {!isDocumentador && canEdit && (
                     <LoadingButton
                       type="submit"
                       isLoading={isSaving}
@@ -1291,7 +1300,7 @@ export default function TermoPlanejamentoPage() {
           })
         }
         assinarEletronica={
-          documento && user && canAssinar
+          !isDocumentador && documento && user && canAssinar
             ? { tipo: 'planejamento', docId: documento.id, userId: user.id }
             : undefined
         }
@@ -1304,7 +1313,7 @@ export default function TermoPlanejamentoPage() {
           await loadData();
         }}
         renderSignButton={({ pdfBlob, openSignatureDialog }) =>
-          documento && !documento.dataAssinatura ? (
+          !isDocumentador && documento && !documento.dataAssinatura ? (
             <Button
               type="button"
               size="sm"

@@ -71,6 +71,7 @@ export default function TermoAberturaPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isDocumentador = user?.perfil === 'D';
   const { selectedProject } = useProject();
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [selectedTermo, setSelectedTermo] = useState<TermoAbertura | null>(null);
@@ -584,18 +585,20 @@ export default function TermoAberturaPage() {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleDeleteDocument}
-                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoAbertura(demanda?.status ?? demanda?.situacao)}
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title={t('openingTerm.deleteDocument')}
-                      aria-label={t('openingTerm.deleteDocument')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!isDocumentador && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDeleteDocument}
+                        disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoAbertura(demanda?.status ?? demanda?.situacao)}
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title={t('openingTerm.deleteDocument')}
+                        aria-label={t('openingTerm.deleteDocument')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -618,18 +621,20 @@ export default function TermoAberturaPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="min-w-[220px]">
-                        <DropdownMenuItem
-                          onClick={handleGeneratePdf}
-                          disabled={!canGenerateTermoAbertura(demanda?.status ?? demanda?.situacao)}
-                          title={
-                            !canGenerateTermoAbertura(demanda?.status ?? demanda?.situacao)
-                              ? t('openingTerm.statusRestrictionGenerate')
-                              : undefined
-                          }
-                        >
-                          <FileDown className="h-4 w-4 mr-2" />
-                          {t('openingTerm.generatePdf')}
-                        </DropdownMenuItem>
+                        {user?.perfil !== 'D' && (
+                          <DropdownMenuItem
+                            onClick={handleGeneratePdf}
+                            disabled={!canGenerateTermoAbertura(demanda?.status ?? demanda?.situacao)}
+                            title={
+                              !canGenerateTermoAbertura(demanda?.status ?? demanda?.situacao)
+                                ? t('openingTerm.statusRestrictionGenerate')
+                                : undefined
+                            }
+                          >
+                            <FileDown className="h-4 w-4 mr-2" />
+                            {t('openingTerm.generatePdf')}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={handleOpenUpload}
                           disabled={!canUploadTermoAbertura(demanda?.status ?? demanda?.situacao)}
@@ -645,7 +650,7 @@ export default function TermoAberturaPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  {selectedTermo && canDeleteTermoAbertura(demanda?.status ?? demanda?.situacao) && (
+                  {!isDocumentador && selectedTermo && canDeleteTermoAbertura(demanda?.status ?? demanda?.situacao) && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -668,7 +673,7 @@ export default function TermoAberturaPage() {
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  {canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) || (!!demanda && !selectedTermo && demanda?.status == null && demanda?.situacao == null) ? (
+                  {!isDocumentador && (canSaveTermoAbertura(demanda?.status ?? demanda?.situacao) || (!!demanda && !selectedTermo && demanda?.status == null && demanda?.situacao == null)) ? (
                     <LoadingButton
                       type="submit"
                       isLoading={isSaving}

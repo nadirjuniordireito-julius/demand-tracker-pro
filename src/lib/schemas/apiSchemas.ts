@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 const userStatusSchema = z.enum(['A', 'I']);
-const userProfileSchema = z.enum(['A', 'O', 'V']);
+const userProfileSchema = z.enum(['A', 'O', 'V', 'D']);
 
 /** Schema para a entidade Usuario (resposta /auth/me e dentro de AuthResponse) */
 export const usuarioSchema = z.object({

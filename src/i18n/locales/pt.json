@@ -173,6 +173,8 @@
     "welcomeOperador": "Área do Operador",
     "descriptionOperador": "Gerencie demandas e projetos liberados para você.",
     "welcomeVisualizador": "Área do Visualizador",
+    "welcomeDocumentador": "Bem vindo {{name}}",
+    "welcomeDocumentadorFallback": "Bem vindo",
     "descriptionVisualizador": "Consulte demandas e projetos conforme suas permissões.",
     "technicalTermsForSignature": "Termos de Demandas Técnicas para assinatura"
   },
@@ -721,6 +723,7 @@
     "administrator": "Administrador",
     "operator": "Operador",
     "viewer": "Visualizador",
+    "documentador": "Documentador",
     "active": "Ativo",
     "inactive": "Inativo",
     "deleteConfirm": "Tem certeza que deseja excluir este usuário?",
@@ -1477,7 +1480,7 @@
     "generatePdfError": "Erro ao gerar PDF do template",
     "attachments": {
       "title": "Anexos",
-      "description": "Anexos de apoio à consulta. Inclusão e exclusão permitidas quando a demanda estiver com status E ou F (Planejado e assinado ou Em encerramento).",
+      "description": "Anexos de apoio à consulta",
       "onlyWhenStatusE": "Inclusão e exclusão de anexos só são permitidas quando a demanda estiver com status E ou F (Planejado e assinado ou Em encerramento).",
       "selectFile": "Selecione um arquivo",
       "upload": "Enviar",

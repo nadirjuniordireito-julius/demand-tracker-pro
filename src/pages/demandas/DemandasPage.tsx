@@ -327,7 +327,7 @@ export default function DemandasPage() {
   }, []);
 
   const handleAdd = () => {
-    if (!selectedProject) {
+    if (user?.perfil === 'D' || !selectedProject) {
       // TODO: Mostrar mensagem de erro ou redirecionar para seleção de projeto
       return;
     }
@@ -394,6 +394,7 @@ export default function DemandasPage() {
       label: t('common.edit'),
       icon: <Edit className="h-4 w-4" />,
       onClick: handleEdit,
+      visible: () => user?.perfil !== 'D',
     },
     {
       label: t('nav.openingTerm'),
@@ -424,20 +425,20 @@ export default function DemandasPage() {
       label: t('avaliacaoDemanda.actionLabel'),
       icon: <ClipboardList className="h-4 w-4" />,
       onClick: (demanda) => navigate(`/demandas/avaliacao?demandaId=${demanda.id}`),
-      visible: (demanda) => canAvaliarDemanda(demanda),
+      visible: (demanda) => user?.perfil !== 'D' && canAvaliarDemanda(demanda),
     },
     {
       label: t('execucao.manageExecution', 'Execução'),
       icon: <ClipboardList className="h-4 w-4" />,
       onClick: (demanda) => navigate(`/execucao-demandas/${demanda.id}`),
-      visible: (demanda) => execucaoExistsByDemandaId[demanda.id] === true,
+      visible: (demanda) => user?.perfil !== 'D' && execucaoExistsByDemandaId[demanda.id] === true,
     },
     {
       label: t('demands.cancelDemand'),
       icon: <XCircle className="h-4 w-4" />,
       onClick: handleCancel,
       variant: 'destructive',
-      visible: (demanda) => canCancelDemanda(demanda.status ?? demanda.situacao),
+      visible: (demanda) => user?.perfil !== 'D' && canCancelDemanda(demanda.status ?? demanda.situacao),
     },
     {
       label: t('common.delete'),
@@ -445,9 +446,9 @@ export default function DemandasPage() {
       onClick: handleDelete,
       variant: 'destructive',
       separator: true,
-      visible: (demanda) => canDeleteDemanda(demanda.status ?? demanda.situacao),
+      visible: (demanda) => user?.perfil !== 'D' && canDeleteDemanda(demanda.status ?? demanda.situacao),
     },
-  ], [t, navigate, handleEdit, handleDelete, execucaoExistsByDemandaId]);
+  ], [t, navigate, handleEdit, handleDelete, execucaoExistsByDemandaId, user?.perfil]);
 
   const onSubmit = async (data: DemandaFormData) => {
     if (!user || !selectedProject) return;
@@ -705,7 +706,7 @@ export default function DemandasPage() {
       <PageHeader 
         title={t('demands.title')} 
         description={t('common.manageDemands')} 
-        onAdd={handleAdd} 
+        onAdd={user?.perfil === 'D' ? undefined : handleAdd} 
         addLabel={t('demands.newDemand')} 
       />
       
@@ -756,7 +757,7 @@ export default function DemandasPage() {
           title={t('common.noResults')} 
           description={t('common.noDemandsFound')} 
           icon={<FileText className="h-6 w-6 text-muted-foreground" />} 
-          action={<Button onClick={handleAdd}>{t('demands.newDemand')}</Button>} 
+          action={user?.perfil === 'D' ? undefined : <Button onClick={handleAdd}>{t('demands.newDemand')}</Button>} 
         />
       ) : (
         <>

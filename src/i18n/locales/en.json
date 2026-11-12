@@ -173,6 +173,8 @@
     "welcomeOperador": "Operator Area",
     "descriptionOperador": "Manage demands and projects assigned to you.",
     "welcomeVisualizador": "Viewer Area",
+    "welcomeDocumentador": "Welcome {{name}}",
+    "welcomeDocumentadorFallback": "Welcome",
     "descriptionVisualizador": "View demands and projects according to your permissions.",
     "technicalTermsForSignature": "Technical demand terms for signature"
   },
@@ -687,6 +689,7 @@
     "administrator": "Administrator",
     "operator": "Operator",
     "viewer": "Viewer",
+    "documentador": "Documenter",
     "active": "Active",
     "inactive": "Inactive",
     "deleteConfirm": "Are you sure you want to delete this user?",

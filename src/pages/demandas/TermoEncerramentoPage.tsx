@@ -97,6 +97,7 @@ export default function TermoEncerramentoPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isDocumentador = user?.perfil === 'D';
   const { selectedProject } = useProject();
   const [demanda, setDemanda] = useState<DemandaTecnica | null>(null);
   const [execucao, setExecucao] = useState<DemandaExecucaoDTO | null>(null);
@@ -971,10 +972,12 @@ export default function TermoEncerramentoPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">{t('closingTerm.costs')}</CardTitle>
-                        <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          {t('closingTerm.addCost')}
-                        </Button>
+                        {!isDocumentador && (
+                          <Button type="button" variant="outline" size="sm" onClick={handleAddCusto}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            {t('closingTerm.addCost')}
+                          </Button>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-1.5">
@@ -1022,24 +1025,26 @@ export default function TermoEncerramentoPage() {
                                         )}
                                       </SelectContent>
                                     </Select>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="icon"
-                                          className="h-8 w-8 shrink-0 justify-self-center"
-                                          onClick={() => setCustoProfissionaisModalIndex(index)}
-                                          disabled={!custo.perfilId}
-                                          aria-label={t('closingTerm.costProfessionals.composeProfessionalsTooltip')}
-                                        >
-                                          <UserCircle className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        {t('closingTerm.costProfessionals.composeProfessionalsTooltip')}
-                                      </TooltipContent>
-                                    </Tooltip>
+                                    {!isDocumentador && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0 justify-self-center"
+                                            onClick={() => setCustoProfissionaisModalIndex(index)}
+                                            disabled={!custo.perfilId}
+                                            aria-label={t('closingTerm.costProfessionals.composeProfessionalsTooltip')}
+                                          >
+                                            <UserCircle className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                          {t('closingTerm.costProfessionals.composeProfessionalsTooltip')}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
                                     <div className="flex items-center h-8 px-3 rounded-md border border-input bg-muted/30 text-sm tabular-nums">
                                       {horas > 0 ? horas.toFixed(2) : '—'}
                                     </div>
@@ -1050,17 +1055,19 @@ export default function TermoEncerramentoPage() {
                                       {totalLinha > 0 ? formatCurrency(totalLinha) : '—'}
                                     </div>
                                   </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                                    onClick={() => handleRemoveCusto(index)}
-                                    disabled={normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'E'}
-                                    aria-label={t('common.remove')}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  {!isDocumentador && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                                      onClick={() => handleRemoveCusto(index)}
+                                      disabled={normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'E'}
+                                      aria-label={t('common.remove')}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </div>
                                 {custoErrors[index] && (
                                   <p className="text-xs text-destructive">{custoErrors[index]}</p>
@@ -1115,18 +1122,20 @@ export default function TermoEncerramentoPage() {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleDeleteDocument}
-                      disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoEncerramento(demanda?.status ?? demanda?.situacao)}
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title={t('closingTerm.deleteDocument')}
-                      aria-label={t('closingTerm.deleteDocument')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!isDocumentador && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDeleteDocument}
+                        disabled={isDeletingDoc || isSaving || isDeleting || !canDeleteDocTermoEncerramento(demanda?.status ?? demanda?.situacao)}
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title={t('closingTerm.deleteDocument')}
+                        aria-label={t('closingTerm.deleteDocument')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1149,13 +1158,15 @@ export default function TermoEncerramentoPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="min-w-[220px]">
-                        <DropdownMenuItem
-                          onClick={handleGeneratePdf}
-                          disabled={!canUploadTermoEncerramento(demanda?.status)}
-                        >
-                          <FileDown className="h-4 w-4 mr-2" />
-                          {t('closingTerm.generatePdf')}
-                        </DropdownMenuItem>
+                        {user?.perfil !== 'D' && (
+                          <DropdownMenuItem
+                            onClick={handleGeneratePdf}
+                            disabled={!canUploadTermoEncerramento(demanda?.status)}
+                          >
+                            <FileDown className="h-4 w-4 mr-2" />
+                            {t('closingTerm.generatePdf')}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={handleOpenUpload}
                           disabled={!canUploadTermoEncerramento(demanda?.status)}
@@ -1170,7 +1181,7 @@ export default function TermoEncerramentoPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  {selectedTermo && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                  {!isDocumentador && selectedTermo && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -1188,7 +1199,7 @@ export default function TermoEncerramentoPage() {
                   <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving || isDeleting}>
                     {t('common.cancel')}
                   </Button>
-                  {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) === 'F' && execucao?.status === 'CONCLUIDA' && (
+                  {!isDocumentador && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) === 'F' && execucao?.status === 'CONCLUIDA' && (
                     <LoadingButton
                       type="button"
                       variant="outline"
@@ -1202,7 +1213,7 @@ export default function TermoEncerramentoPage() {
                       {t('closingTerm.reabrirExecucao', 'Reabrir execução')}
                     </LoadingButton>
                   )}
-                  {normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
+                  {!isDocumentador && normalizeDemandaStatus(demanda?.status ?? demanda?.situacao) !== 'G' && (
                     <LoadingButton
                       type="submit"
                       isLoading={isSaving}

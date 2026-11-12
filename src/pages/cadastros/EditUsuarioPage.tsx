@@ -231,6 +231,7 @@ export default function EditUsuarioPage() {
                     <SelectItem value="A">{t('users.administrator')}</SelectItem>
                     <SelectItem value="O">{t('users.operator')}</SelectItem>
                     <SelectItem value="V">{t('users.viewer')}</SelectItem>
+                    <SelectItem value="D">{t('users.documentador')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

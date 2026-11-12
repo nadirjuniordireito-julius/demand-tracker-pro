@@ -31,6 +31,7 @@ const getProfileLabel = (perfil: UserProfile, t: (key: string) => string) => {
     A: t('users.administrator'),
     O: t('users.operator'),
     V: t('users.viewer'),
+    D: t('users.documentador'),
   };
   return labels[perfil];
 };

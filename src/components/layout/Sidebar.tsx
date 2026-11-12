@@ -227,13 +227,16 @@ export function Sidebar({ isCollapsed, onToggleSidebar, onCollapseSidebar }: Sid
           isCollapsed={isCollapsed}
           end
         />
-        <NavItem 
-          to="/dashboard" 
-          icon={<LayoutDashboard className="h-5 w-5" />} 
-          label={t('nav.dashboard')} 
-          isCollapsed={isCollapsed}
-          onClick={onCollapseSidebar}
-        />
+        {/* Dashboard - Documentador (D) vê apenas Home e Demandas */}
+        {user?.perfil !== 'D' && (
+          <NavItem 
+            to="/dashboard" 
+            icon={<LayoutDashboard className="h-5 w-5" />} 
+            label={t('nav.dashboard')} 
+            isCollapsed={isCollapsed}
+            onClick={onCollapseSidebar}
+          />
+        )}
 
         {/* Cadastros Group - apenas perfil Admin (A) */}
         {user?.perfil === 'A' && (
@@ -304,7 +307,7 @@ export function Sidebar({ isCollapsed, onToggleSidebar, onCollapseSidebar }: Sid
           </NavGroup>
         )}
 
-        {/* Demandas Group - Visualizador (V) não vê submenu Demanda Técnica */}
+        {/* Demandas: V não vê Demanda Técnica; D vê só Demanda Técnica */}
         <NavGroup
           id={DEMANDAS_GROUP_ID}
           icon={<FileText className="h-5 w-5" />}
@@ -324,7 +327,7 @@ export function Sidebar({ isCollapsed, onToggleSidebar, onCollapseSidebar }: Sid
               end
             />
           )}
-          {user?.perfil !== 'V' && (
+          {user?.perfil !== 'V' && user?.perfil !== 'D' && (
             <NavItem 
               to="/execucao-demandas" 
               icon={<Settings2 className="h-4 w-4" />} 
@@ -333,16 +336,18 @@ export function Sidebar({ isCollapsed, onToggleSidebar, onCollapseSidebar }: Sid
               end
             />
           )}
-          <NavItem 
-            to="/demandas/health-map" 
-            icon={<HeartPulse className="h-4 w-4" />} 
-            label={t('nav.healthMap')} 
-            isCollapsed={isCollapsed}
-            end
-          />
+          {user?.perfil !== 'D' && (
+            <NavItem 
+              to="/demandas/health-map" 
+              icon={<HeartPulse className="h-4 w-4" />} 
+              label={t('nav.healthMap')} 
+              isCollapsed={isCollapsed}
+              end
+            />
+          )}
         </NavGroup>
 
-        {user?.perfil !== 'V' && (
+        {user?.perfil !== 'V' && user?.perfil !== 'D' && (
           <NavGroup
             id={GERENCIAL_GROUP_ID}
             icon={<BarChart3 className="h-5 w-5" />}
