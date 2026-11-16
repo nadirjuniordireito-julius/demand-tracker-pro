@@ -71,6 +71,7 @@ export function TermoEncerramentoAnexosModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const statusCode = normalizeDemandaStatus(demandaStatus);
+  
   const canEdit = true; // statusCode === 'E' || statusCode === 'F';
 
   const loadAnexos = useCallback(async () => {
